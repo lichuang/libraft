@@ -10,7 +10,11 @@ using namespace std;
 using namespace raftpb;
 
 enum ErrorCode {
-  Success = 0,
+  Success                           = 0,
+  ErrCompacted                      = 1,
+  ErrSnapOutOfDate                  = 2,
+  ErrUnavailable                    = 3,
+  ErrSnapshotTemporarilyUnavailable = 4
 };
 
 #define SUCCESS(err) (err == SUCCESS)
@@ -46,6 +50,7 @@ public:
   virtual int InitialState(HardState *, ConfState *) = 0;
   virtual int FirstIndex(uint64_t *index) = 0;
   virtual int LastIndex(uint64_t *index) = 0;
+  virtual int Term(uint64_t i, uint64_t *term) = 0;
 };
 
 class Logger {

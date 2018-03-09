@@ -25,6 +25,7 @@ struct raftLog {
   int term(uint64_t i, uint64_t *t);
 
   uint64_t firstIndex();
+  uint64_t lastIndex();
 };
 
 extern raftLog* newLog(Storage *storage, Logger *logger);

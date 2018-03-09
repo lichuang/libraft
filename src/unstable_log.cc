@@ -67,7 +67,7 @@ void unstableLog::restore(Snapshot *snapshot) {
   snapshot_ = snapshot;
 }
 
-void unstableLog::truncateAndAppend(const vector<Entry> entries) {
+void unstableLog::truncateAndAppend(const vector<Entry>& entries) {
   uint64_t after = entries[0].index();
 
   if (after == offset_ + uint64_t(entries_.size())) {
