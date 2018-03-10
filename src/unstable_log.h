@@ -3,24 +3,29 @@
 
 #include "libraft.h"
 
+// unstable.entries[i] has raft log position i+unstable.offset.
+// Note that unstable.offset may be less than the highest log
+// position in storage; this means that the next write to storage
+// might need to truncate the log before persisting unstable.entries.
 struct unstableLog {
+  unstableLog()
+    : snapshot_(NULL) {
+  }
+
+  // the incoming unstable snapshot, if any.
   Snapshot *snapshot_;
 
-  vector<Entry> entries_;
+  // all entries that have not yet been written to storage.
+  EntryVec entries_;
   uint64_t offset_;
   Logger *logger_;
 
-  // return the index of the first possible entry in entries
-  // if it has a snapshot
-  // return 0 otherwise
+  void truncateAndAppend(const EntryVec& entries);
+
   uint64_t maybeFirstIndex();
 
-  // maybeLastIndex returns the last index if it has at least one
-  // unstable entry or snapshot.
   uint64_t maybeLastIndex();
 
-  // maybeTerm returns the term of the entry at index i, if there
-  // is any.
   uint64_t maybeTerm(uint64_t i);
 
   void stableTo(uint64_t i, uint64_t t);
@@ -29,9 +34,7 @@ struct unstableLog {
 
   void restore(Snapshot *snapshot);
 
-  void truncateAndAppend(const vector<Entry> entries);
-
-  void slice(uint64_t lo, uint64_t hi, vector<Entry> *entries);
+  void slice(uint64_t lo, uint64_t hi, EntryVec *entries);
 
   void mustCheckOutOfBounds(uint64_t lo, uint64_t hi);
 };

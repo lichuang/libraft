@@ -2,6 +2,7 @@
 #define __LIB_RAFT_H__
 
 #include <stdint.h>
+#include <climits>
 #include <string>
 #include <vector>
 #include "../src/raft.pb.h"
@@ -9,15 +10,18 @@
 using namespace std;
 using namespace raftpb;
 
+const static uint64_t None = 0;
+const static uint64_t noLimit = ULONG_MAX;
+
 enum ErrorCode {
-  Success                           = 0,
+  OK                                = 0,
   ErrCompacted                      = 1,
   ErrSnapOutOfDate                  = 2,
   ErrUnavailable                    = 3,
   ErrSnapshotTemporarilyUnavailable = 4
 };
 
-#define SUCCESS(err) (err == SUCCESS)
+#define SUCCESS(err) (err == OK)
 
 enum RaftState {
   StateFollower = 1,
@@ -36,6 +40,8 @@ struct ReadState {
   string   requestCtx;
 };
 
+typedef vector<Entry> EntryVec;
+
 struct Ready {
   SoftState         softState;
   HardState         hardState;
@@ -51,6 +57,8 @@ public:
   virtual int FirstIndex(uint64_t *index) = 0;
   virtual int LastIndex(uint64_t *index) = 0;
   virtual int Term(uint64_t i, uint64_t *term) = 0;
+  virtual int Entries(uint64_t lo, uint64_t hi, uint64_t maxSize, vector<Entry> *entries) = 0;
+  virtual int Snapshot(Snapshot **snapshot) = 0;
 };
 
 class Logger {
@@ -91,6 +99,6 @@ public:
 
 extern Node* StartNode(Config *config);
 extern Node* RestartNode(Config *config);
-extern string GetErrorString(int err);
+extern const char* GetErrorString(int err);
 
 #endif  // __LIB_RAFT_H__

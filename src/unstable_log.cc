@@ -1,13 +1,17 @@
 #include "unstable_log.h"
 
+// maybeFirstIndex returns the index of the first possible entry in entries
+// if it has a snapshot.
 uint64_t unstableLog::maybeFirstIndex() {
   if (snapshot_ != NULL) {
-    return snapshot_->metadata().index() + 1
+    return snapshot_->metadata().index() + 1;
   }
 
   return 0;
 }
 
+// maybeLastIndex returns the last index if it has at least one
+// unstable entry or snapshot.
 uint64_t unstableLog::maybeLastIndex() {
   if (entries_.size() > 0) {
     return offset_ + entries_.size() - 1;
@@ -20,6 +24,8 @@ uint64_t unstableLog::maybeLastIndex() {
   return 0;
 }
 
+// maybeTerm returns the term of the entry at index i, if there
+// is any.
 uint64_t unstableLog::maybeTerm(uint64_t i) {
   if (i < offset_) {
     if (snapshot_ == NULL) {
@@ -32,11 +38,7 @@ uint64_t unstableLog::maybeTerm(uint64_t i) {
     return 0;
   }
 
-  last = maybeLastIndex();
-  if (!last) {
-    return 0;
-  }
-
+  uint64_t last = maybeLastIndex();
   if (i > last) {
     return 0;
   }
@@ -44,7 +46,7 @@ uint64_t unstableLog::maybeTerm(uint64_t i) {
 }
 
 void unstableLog::stableTo(uint64_t i, uint64_t t) {
-  gt = maybeTerm(i);
+  uint64_t gt = maybeTerm(i);
   if (!gt) {
     return;
   }
@@ -56,7 +58,8 @@ void unstableLog::stableTo(uint64_t i, uint64_t t) {
 }
 
 void unstableLog::stableSnapTo(uint64_t i) {
-  if (snapshot_ != NULL && snapshot_.metadata().index() == i) {
+  if (snapshot_ != NULL && snapshot_->metadata().index() == i) {
+    delete snapshot_;
     snapshot_ = NULL;
   }
 }
@@ -67,40 +70,46 @@ void unstableLog::restore(Snapshot *snapshot) {
   snapshot_ = snapshot;
 }
 
-void unstableLog::truncateAndAppend(const vector<Entry>& entries) {
+void unstableLog::truncateAndAppend(const EntryVec& entries) {
   uint64_t after = entries[0].index();
 
   if (after == offset_ + uint64_t(entries_.size())) {
-    entries_ += entries;
+    // after is the next index in the u.entries
+    // directly append
+    entries_.insert(entries_.end(), entries.begin(), entries.end());
     return;
   }
 
-  if (after < offset_) {
+  if (after <= offset_) {
+    // The log is being truncated to before our current offset
+    // portion, so set the offset and replace the entries
     logger_->Infof("replace the unstable entries from index %d", after);
     offset_ = after;
     entries_ = entries;
     return;
   }
 
+  // truncate to after and copy to u.entries then append
   logger_->Infof("truncate the unstable entries before index %d", after);
   vector<Entry> slice;
-  slice(offset, after, &slice);
+  this->slice(offset_, after, &slice);
   entries_ = slice;
-  entries_ += entries;
+  entries_.insert(entries_.end(), entries.begin(), entries.end());
 }
 
-void unstableLog::slice(uint64_t lo, uint64_t hi, vector<Entry> *entries) {
+void unstableLog::slice(uint64_t lo, uint64_t hi, EntryVec *entries) {
   mustCheckOutOfBounds(lo, hi);
-  entries->assign(entries_->begin() + lo - offset_, entries_->begin() + hi - offset_);
+  entries->assign(entries_.begin() + lo - offset_, entries_.begin() + hi - offset_);
 }
 
+// u.offset <= lo <= hi <= u.offset+len(u.offset)
 void unstableLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
   if (lo > hi) {
-    log_->Fatalf("invalid unstable.slice %d > %d", lo, hi);
+    logger_->Fatalf("invalid unstable.slice %d > %d", lo, hi);
   }
 
-  upper = offset_ + (uint64_t)entries_.size();
-  if lo < offset_ || upper < hi {
-    log_->Fatalf("unstable.slice[%d,%d) out of bound [%d,%d]", lo, hi, u.offset, upper)
+  uint64_t upper = offset_ + (uint64_t)entries_.size();
+  if (lo < offset_ || upper < hi) {
+    logger_->Fatalf("unstable.slice[%d,%d) out of bound [%d,%d]", lo, hi, offset_, upper);
   }
 }

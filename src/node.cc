@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 NodeImpl::NodeImpl(Config *config)
-  : raft_(new Raft(config))
+  : raft_(newRaft(config))
   , logger_(config->logger) {
 }
 
