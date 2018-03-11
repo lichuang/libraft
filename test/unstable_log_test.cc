@@ -2,7 +2,7 @@
 #include "libraft.h"
 #include "util.h"
 #include "unstable_log.h"
-#include "logger.h"
+#include "default_logger.h"
 
 TEST(unstableLogTests, TestUnstableMaybeFirstIndex) {
   struct tmp {
