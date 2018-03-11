@@ -39,6 +39,9 @@ uint64_t unstableLog::maybeTerm(uint64_t i) {
   }
 
   uint64_t last = maybeLastIndex();
+  if (last == 0) {
+    return 0;
+  }
   if (i > last) {
     return 0;
   }

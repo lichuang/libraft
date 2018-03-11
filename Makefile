@@ -24,9 +24,9 @@ all:$(OBJS)
 	$(AR) $(LIB_DIR)/$(LIB) $(OBJS)
 
 test:$(TEST_OBJS)
-	$(CC) $(TEST_OBJS) test/main.cc -o test/test -lgtest -lprotobuf $(LIB_DIR)/$(LIB)
+	$(CC) $(TEST_OBJS) -o test/all_test -lgtest -lprotobuf $(LIB_DIR)/$(LIB)
 
-$(TEST_DIR)/%.o:$(TEST_DIR)/*test.$(EXTENSION)
+$(TEST_DIR)/%.o:$(TEST_DIR)/%.$(EXTENSION)
 	$(CC) $< -o $@ -c $(CFLAGS) $(INCLUDE) 
 
 unstable_log_test:$(TEST_DIR)/unstable_log_test.cc
@@ -41,4 +41,4 @@ rebuild:
 	make
 
 clean:
-	rm -rf $(TEST_OBJS) $(OBJS) $(BIN_DIR)/* $(LIB_DIR)/*
+	rm -rf $(TEST_OBJS) $(OBJS) $(BIN_DIR)/* $(LIB_DIR)/* $(TEST_DIR)/all_test

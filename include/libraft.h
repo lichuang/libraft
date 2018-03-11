@@ -1,7 +1,7 @@
 #ifndef __LIB_RAFT_H__
 #define __LIB_RAFT_H__
 
-#include <stdint.h>
+#include <cstdint>
 #include <climits>
 #include <string>
 #include <vector>
