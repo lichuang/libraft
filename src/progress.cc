@@ -108,7 +108,7 @@ bool Progress::needSnapshotAbort() {
 
 void inflights::add(uint64_t infight) {
   if (full()) {
-    logger_->Fatalf("cannot add into a full inflights");
+    logger_->Fatalf(__FILE__, __LINE__, "cannot add into a full inflights");
   }
 
   uint64_t next = start_ + count_;

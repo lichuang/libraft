@@ -20,7 +20,9 @@ AR= ar rcu
 CFLAGS=-Wall -g -fno-strict-aliasing -O0 -export-dynamic -Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64 
 LDFLAGS= -L ./lib
 
-all:$(OBJS)
+all:lib
+
+lib:$(OBJS)
 	$(AR) $(LIB_DIR)/$(LIB) $(OBJS)
 
 test:$(TEST_OBJS)
