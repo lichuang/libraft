@@ -518,8 +518,11 @@ TEST(unstableLogTests, TestUnstableTruncateAndAppend) {
     entry.set_term(1);
     entries.push_back(entry); 
     
-    entry.set_index(5);
-    entry.set_term(2);
+    entry.set_index(6);
+    entry.set_term(1);
+    append.push_back(entry);
+    entry.set_index(7);
+    entry.set_term(1);
     append.push_back(entry);
 
     entry.set_index(5);
@@ -673,6 +676,6 @@ TEST(unstableLogTests, TestUnstableTruncateAndAppend) {
 
     unstable.truncateAndAppend(tests[i].toappend);
     EXPECT_EQ(unstable.offset_, tests[i].woffset) << "i: " << i << ", woffset: " << tests[i].woffset;
-    EXPECT_EQ(true, isDeepEqualEntries(unstable.entries_, tests[i].wentries));
+    EXPECT_EQ(true, isDeepEqualEntries(unstable.entries_, tests[i].wentries)) << "i: " << i;
   }
 }
