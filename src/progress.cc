@@ -1,5 +1,10 @@
 #include "progress.h"
 
+Progress::Progress(uint64_t next, int maxInfilght)
+  : next_(next),
+    ins_(new inflights(maxInfilght)) {
+}
+
 void Progress::resetState(ProgressState state) {
   paused_ = false;
   pendingSnapshot_ = 0;
@@ -85,11 +90,25 @@ void Progress::resume() {
   paused_ = false;
 }
 
+const char* Progress::stateString() {
+  if (state_ == ProgressStateProbe) {
+    return "ProgressStateProbe";
+  }
+  if (state_ == ProgressStateSnapshot) {
+    return "ProgressStateSnapshot";
+  }
+  if (state_ == ProgressStateReplicate) {
+    return "ProgressStateReplicate";
+  }
+
+  return "unknown state";
+}
+
 // IsPaused returns whether sending log entries to this node has been
 // paused. A node may be paused because it has rejected recent
 // MsgApps, is currently waiting for a snapshot, or has reached the
 // MaxInflightMsgs limit.
-bool Progress::IsPaused() {
+bool Progress::isPaused() {
   switch (state_) {
   case ProgressStateProbe:
     return paused_;
@@ -104,6 +123,13 @@ bool Progress::IsPaused() {
 // is equal or higher than the pendingSnapshot.
 bool Progress::needSnapshotAbort() {
   return state_ == ProgressStateSnapshot && match_ >= pendingSnapshot_;
+}
+
+string Progress::string() {
+  char tmp[500];
+  snprintf(tmp, sizeof(tmp), "next = %llu, match = %llu, state = %s, waiting = %d, pendingSnapshot = %llu",
+    next_, match_, stateString(), isPaused(), pendingSnapshot_);
+  return std::string(tmp);
 }
 
 void inflights::add(uint64_t infight) {

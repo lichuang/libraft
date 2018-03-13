@@ -25,6 +25,8 @@ struct inflights {
   void freeFirstOne();
   bool full();
   void reset();
+
+  inflights(int size) : size_(size) {}
 };
 
 enum ProgressState {
@@ -81,6 +83,7 @@ struct Progress {
   // received entry.
   inflights *ins_;
 
+  const char* stateString();
   void resetState(ProgressState state);
   void becomeProbe();
   void becomeReplicate();
@@ -90,8 +93,11 @@ struct Progress {
   bool maybeDecrTo(uint64_t last, uint64_t rejected);
   void pause();
   void resume();
-  bool IsPaused();
+  bool isPaused();
   bool needSnapshotAbort();
+  string string();
+
+  Progress(uint64_t next, int maxInfilght);
 };
 
 #endif  // __PROGRESS_H__

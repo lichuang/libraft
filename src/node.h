@@ -3,7 +3,7 @@
 
 #include "libraft.h"
 
-class Raft;
+struct raft;
 
 class NodeImpl : public Node {
 public:
@@ -14,7 +14,7 @@ public:
 private:
 
 private:
-  Raft *raft_;
+  raft *raft_;
   Logger *logger_;
 };
 

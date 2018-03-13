@@ -21,18 +21,18 @@ enum ErrorCode {
   ErrSnapshotTemporarilyUnavailable = 4
 };
 
-#define SUCCESS(err) (err == OK)
+inline bool SUCCESS(int err) { return err == OK; }
 
-enum RaftState {
-  StateFollower = 1,
-  StateCandidate = 2,
-  StateLeader = 3,
-  StatePreCandidate = 4
+enum StateType {
+  StateFollower = 0,
+  StateCandidate = 1,
+  StateLeader = 2,
+  StatePreCandidate = 3
 };
 
 struct SoftState {
   uint64_t leader;
-  RaftState state;
+  StateType state;
 };
 
 struct ReadState {
@@ -71,8 +71,15 @@ public:
 };
 
 enum ReadOnlyOption {
-  ReadOnlySafe        = 1,
-  ReadOnlyLeaseBased  = 2
+  // ReadOnlySafe guarantees the linearizability of the read only request by
+  // communicating with the quorum. It is the default and suggested option.
+  ReadOnlySafe = 1,
+  // ReadOnlyLeaseBased ensures linearizability of the read only request by
+  // relying on the leader lease. It can be affected by clock drift.
+  // If the clock drift is unbounded, leader might keep the lease longer than it
+  // should (clock can move backward/pause without any bound). ReadIndex is not safe
+  // in that case.
+  ReadOnlyLeaseBased = 2
 };
 
 struct Config {
@@ -85,6 +92,7 @@ struct Config {
   uint64_t          maxSizePerMsg;
   uint64_t          maxInflightMsgs;
   Logger*           logger;            
+  ReadOnlyOption    readOnlyOption;
 };
 
 class Node {

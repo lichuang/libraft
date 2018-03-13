@@ -2,6 +2,7 @@
 #include "raft.h"
 #include <unistd.h>
 
+
 NodeImpl::NodeImpl(Config *config)
   : raft_(newRaft(config))
   , logger_(config->logger) {

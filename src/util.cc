@@ -72,3 +72,51 @@ void limitSize(uint64_t maxSize, EntryVec *entries) {
 
   entries->erase(entries->begin() + limit, entries->end());
 }
+
+bool isHardStateEqual(const HardState& h1, const HardState& h2) {
+  return h1.term() == h2.term() &&
+         h1.vote() == h2.vote() &&
+         h1.commit() == h2.commit();
+}
+
+bool isEmptySnapshot(const Snapshot* snapshot) {
+  return snapshot->metadata().index() == 0;
+}
+
+int numOfPendingConf(const EntryVec& entries) {
+  size_t i;
+  int n = 0;
+  for (i = 0; i < entries.size(); ++i) {
+    if (entries[i].type() == EntryConfChange) {
+      ++n;
+    }
+  }
+
+  return n;
+}
+
+MessageType voteRespMsgType(MessageType t) {
+  if (t == MsgVote) {
+    return MsgVoteResp;
+  }
+  if (t == MsgPreVote) {
+    return MsgPreVoteResp;
+  }
+}
+
+const char* msgTypeString(int type) {
+  return "msg";
+}
+
+string joinStrings(const vector<string>& strs, const string &sep) {
+  string ret = "";
+  size_t i;
+  for (i = 0; i < strs.size(); ++i) {
+    if (ret.length() > 0) {
+      ret += sep;
+    }
+    ret += strs[i];
+  }
+
+  return ret;
+}

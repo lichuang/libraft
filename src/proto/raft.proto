@@ -50,20 +50,19 @@ enum MessageType {
   MsgPreVoteResp     = 18;
 }
 
-message PropData {
-}
-
-message AppendData {
-}
-
-message AppendRespData {
-}
-
 message Message {
-  required MessageType type = 1;
-  required uint64 to = 2;
-  required uint64 from = 3;
-  optional PropData prop = 4;
+  optional MessageType type        = 1;
+  optional uint64      to          = 2;
+  optional uint64      from        = 3;
+  optional uint64      term        = 4;
+  optional uint64      logTerm     = 5;
+  optional uint64      index       = 6;
+  repeated Entry       entries     = 7;
+  optional uint64      commit      = 8;
+  optional Snapshot    snapshot    = 9;
+  optional bool        reject      = 10;
+  optional uint64      rejectHint  = 11;
+  optional bytes       context     = 12; 
 }
 
 message HardState {

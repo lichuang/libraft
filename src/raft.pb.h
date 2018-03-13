@@ -37,7 +37,7 @@ namespace protobuf_raft_2eproto {
 struct TableStruct {
   static const ::google::protobuf::internal::ParseTableField entries[];
   static const ::google::protobuf::internal::AuxillaryParseTableField aux[];
-  static const ::google::protobuf::internal::ParseTable schema[10];
+  static const ::google::protobuf::internal::ParseTable schema[7];
   static const ::google::protobuf::internal::FieldMetadata field_metadata[];
   static const ::google::protobuf::internal::SerializationTable serialization_table[];
   static const ::google::protobuf::uint32 offsets[];
@@ -51,12 +51,6 @@ void InitDefaultsSnapshotMetadataImpl();
 void InitDefaultsSnapshotMetadata();
 void InitDefaultsSnapshotImpl();
 void InitDefaultsSnapshot();
-void InitDefaultsPropDataImpl();
-void InitDefaultsPropData();
-void InitDefaultsAppendDataImpl();
-void InitDefaultsAppendData();
-void InitDefaultsAppendRespDataImpl();
-void InitDefaultsAppendRespData();
 void InitDefaultsMessageImpl();
 void InitDefaultsMessage();
 void InitDefaultsHardStateImpl();
@@ -68,21 +62,12 @@ inline void InitDefaults() {
   InitDefaultsConfState();
   InitDefaultsSnapshotMetadata();
   InitDefaultsSnapshot();
-  InitDefaultsPropData();
-  InitDefaultsAppendData();
-  InitDefaultsAppendRespData();
   InitDefaultsMessage();
   InitDefaultsHardState();
   InitDefaultsConfChange();
 }
 }  // namespace protobuf_raft_2eproto
 namespace raftpb {
-class AppendData;
-class AppendDataDefaultTypeInternal;
-extern AppendDataDefaultTypeInternal _AppendData_default_instance_;
-class AppendRespData;
-class AppendRespDataDefaultTypeInternal;
-extern AppendRespDataDefaultTypeInternal _AppendRespData_default_instance_;
 class ConfChange;
 class ConfChangeDefaultTypeInternal;
 extern ConfChangeDefaultTypeInternal _ConfChange_default_instance_;
@@ -98,9 +83,6 @@ extern HardStateDefaultTypeInternal _HardState_default_instance_;
 class Message;
 class MessageDefaultTypeInternal;
 extern MessageDefaultTypeInternal _Message_default_instance_;
-class PropData;
-class PropDataDefaultTypeInternal;
-extern PropDataDefaultTypeInternal _PropData_default_instance_;
 class Snapshot;
 class SnapshotDefaultTypeInternal;
 extern SnapshotDefaultTypeInternal _Snapshot_default_instance_;
@@ -713,306 +695,6 @@ class Snapshot : public ::google::protobuf::Message /* @@protoc_insertion_point(
 };
 // -------------------------------------------------------------------
 
-class PropData : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:raftpb.PropData) */ {
- public:
-  PropData();
-  virtual ~PropData();
-
-  PropData(const PropData& from);
-
-  inline PropData& operator=(const PropData& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  #if LANG_CXX11
-  PropData(PropData&& from) noexcept
-    : PropData() {
-    *this = ::std::move(from);
-  }
-
-  inline PropData& operator=(PropData&& from) noexcept {
-    if (GetArenaNoVirtual() == from.GetArenaNoVirtual()) {
-      if (this != &from) InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-  #endif
-  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
-    return _internal_metadata_.unknown_fields();
-  }
-  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
-    return _internal_metadata_.mutable_unknown_fields();
-  }
-
-  static const ::google::protobuf::Descriptor* descriptor();
-  static const PropData& default_instance();
-
-  static void InitAsDefaultInstance();  // FOR INTERNAL USE ONLY
-  static inline const PropData* internal_default_instance() {
-    return reinterpret_cast<const PropData*>(
-               &_PropData_default_instance_);
-  }
-  static PROTOBUF_CONSTEXPR int const kIndexInFileMessages =
-    4;
-
-  void Swap(PropData* other);
-  friend void swap(PropData& a, PropData& b) {
-    a.Swap(&b);
-  }
-
-  // implements Message ----------------------------------------------
-
-  inline PropData* New() const PROTOBUF_FINAL { return New(NULL); }
-
-  PropData* New(::google::protobuf::Arena* arena) const PROTOBUF_FINAL;
-  void CopyFrom(const ::google::protobuf::Message& from) PROTOBUF_FINAL;
-  void MergeFrom(const ::google::protobuf::Message& from) PROTOBUF_FINAL;
-  void CopyFrom(const PropData& from);
-  void MergeFrom(const PropData& from);
-  void Clear() PROTOBUF_FINAL;
-  bool IsInitialized() const PROTOBUF_FINAL;
-
-  size_t ByteSizeLong() const PROTOBUF_FINAL;
-  bool MergePartialFromCodedStream(
-      ::google::protobuf::io::CodedInputStream* input) PROTOBUF_FINAL;
-  void SerializeWithCachedSizes(
-      ::google::protobuf::io::CodedOutputStream* output) const PROTOBUF_FINAL;
-  ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
-      bool deterministic, ::google::protobuf::uint8* target) const PROTOBUF_FINAL;
-  int GetCachedSize() const PROTOBUF_FINAL { return _cached_size_; }
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const PROTOBUF_FINAL;
-  void InternalSwap(PropData* other);
-  private:
-  inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
-    return NULL;
-  }
-  inline void* MaybeArenaPtr() const {
-    return NULL;
-  }
-  public:
-
-  ::google::protobuf::Metadata GetMetadata() const PROTOBUF_FINAL;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  // @@protoc_insertion_point(class_scope:raftpb.PropData)
- private:
-
-  ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
-  ::google::protobuf::internal::HasBits<1> _has_bits_;
-  mutable int _cached_size_;
-  friend struct ::protobuf_raft_2eproto::TableStruct;
-  friend void ::protobuf_raft_2eproto::InitDefaultsPropDataImpl();
-};
-// -------------------------------------------------------------------
-
-class AppendData : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:raftpb.AppendData) */ {
- public:
-  AppendData();
-  virtual ~AppendData();
-
-  AppendData(const AppendData& from);
-
-  inline AppendData& operator=(const AppendData& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  #if LANG_CXX11
-  AppendData(AppendData&& from) noexcept
-    : AppendData() {
-    *this = ::std::move(from);
-  }
-
-  inline AppendData& operator=(AppendData&& from) noexcept {
-    if (GetArenaNoVirtual() == from.GetArenaNoVirtual()) {
-      if (this != &from) InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-  #endif
-  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
-    return _internal_metadata_.unknown_fields();
-  }
-  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
-    return _internal_metadata_.mutable_unknown_fields();
-  }
-
-  static const ::google::protobuf::Descriptor* descriptor();
-  static const AppendData& default_instance();
-
-  static void InitAsDefaultInstance();  // FOR INTERNAL USE ONLY
-  static inline const AppendData* internal_default_instance() {
-    return reinterpret_cast<const AppendData*>(
-               &_AppendData_default_instance_);
-  }
-  static PROTOBUF_CONSTEXPR int const kIndexInFileMessages =
-    5;
-
-  void Swap(AppendData* other);
-  friend void swap(AppendData& a, AppendData& b) {
-    a.Swap(&b);
-  }
-
-  // implements Message ----------------------------------------------
-
-  inline AppendData* New() const PROTOBUF_FINAL { return New(NULL); }
-
-  AppendData* New(::google::protobuf::Arena* arena) const PROTOBUF_FINAL;
-  void CopyFrom(const ::google::protobuf::Message& from) PROTOBUF_FINAL;
-  void MergeFrom(const ::google::protobuf::Message& from) PROTOBUF_FINAL;
-  void CopyFrom(const AppendData& from);
-  void MergeFrom(const AppendData& from);
-  void Clear() PROTOBUF_FINAL;
-  bool IsInitialized() const PROTOBUF_FINAL;
-
-  size_t ByteSizeLong() const PROTOBUF_FINAL;
-  bool MergePartialFromCodedStream(
-      ::google::protobuf::io::CodedInputStream* input) PROTOBUF_FINAL;
-  void SerializeWithCachedSizes(
-      ::google::protobuf::io::CodedOutputStream* output) const PROTOBUF_FINAL;
-  ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
-      bool deterministic, ::google::protobuf::uint8* target) const PROTOBUF_FINAL;
-  int GetCachedSize() const PROTOBUF_FINAL { return _cached_size_; }
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const PROTOBUF_FINAL;
-  void InternalSwap(AppendData* other);
-  private:
-  inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
-    return NULL;
-  }
-  inline void* MaybeArenaPtr() const {
-    return NULL;
-  }
-  public:
-
-  ::google::protobuf::Metadata GetMetadata() const PROTOBUF_FINAL;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  // @@protoc_insertion_point(class_scope:raftpb.AppendData)
- private:
-
-  ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
-  ::google::protobuf::internal::HasBits<1> _has_bits_;
-  mutable int _cached_size_;
-  friend struct ::protobuf_raft_2eproto::TableStruct;
-  friend void ::protobuf_raft_2eproto::InitDefaultsAppendDataImpl();
-};
-// -------------------------------------------------------------------
-
-class AppendRespData : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:raftpb.AppendRespData) */ {
- public:
-  AppendRespData();
-  virtual ~AppendRespData();
-
-  AppendRespData(const AppendRespData& from);
-
-  inline AppendRespData& operator=(const AppendRespData& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  #if LANG_CXX11
-  AppendRespData(AppendRespData&& from) noexcept
-    : AppendRespData() {
-    *this = ::std::move(from);
-  }
-
-  inline AppendRespData& operator=(AppendRespData&& from) noexcept {
-    if (GetArenaNoVirtual() == from.GetArenaNoVirtual()) {
-      if (this != &from) InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-  #endif
-  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
-    return _internal_metadata_.unknown_fields();
-  }
-  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
-    return _internal_metadata_.mutable_unknown_fields();
-  }
-
-  static const ::google::protobuf::Descriptor* descriptor();
-  static const AppendRespData& default_instance();
-
-  static void InitAsDefaultInstance();  // FOR INTERNAL USE ONLY
-  static inline const AppendRespData* internal_default_instance() {
-    return reinterpret_cast<const AppendRespData*>(
-               &_AppendRespData_default_instance_);
-  }
-  static PROTOBUF_CONSTEXPR int const kIndexInFileMessages =
-    6;
-
-  void Swap(AppendRespData* other);
-  friend void swap(AppendRespData& a, AppendRespData& b) {
-    a.Swap(&b);
-  }
-
-  // implements Message ----------------------------------------------
-
-  inline AppendRespData* New() const PROTOBUF_FINAL { return New(NULL); }
-
-  AppendRespData* New(::google::protobuf::Arena* arena) const PROTOBUF_FINAL;
-  void CopyFrom(const ::google::protobuf::Message& from) PROTOBUF_FINAL;
-  void MergeFrom(const ::google::protobuf::Message& from) PROTOBUF_FINAL;
-  void CopyFrom(const AppendRespData& from);
-  void MergeFrom(const AppendRespData& from);
-  void Clear() PROTOBUF_FINAL;
-  bool IsInitialized() const PROTOBUF_FINAL;
-
-  size_t ByteSizeLong() const PROTOBUF_FINAL;
-  bool MergePartialFromCodedStream(
-      ::google::protobuf::io::CodedInputStream* input) PROTOBUF_FINAL;
-  void SerializeWithCachedSizes(
-      ::google::protobuf::io::CodedOutputStream* output) const PROTOBUF_FINAL;
-  ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
-      bool deterministic, ::google::protobuf::uint8* target) const PROTOBUF_FINAL;
-  int GetCachedSize() const PROTOBUF_FINAL { return _cached_size_; }
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const PROTOBUF_FINAL;
-  void InternalSwap(AppendRespData* other);
-  private:
-  inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
-    return NULL;
-  }
-  inline void* MaybeArenaPtr() const {
-    return NULL;
-  }
-  public:
-
-  ::google::protobuf::Metadata GetMetadata() const PROTOBUF_FINAL;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  // @@protoc_insertion_point(class_scope:raftpb.AppendRespData)
- private:
-
-  ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
-  ::google::protobuf::internal::HasBits<1> _has_bits_;
-  mutable int _cached_size_;
-  friend struct ::protobuf_raft_2eproto::TableStruct;
-  friend void ::protobuf_raft_2eproto::InitDefaultsAppendRespDataImpl();
-};
-// -------------------------------------------------------------------
-
 class Message : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:raftpb.Message) */ {
  public:
   Message();
@@ -1055,7 +737,7 @@ class Message : public ::google::protobuf::Message /* @@protoc_insertion_point(c
                &_Message_default_instance_);
   }
   static PROTOBUF_CONSTEXPR int const kIndexInFileMessages =
-    7;
+    4;
 
   void Swap(Message* other);
   friend void swap(Message& a, Message& b) {
@@ -1102,35 +784,104 @@ class Message : public ::google::protobuf::Message /* @@protoc_insertion_point(c
 
   // accessors -------------------------------------------------------
 
-  // optional .raftpb.PropData prop = 4;
-  bool has_prop() const;
-  void clear_prop();
-  static const int kPropFieldNumber = 4;
-  const ::raftpb::PropData& prop() const;
-  ::raftpb::PropData* release_prop();
-  ::raftpb::PropData* mutable_prop();
-  void set_allocated_prop(::raftpb::PropData* prop);
+  // repeated .raftpb.Entry entries = 7;
+  int entries_size() const;
+  void clear_entries();
+  static const int kEntriesFieldNumber = 7;
+  const ::raftpb::Entry& entries(int index) const;
+  ::raftpb::Entry* mutable_entries(int index);
+  ::raftpb::Entry* add_entries();
+  ::google::protobuf::RepeatedPtrField< ::raftpb::Entry >*
+      mutable_entries();
+  const ::google::protobuf::RepeatedPtrField< ::raftpb::Entry >&
+      entries() const;
 
-  // required uint64 to = 2;
+  // optional bytes context = 12;
+  bool has_context() const;
+  void clear_context();
+  static const int kContextFieldNumber = 12;
+  const ::std::string& context() const;
+  void set_context(const ::std::string& value);
+  #if LANG_CXX11
+  void set_context(::std::string&& value);
+  #endif
+  void set_context(const char* value);
+  void set_context(const void* value, size_t size);
+  ::std::string* mutable_context();
+  ::std::string* release_context();
+  void set_allocated_context(::std::string* context);
+
+  // optional .raftpb.Snapshot snapshot = 9;
+  bool has_snapshot() const;
+  void clear_snapshot();
+  static const int kSnapshotFieldNumber = 9;
+  const ::raftpb::Snapshot& snapshot() const;
+  ::raftpb::Snapshot* release_snapshot();
+  ::raftpb::Snapshot* mutable_snapshot();
+  void set_allocated_snapshot(::raftpb::Snapshot* snapshot);
+
+  // optional uint64 to = 2;
   bool has_to() const;
   void clear_to();
   static const int kToFieldNumber = 2;
   ::google::protobuf::uint64 to() const;
   void set_to(::google::protobuf::uint64 value);
 
-  // required uint64 from = 3;
+  // optional uint64 from = 3;
   bool has_from() const;
   void clear_from();
   static const int kFromFieldNumber = 3;
   ::google::protobuf::uint64 from() const;
   void set_from(::google::protobuf::uint64 value);
 
-  // required .raftpb.MessageType type = 1;
+  // optional uint64 term = 4;
+  bool has_term() const;
+  void clear_term();
+  static const int kTermFieldNumber = 4;
+  ::google::protobuf::uint64 term() const;
+  void set_term(::google::protobuf::uint64 value);
+
+  // optional uint64 logTerm = 5;
+  bool has_logterm() const;
+  void clear_logterm();
+  static const int kLogTermFieldNumber = 5;
+  ::google::protobuf::uint64 logterm() const;
+  void set_logterm(::google::protobuf::uint64 value);
+
+  // optional .raftpb.MessageType type = 1;
   bool has_type() const;
   void clear_type();
   static const int kTypeFieldNumber = 1;
   ::raftpb::MessageType type() const;
   void set_type(::raftpb::MessageType value);
+
+  // optional bool reject = 10;
+  bool has_reject() const;
+  void clear_reject();
+  static const int kRejectFieldNumber = 10;
+  bool reject() const;
+  void set_reject(bool value);
+
+  // optional uint64 index = 6;
+  bool has_index() const;
+  void clear_index();
+  static const int kIndexFieldNumber = 6;
+  ::google::protobuf::uint64 index() const;
+  void set_index(::google::protobuf::uint64 value);
+
+  // optional uint64 commit = 8;
+  bool has_commit() const;
+  void clear_commit();
+  static const int kCommitFieldNumber = 8;
+  ::google::protobuf::uint64 commit() const;
+  void set_commit(::google::protobuf::uint64 value);
+
+  // optional uint64 rejectHint = 11;
+  bool has_rejecthint() const;
+  void clear_rejecthint();
+  static const int kRejectHintFieldNumber = 11;
+  ::google::protobuf::uint64 rejecthint() const;
+  void set_rejecthint(::google::protobuf::uint64 value);
 
   // @@protoc_insertion_point(class_scope:raftpb.Message)
  private:
@@ -1140,19 +891,38 @@ class Message : public ::google::protobuf::Message /* @@protoc_insertion_point(c
   void clear_has_to();
   void set_has_from();
   void clear_has_from();
-  void set_has_prop();
-  void clear_has_prop();
-
-  // helper for ByteSizeLong()
-  size_t RequiredFieldsByteSizeFallback() const;
+  void set_has_term();
+  void clear_has_term();
+  void set_has_logterm();
+  void clear_has_logterm();
+  void set_has_index();
+  void clear_has_index();
+  void set_has_commit();
+  void clear_has_commit();
+  void set_has_snapshot();
+  void clear_has_snapshot();
+  void set_has_reject();
+  void clear_has_reject();
+  void set_has_rejecthint();
+  void clear_has_rejecthint();
+  void set_has_context();
+  void clear_has_context();
 
   ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
   ::google::protobuf::internal::HasBits<1> _has_bits_;
   mutable int _cached_size_;
-  ::raftpb::PropData* prop_;
+  ::google::protobuf::RepeatedPtrField< ::raftpb::Entry > entries_;
+  ::google::protobuf::internal::ArenaStringPtr context_;
+  ::raftpb::Snapshot* snapshot_;
   ::google::protobuf::uint64 to_;
   ::google::protobuf::uint64 from_;
+  ::google::protobuf::uint64 term_;
+  ::google::protobuf::uint64 logterm_;
   int type_;
+  bool reject_;
+  ::google::protobuf::uint64 index_;
+  ::google::protobuf::uint64 commit_;
+  ::google::protobuf::uint64 rejecthint_;
   friend struct ::protobuf_raft_2eproto::TableStruct;
   friend void ::protobuf_raft_2eproto::InitDefaultsMessageImpl();
 };
@@ -1200,7 +970,7 @@ class HardState : public ::google::protobuf::Message /* @@protoc_insertion_point
                &_HardState_default_instance_);
   }
   static PROTOBUF_CONSTEXPR int const kIndexInFileMessages =
-    8;
+    5;
 
   void Swap(HardState* other);
   friend void swap(HardState& a, HardState& b) {
@@ -1330,7 +1100,7 @@ class ConfChange : public ::google::protobuf::Message /* @@protoc_insertion_poin
                &_ConfChange_default_instance_);
   }
   static PROTOBUF_CONSTEXPR int const kIndexInFileMessages =
-    9;
+    6;
 
   void Swap(ConfChange* other);
   friend void swap(ConfChange& a, ConfChange& b) {
@@ -1844,29 +1614,17 @@ inline void Snapshot::set_allocated_metadata(::raftpb::SnapshotMetadata* metadat
 
 // -------------------------------------------------------------------
 
-// PropData
-
-// -------------------------------------------------------------------
-
-// AppendData
-
-// -------------------------------------------------------------------
-
-// AppendRespData
-
-// -------------------------------------------------------------------
-
 // Message
 
-// required .raftpb.MessageType type = 1;
+// optional .raftpb.MessageType type = 1;
 inline bool Message::has_type() const {
-  return (_has_bits_[0] & 0x00000008u) != 0;
+  return (_has_bits_[0] & 0x00000040u) != 0;
 }
 inline void Message::set_has_type() {
-  _has_bits_[0] |= 0x00000008u;
+  _has_bits_[0] |= 0x00000040u;
 }
 inline void Message::clear_has_type() {
-  _has_bits_[0] &= ~0x00000008u;
+  _has_bits_[0] &= ~0x00000040u;
 }
 inline void Message::clear_type() {
   type_ = 0;
@@ -1883,15 +1641,15 @@ inline void Message::set_type(::raftpb::MessageType value) {
   // @@protoc_insertion_point(field_set:raftpb.Message.type)
 }
 
-// required uint64 to = 2;
+// optional uint64 to = 2;
 inline bool Message::has_to() const {
-  return (_has_bits_[0] & 0x00000002u) != 0;
+  return (_has_bits_[0] & 0x00000004u) != 0;
 }
 inline void Message::set_has_to() {
-  _has_bits_[0] |= 0x00000002u;
+  _has_bits_[0] |= 0x00000004u;
 }
 inline void Message::clear_has_to() {
-  _has_bits_[0] &= ~0x00000002u;
+  _has_bits_[0] &= ~0x00000004u;
 }
 inline void Message::clear_to() {
   to_ = GOOGLE_ULONGLONG(0);
@@ -1907,15 +1665,15 @@ inline void Message::set_to(::google::protobuf::uint64 value) {
   // @@protoc_insertion_point(field_set:raftpb.Message.to)
 }
 
-// required uint64 from = 3;
+// optional uint64 from = 3;
 inline bool Message::has_from() const {
-  return (_has_bits_[0] & 0x00000004u) != 0;
+  return (_has_bits_[0] & 0x00000008u) != 0;
 }
 inline void Message::set_has_from() {
-  _has_bits_[0] |= 0x00000004u;
+  _has_bits_[0] |= 0x00000008u;
 }
 inline void Message::clear_has_from() {
-  _has_bits_[0] &= ~0x00000004u;
+  _has_bits_[0] &= ~0x00000008u;
 }
 inline void Message::clear_from() {
   from_ = GOOGLE_ULONGLONG(0);
@@ -1931,58 +1689,295 @@ inline void Message::set_from(::google::protobuf::uint64 value) {
   // @@protoc_insertion_point(field_set:raftpb.Message.from)
 }
 
-// optional .raftpb.PropData prop = 4;
-inline bool Message::has_prop() const {
-  return (_has_bits_[0] & 0x00000001u) != 0;
+// optional uint64 term = 4;
+inline bool Message::has_term() const {
+  return (_has_bits_[0] & 0x00000010u) != 0;
 }
-inline void Message::set_has_prop() {
-  _has_bits_[0] |= 0x00000001u;
+inline void Message::set_has_term() {
+  _has_bits_[0] |= 0x00000010u;
 }
-inline void Message::clear_has_prop() {
-  _has_bits_[0] &= ~0x00000001u;
+inline void Message::clear_has_term() {
+  _has_bits_[0] &= ~0x00000010u;
 }
-inline void Message::clear_prop() {
-  if (prop_ != NULL) prop_->Clear();
-  clear_has_prop();
+inline void Message::clear_term() {
+  term_ = GOOGLE_ULONGLONG(0);
+  clear_has_term();
 }
-inline const ::raftpb::PropData& Message::prop() const {
-  const ::raftpb::PropData* p = prop_;
-  // @@protoc_insertion_point(field_get:raftpb.Message.prop)
-  return p != NULL ? *p : *reinterpret_cast<const ::raftpb::PropData*>(
-      &::raftpb::_PropData_default_instance_);
+inline ::google::protobuf::uint64 Message::term() const {
+  // @@protoc_insertion_point(field_get:raftpb.Message.term)
+  return term_;
 }
-inline ::raftpb::PropData* Message::release_prop() {
-  // @@protoc_insertion_point(field_release:raftpb.Message.prop)
-  clear_has_prop();
-  ::raftpb::PropData* temp = prop_;
-  prop_ = NULL;
+inline void Message::set_term(::google::protobuf::uint64 value) {
+  set_has_term();
+  term_ = value;
+  // @@protoc_insertion_point(field_set:raftpb.Message.term)
+}
+
+// optional uint64 logTerm = 5;
+inline bool Message::has_logterm() const {
+  return (_has_bits_[0] & 0x00000020u) != 0;
+}
+inline void Message::set_has_logterm() {
+  _has_bits_[0] |= 0x00000020u;
+}
+inline void Message::clear_has_logterm() {
+  _has_bits_[0] &= ~0x00000020u;
+}
+inline void Message::clear_logterm() {
+  logterm_ = GOOGLE_ULONGLONG(0);
+  clear_has_logterm();
+}
+inline ::google::protobuf::uint64 Message::logterm() const {
+  // @@protoc_insertion_point(field_get:raftpb.Message.logTerm)
+  return logterm_;
+}
+inline void Message::set_logterm(::google::protobuf::uint64 value) {
+  set_has_logterm();
+  logterm_ = value;
+  // @@protoc_insertion_point(field_set:raftpb.Message.logTerm)
+}
+
+// optional uint64 index = 6;
+inline bool Message::has_index() const {
+  return (_has_bits_[0] & 0x00000100u) != 0;
+}
+inline void Message::set_has_index() {
+  _has_bits_[0] |= 0x00000100u;
+}
+inline void Message::clear_has_index() {
+  _has_bits_[0] &= ~0x00000100u;
+}
+inline void Message::clear_index() {
+  index_ = GOOGLE_ULONGLONG(0);
+  clear_has_index();
+}
+inline ::google::protobuf::uint64 Message::index() const {
+  // @@protoc_insertion_point(field_get:raftpb.Message.index)
+  return index_;
+}
+inline void Message::set_index(::google::protobuf::uint64 value) {
+  set_has_index();
+  index_ = value;
+  // @@protoc_insertion_point(field_set:raftpb.Message.index)
+}
+
+// repeated .raftpb.Entry entries = 7;
+inline int Message::entries_size() const {
+  return entries_.size();
+}
+inline void Message::clear_entries() {
+  entries_.Clear();
+}
+inline const ::raftpb::Entry& Message::entries(int index) const {
+  // @@protoc_insertion_point(field_get:raftpb.Message.entries)
+  return entries_.Get(index);
+}
+inline ::raftpb::Entry* Message::mutable_entries(int index) {
+  // @@protoc_insertion_point(field_mutable:raftpb.Message.entries)
+  return entries_.Mutable(index);
+}
+inline ::raftpb::Entry* Message::add_entries() {
+  // @@protoc_insertion_point(field_add:raftpb.Message.entries)
+  return entries_.Add();
+}
+inline ::google::protobuf::RepeatedPtrField< ::raftpb::Entry >*
+Message::mutable_entries() {
+  // @@protoc_insertion_point(field_mutable_list:raftpb.Message.entries)
+  return &entries_;
+}
+inline const ::google::protobuf::RepeatedPtrField< ::raftpb::Entry >&
+Message::entries() const {
+  // @@protoc_insertion_point(field_list:raftpb.Message.entries)
+  return entries_;
+}
+
+// optional uint64 commit = 8;
+inline bool Message::has_commit() const {
+  return (_has_bits_[0] & 0x00000200u) != 0;
+}
+inline void Message::set_has_commit() {
+  _has_bits_[0] |= 0x00000200u;
+}
+inline void Message::clear_has_commit() {
+  _has_bits_[0] &= ~0x00000200u;
+}
+inline void Message::clear_commit() {
+  commit_ = GOOGLE_ULONGLONG(0);
+  clear_has_commit();
+}
+inline ::google::protobuf::uint64 Message::commit() const {
+  // @@protoc_insertion_point(field_get:raftpb.Message.commit)
+  return commit_;
+}
+inline void Message::set_commit(::google::protobuf::uint64 value) {
+  set_has_commit();
+  commit_ = value;
+  // @@protoc_insertion_point(field_set:raftpb.Message.commit)
+}
+
+// optional .raftpb.Snapshot snapshot = 9;
+inline bool Message::has_snapshot() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void Message::set_has_snapshot() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void Message::clear_has_snapshot() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void Message::clear_snapshot() {
+  if (snapshot_ != NULL) snapshot_->Clear();
+  clear_has_snapshot();
+}
+inline const ::raftpb::Snapshot& Message::snapshot() const {
+  const ::raftpb::Snapshot* p = snapshot_;
+  // @@protoc_insertion_point(field_get:raftpb.Message.snapshot)
+  return p != NULL ? *p : *reinterpret_cast<const ::raftpb::Snapshot*>(
+      &::raftpb::_Snapshot_default_instance_);
+}
+inline ::raftpb::Snapshot* Message::release_snapshot() {
+  // @@protoc_insertion_point(field_release:raftpb.Message.snapshot)
+  clear_has_snapshot();
+  ::raftpb::Snapshot* temp = snapshot_;
+  snapshot_ = NULL;
   return temp;
 }
-inline ::raftpb::PropData* Message::mutable_prop() {
-  set_has_prop();
-  if (prop_ == NULL) {
-    prop_ = new ::raftpb::PropData;
+inline ::raftpb::Snapshot* Message::mutable_snapshot() {
+  set_has_snapshot();
+  if (snapshot_ == NULL) {
+    snapshot_ = new ::raftpb::Snapshot;
   }
-  // @@protoc_insertion_point(field_mutable:raftpb.Message.prop)
-  return prop_;
+  // @@protoc_insertion_point(field_mutable:raftpb.Message.snapshot)
+  return snapshot_;
 }
-inline void Message::set_allocated_prop(::raftpb::PropData* prop) {
+inline void Message::set_allocated_snapshot(::raftpb::Snapshot* snapshot) {
   ::google::protobuf::Arena* message_arena = GetArenaNoVirtual();
   if (message_arena == NULL) {
-    delete prop_;
+    delete snapshot_;
   }
-  if (prop) {
+  if (snapshot) {
     ::google::protobuf::Arena* submessage_arena = NULL;
     if (message_arena != submessage_arena) {
-      prop = ::google::protobuf::internal::GetOwnedMessage(
-          message_arena, prop, submessage_arena);
+      snapshot = ::google::protobuf::internal::GetOwnedMessage(
+          message_arena, snapshot, submessage_arena);
     }
-    set_has_prop();
+    set_has_snapshot();
   } else {
-    clear_has_prop();
+    clear_has_snapshot();
   }
-  prop_ = prop;
-  // @@protoc_insertion_point(field_set_allocated:raftpb.Message.prop)
+  snapshot_ = snapshot;
+  // @@protoc_insertion_point(field_set_allocated:raftpb.Message.snapshot)
+}
+
+// optional bool reject = 10;
+inline bool Message::has_reject() const {
+  return (_has_bits_[0] & 0x00000080u) != 0;
+}
+inline void Message::set_has_reject() {
+  _has_bits_[0] |= 0x00000080u;
+}
+inline void Message::clear_has_reject() {
+  _has_bits_[0] &= ~0x00000080u;
+}
+inline void Message::clear_reject() {
+  reject_ = false;
+  clear_has_reject();
+}
+inline bool Message::reject() const {
+  // @@protoc_insertion_point(field_get:raftpb.Message.reject)
+  return reject_;
+}
+inline void Message::set_reject(bool value) {
+  set_has_reject();
+  reject_ = value;
+  // @@protoc_insertion_point(field_set:raftpb.Message.reject)
+}
+
+// optional uint64 rejectHint = 11;
+inline bool Message::has_rejecthint() const {
+  return (_has_bits_[0] & 0x00000400u) != 0;
+}
+inline void Message::set_has_rejecthint() {
+  _has_bits_[0] |= 0x00000400u;
+}
+inline void Message::clear_has_rejecthint() {
+  _has_bits_[0] &= ~0x00000400u;
+}
+inline void Message::clear_rejecthint() {
+  rejecthint_ = GOOGLE_ULONGLONG(0);
+  clear_has_rejecthint();
+}
+inline ::google::protobuf::uint64 Message::rejecthint() const {
+  // @@protoc_insertion_point(field_get:raftpb.Message.rejectHint)
+  return rejecthint_;
+}
+inline void Message::set_rejecthint(::google::protobuf::uint64 value) {
+  set_has_rejecthint();
+  rejecthint_ = value;
+  // @@protoc_insertion_point(field_set:raftpb.Message.rejectHint)
+}
+
+// optional bytes context = 12;
+inline bool Message::has_context() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void Message::set_has_context() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void Message::clear_has_context() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void Message::clear_context() {
+  context_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  clear_has_context();
+}
+inline const ::std::string& Message::context() const {
+  // @@protoc_insertion_point(field_get:raftpb.Message.context)
+  return context_.GetNoArena();
+}
+inline void Message::set_context(const ::std::string& value) {
+  set_has_context();
+  context_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), value);
+  // @@protoc_insertion_point(field_set:raftpb.Message.context)
+}
+#if LANG_CXX11
+inline void Message::set_context(::std::string&& value) {
+  set_has_context();
+  context_.SetNoArena(
+    &::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
+  // @@protoc_insertion_point(field_set_rvalue:raftpb.Message.context)
+}
+#endif
+inline void Message::set_context(const char* value) {
+  GOOGLE_DCHECK(value != NULL);
+  set_has_context();
+  context_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
+  // @@protoc_insertion_point(field_set_char:raftpb.Message.context)
+}
+inline void Message::set_context(const void* value, size_t size) {
+  set_has_context();
+  context_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
+      ::std::string(reinterpret_cast<const char*>(value), size));
+  // @@protoc_insertion_point(field_set_pointer:raftpb.Message.context)
+}
+inline ::std::string* Message::mutable_context() {
+  set_has_context();
+  // @@protoc_insertion_point(field_mutable:raftpb.Message.context)
+  return context_.MutableNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline ::std::string* Message::release_context() {
+  // @@protoc_insertion_point(field_release:raftpb.Message.context)
+  clear_has_context();
+  return context_.ReleaseNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline void Message::set_allocated_context(::std::string* context) {
+  if (context != NULL) {
+    set_has_context();
+  } else {
+    clear_has_context();
+  }
+  context_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), context);
+  // @@protoc_insertion_point(field_set_allocated:raftpb.Message.context)
 }
 
 // -------------------------------------------------------------------
@@ -2204,12 +2199,6 @@ inline void ConfChange::set_allocated_context(::std::string* context) {
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
-// -------------------------------------------------------------------
-
-// -------------------------------------------------------------------
-
-// -------------------------------------------------------------------
-
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------
