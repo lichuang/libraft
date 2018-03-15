@@ -9,6 +9,7 @@
 using namespace std;
 
 struct readOnly;
+struct ReadState;
 
 enum CampaignType {
   // campaignPreElection represents the first phase of a normal election when
@@ -26,6 +27,7 @@ struct raft {
   uint64_t term_;
   uint64_t vote_;
 
+  vector<ReadState*> readStates_;
   raftLog *raftLog_;
   int maxInfilght_;
   uint64_t maxMsgSize_;
@@ -64,6 +66,8 @@ struct raft {
   Logger* logger_;
 
   raft(Config *, raftLog *);
+  void tick();
+  const char* getCampaignString(CampaignType t);
   void loadState(const HardState &hs);
   void nodes(vector<uint64_t> *nodes);
   bool hasLeader();
@@ -74,6 +78,7 @@ struct raft {
   void sendAppend(uint64_t to);
   void sendHeartbeat(uint64_t to, const string &ctx);
   void bcastAppend();
+  void bcastHeartbeat();
   void bcastHeartbeatWithCtx(const string &ctx);
   void becomeFollower(uint64_t term, uint64_t leader);
   void becomeCandidate();
@@ -82,14 +87,26 @@ struct raft {
   bool maybeCommit();
   void reset(uint64_t term);
   void appendEntry(EntryVec* entries);
+  void handleAppendEntries(Message *msg);
+  void handleHeartbeat(Message *msg);
+  void handleSnapshot(Message *msg);
   void tickElection();
   void tickHeartbeat();
   int  poll(uint64_t id, MessageType t, bool v);
   int  step(Message *msg);
+  bool stepFollower(Message *msg);
+  bool stepCandidate(Message *msg);
+  bool stepLeader(Message *msg);
   bool promotable();
+  bool restore(const Snapshot& snapshot);
+  void delProgress(uint64_t id);
+  void addNode(uint64_t id);
+  void removeNode(uint64_t id);
   bool pastElectionTimeout();
   void resetRandomizedElectionTimeout();
+  void setProgress(uint64_t id, uint64_t match, uint64_t next);
   void abortLeaderTransfer();
+  bool proxyMessage(Message *msg);
 };
 extern raft* newRaft(Config *);
 

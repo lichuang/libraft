@@ -95,17 +95,11 @@ int numOfPendingConf(const EntryVec& entries) {
   return n;
 }
 
-MessageType voteRespMsgType(MessageType t) {
+MessageType voteRespMsgType(int t) {
   if (t == MsgVote) {
     return MsgVoteResp;
   }
-  if (t == MsgPreVote) {
-    return MsgPreVoteResp;
-  }
-}
-
-const char* msgTypeString(int type) {
-  return "msg";
+  return MsgPreVoteResp;
 }
 
 string joinStrings(const vector<string>& strs, const string &sep) {

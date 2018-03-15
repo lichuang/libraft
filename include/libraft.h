@@ -35,9 +35,17 @@ struct SoftState {
   StateType state;
 };
 
+// ReadState provides state for read only query.
+// It's caller's responsibility to call ReadIndex first before getting
+// this state from ready, It's also caller's duty to differentiate if this
+// state is what it requests through RequestCtx, eg. given a unique id as
+// RequestCtx
 struct ReadState {
-  uint64_t index;
-  string   requestCtx;
+  uint64_t index_;
+  string   requestCtx_;
+  ReadState(uint64_t index, const string &ctx)
+    : index_(index),
+      requestCtx_(ctx) {}
 };
 
 typedef vector<Entry> EntryVec;

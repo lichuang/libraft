@@ -43,5 +43,5 @@ public:
   }
 };
 
-DefaultLogger kDefaultLogger;
+extern DefaultLogger kDefaultLogger;
 #endif // __LOGGER_H__

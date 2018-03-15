@@ -15,7 +15,7 @@ struct inflights {
 
   // buffer contains the index of the last entry
   // inside one message.
-  vector<uint64_t>* buffer_;
+  vector<uint64_t> buffer_;
 
   Logger* logger_;
 
@@ -26,7 +26,15 @@ struct inflights {
   bool full();
   void reset();
 
-  inflights(int size) : size_(size) {}
+  inflights(int size, Logger *logger)
+    : start_(0),
+      count_(0),
+      size_(size),
+      logger_(logger) {
+    buffer_.resize(size);
+  }
+  ~inflights() {
+  }
 };
 
 enum ProgressState {
@@ -82,6 +90,7 @@ struct Progress {
   // be freed by calling inflights.freeTo with the index of the last
   // received entry.
   inflights *ins_;
+  Logger* logger_;
 
   const char* stateString();
   void resetState(ProgressState state);
@@ -91,13 +100,15 @@ struct Progress {
   bool maybeUpdate(uint64_t n);
   void optimisticUpdate(uint64_t n);
   bool maybeDecrTo(uint64_t last, uint64_t rejected);
+  void snapshotFailure();
   void pause();
   void resume();
   bool isPaused();
   bool needSnapshotAbort();
   string string();
 
-  Progress(uint64_t next, int maxInfilght);
+  Progress(uint64_t next, int maxInfilght, Logger *logger);
+  ~Progress();
 };
 
 #endif  // __PROGRESS_H__

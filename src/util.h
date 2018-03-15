@@ -10,9 +10,7 @@ bool isDeepEqualEntries(const EntryVec& ents1, const EntryVec& ents2);
 bool isHardStateEqual(const HardState& h1, const HardState& h2);
 bool isEmptySnapshot(const Snapshot* snapshot);
 int numOfPendingConf(const EntryVec& entries);
-MessageType voteRespMsgType(MessageType t);
-
-const char* msgTypeString(int type);
+MessageType voteRespMsgType(int t);
 
 // string util
 string joinStrings(const vector<string>& strs, const string &sep);

@@ -1,8 +1,12 @@
 #include "progress.h"
 
-Progress::Progress(uint64_t next, int maxInfilght)
+Progress::Progress(uint64_t next, int maxInfilght, Logger *logger)
   : next_(next),
-    ins_(new inflights(maxInfilght)) {
+    ins_(new inflights(maxInfilght, logger)) {
+}
+
+Progress::~Progress() {
+  delete ins_;
 }
 
 void Progress::resetState(ProgressState state) {
@@ -53,6 +57,10 @@ bool Progress::maybeUpdate(uint64_t n) {
 
 void Progress::optimisticUpdate(uint64_t n) {
   next_ = n + 1;
+}
+
+void Progress::snapshotFailure() {
+  pendingSnapshot_ = 0;
 }
 
 // maybeDecrTo returns false if the given to index comes from an out of order message.
@@ -144,10 +152,10 @@ void inflights::add(uint64_t infight) {
     next -= size;
   }
 
-  if (next >= buffer_->size()) {
+  if (next >= buffer_.size()) {
     growBuf();
   }
-  (*buffer_)[next] = infight;
+  buffer_[next] = infight;
   count_++;
 }
 
@@ -155,28 +163,25 @@ void inflights::add(uint64_t infight) {
 // instead of preallocating to inflights.size to handle systems which have
 // thousands of Raft groups per process.
 void inflights::growBuf() {
-  uint64_t newSize = buffer_->size() * 2;
+  uint64_t newSize = buffer_.size() * 2;
   if (newSize == 0) {
     newSize = 1;
   } else if (newSize > size_) {
     newSize = size_;
   }
 
-  vector<uint64_t> *newBuffer = new vector<uint64_t>[newSize];
-  newBuffer->assign(buffer_->begin(), buffer_->end());
-  delete buffer_;
-  buffer_ = newBuffer;
+  buffer_.resize(newSize);
 }
 
 // freeTo frees the inflights smaller or equal to the given `to` flight.
 void inflights::freeTo(uint64_t to) {
-  if (count_ == 0 || to < (*buffer_)[start_]) {
+  if (count_ == 0 || to < buffer_[start_]) {
     return;
   }
 
   uint64_t i = 0, idx = start_;
   for (i = 0; i < count_; ++i) {
-    if (to < (*buffer_)[idx]) {  // found the first large inflight
+    if (to < buffer_[idx]) {  // found the first large inflight
       break;
     }
 
@@ -199,7 +204,7 @@ void inflights::freeTo(uint64_t to) {
 }
 
 void inflights::freeFirstOne() {
-  freeTo((*buffer_)[start_]);
+  freeTo(buffer_[start_]);
 }
 
 bool inflights::full() {
