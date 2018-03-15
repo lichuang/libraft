@@ -86,14 +86,14 @@ void unstableLog::truncateAndAppend(const EntryVec& entries) {
   if (after <= offset_) {
     // The log is being truncated to before our current offset
     // portion, so set the offset and replace the entries
-    logger_->Infof(__FILE__, __LINE__, "replace the unstable entries from index %d", after);
+    logger_->Infof(__FILE__, __LINE__, "replace the unstable entries from index %llu", after);
     offset_ = after;
     entries_ = entries;
     return;
   }
 
   // truncate to after and copy to u.entries then append
-  logger_->Infof(__FILE__, __LINE__, "truncate the unstable entries before index %d", after);
+  logger_->Infof(__FILE__, __LINE__, "truncate the unstable entries before index %llu", after);
   vector<Entry> slice;
   this->slice(offset_, after, &slice);
   entries_ = slice;
@@ -108,11 +108,11 @@ void unstableLog::slice(uint64_t lo, uint64_t hi, EntryVec *entries) {
 // u.offset <= lo <= hi <= u.offset+len(u.offset)
 void unstableLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
   if (lo > hi) {
-    logger_->Fatalf(__FILE__, __LINE__, "invalid unstable.slice %d > %d", lo, hi);
+    logger_->Fatalf(__FILE__, __LINE__, "invalid unstable.slice %llu > %llu", lo, hi);
   }
 
   uint64_t upper = offset_ + (uint64_t)entries_.size();
   if (lo < offset_ || upper < hi) {
-    logger_->Fatalf(__FILE__, __LINE__, "unstable.slice[%d,%d) out of bound [%d,%d]", lo, hi, offset_, upper);
+    logger_->Fatalf(__FILE__, __LINE__, "unstable.slice[%llu,%llu) out of bound [%llu,%llu]", lo, hi, offset_, upper);
   }
 }

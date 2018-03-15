@@ -2,44 +2,38 @@
 #define __LOGGER_H__
 
 #include <stdio.h>
+#include <stdlib.h>
 #include "libraft.h"
 
-const static int kMaxLogBufSize = 2048;
+#define doLog(c) va_list args; \
+                 va_start(args, fmt); \
+                 log(c, file, line, fmt, args); \
+                 va_end(args);
 
-class DefaultLogger : public Logger{
-private:
-  void log(const char *level, const char *file, int line, const char *fmt, ...) {
-    va_list args;
-    int     n;
+class DefaultLogger : public Logger {
+public:
+  const static int kMaxLogBufSize = 2048;
+  char buf_[kMaxLogBufSize];
 
-    va_start(args, fmt);
-    va_end(args);
-
-    char buf[kMaxLogBufSize] = {0};
-    n = snprintf(buf, kMaxLogBufSize, "[%s %s:%d]", level, file, line);
-    n += vsnprintf(buf + n, kMaxLogBufSize - n, fmt, args);
-    buf[n++] += '\n';
-    buf[n++] += '\0';
-
-    printf("%s", buf);
-  }
+  void log(const char *level, const char *file, int line, const char *fmt, va_list args);
 
 public:
   void Debugf(const char *file, int line, const char *fmt, ...) {
-    log("D", file, line, fmt);
+    doLog("D");
   }
   void Infof(const char *file, int line, const char *fmt, ...) {
-    log("I", file, line, fmt);
+    doLog("I");
   }
   void Warningf(const char *file, int line, const char *fmt, ...) {
-    log("W", file, line, fmt);
+    doLog("W");
   }
 
   void Errorf(const char *file, int line, const char *fmt, ...) {
-    log("E", file, line, fmt);
+    doLog("E");
   }
   void Fatalf(const char *file, int line, const char *fmt, ...) {
-    log("F", file, line, fmt);
+    doLog("F");
+    abort();
   }
 };
 
