@@ -118,3 +118,130 @@ TEST(progressTests, TestInflightsAdd) {
     EXPECT_EQ(true, deepEqualInflights(ins2, wantIns));
   }
 }
+
+TEST(progressTests, TestInflightFreeTo) {
+  inflights ins(10, &kDefaultLogger);
+  int i;
+
+  for (i = 0; i < 10; ++i) {
+    ins.add(i);
+  }
+
+  ins.freeTo(4);
+  {
+    inflights wantIns(10, &kDefaultLogger);
+    wantIns.start_ = 5;
+    wantIns.count_ = 5;
+    wantIns.size_  = 10;
+    wantIns.buffer_[0] = 0;
+    wantIns.buffer_[1] = 1;
+    wantIns.buffer_[2] = 2;
+    wantIns.buffer_[3] = 3;
+    wantIns.buffer_[4] = 4;
+    wantIns.buffer_[5] = 5;
+    wantIns.buffer_[6] = 6;
+    wantIns.buffer_[7] = 7;
+    wantIns.buffer_[8] = 8;
+    wantIns.buffer_[9] = 9;
+    //                ↓------------
+    // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 
+    EXPECT_EQ(true, deepEqualInflights(ins, wantIns));
+  }
+
+  ins.freeTo(8);
+  {
+    inflights wantIns(10, &kDefaultLogger);
+    wantIns.start_ = 9;
+    wantIns.count_ = 1;
+    wantIns.size_  = 10;
+    wantIns.buffer_[0] = 0;
+    wantIns.buffer_[1] = 1;
+    wantIns.buffer_[2] = 2;
+    wantIns.buffer_[3] = 3;
+    wantIns.buffer_[4] = 4;
+    wantIns.buffer_[5] = 5;
+    wantIns.buffer_[6] = 6;
+    wantIns.buffer_[7] = 7;
+    wantIns.buffer_[8] = 8;
+    wantIns.buffer_[9] = 9;
+    //                            ↓
+    // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 
+    EXPECT_EQ(true, deepEqualInflights(ins, wantIns));
+  }
+
+  // rotating case
+  for (i = 10; i < 15; ++i) {
+    ins.add(i);
+  }
+  ins.freeTo(12);
+  {
+    inflights wantIns(10, &kDefaultLogger);
+    wantIns.start_ = 3;
+    wantIns.count_ = 2;
+    wantIns.size_  = 10;
+    wantIns.buffer_[0] = 10;
+    wantIns.buffer_[1] = 11;
+    wantIns.buffer_[2] = 12;
+    wantIns.buffer_[3] = 13;
+    wantIns.buffer_[4] = 14;
+    wantIns.buffer_[5] = 5;
+    wantIns.buffer_[6] = 6;
+    wantIns.buffer_[7] = 7;
+    wantIns.buffer_[8] = 8;
+    wantIns.buffer_[9] = 9;
+    //             ↓----
+    // 10, 11, 12, 13, 14, 5, 6, 7, 8, 9 
+    EXPECT_EQ(true, deepEqualInflights(ins, wantIns));
+  }
+
+  ins.freeTo(14);
+  {
+    inflights wantIns(10, &kDefaultLogger);
+    wantIns.start_ = 0;
+    wantIns.count_ = 0;
+    wantIns.size_  = 10;
+    wantIns.buffer_[0] = 10;
+    wantIns.buffer_[1] = 11;
+    wantIns.buffer_[2] = 12;
+    wantIns.buffer_[3] = 13;
+    wantIns.buffer_[4] = 14;
+    wantIns.buffer_[5] = 5;
+    wantIns.buffer_[6] = 6;
+    wantIns.buffer_[7] = 7;
+    wantIns.buffer_[8] = 8;
+    wantIns.buffer_[9] = 9;
+    // ↓
+    // 10, 11, 12, 13, 14, 5, 6, 7, 8, 9 
+    EXPECT_EQ(true, deepEqualInflights(ins, wantIns));
+  }
+}
+
+TEST(progressTests, TestInflightFreeFirstOne) {
+  inflights ins(10, &kDefaultLogger);
+  int i;
+
+  for (i = 0; i < 10; ++i) {
+    ins.add(i);
+  }
+  
+  ins.freeFirstOne();
+  {
+    inflights wantIns(10, &kDefaultLogger);
+    wantIns.start_ = 1;
+    wantIns.count_ = 9;
+    wantIns.size_  = 10;
+    wantIns.buffer_[0] = 0;
+    wantIns.buffer_[1] = 1;
+    wantIns.buffer_[2] = 2;
+    wantIns.buffer_[3] = 3;
+    wantIns.buffer_[4] = 4;
+    wantIns.buffer_[5] = 5;
+    wantIns.buffer_[6] = 6;
+    wantIns.buffer_[7] = 7;
+    wantIns.buffer_[8] = 8;
+    wantIns.buffer_[9] = 9;
+    //    ↓-----------------------
+    // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 
+    EXPECT_EQ(true, deepEqualInflights(ins, wantIns));
+  }
+}
