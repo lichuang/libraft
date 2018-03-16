@@ -230,3 +230,74 @@ TEST(logTests, TestFindConflict) {
     delete log;
   }
 }
+
+TEST(logTests, TestIsUpToDate) {
+  EntryVec entries;
+
+  {
+    Entry entry;
+
+    entry.set_index(1);
+    entry.set_term(1);
+    entries.push_back(entry);
+
+    entry.set_index(2);
+    entry.set_term(2);
+    entries.push_back(entry);
+
+    entry.set_index(3);
+    entry.set_term(3);
+    entries.push_back(entry);
+  }
+
+  struct tmp {
+    uint64_t lastindex;
+    uint64_t term;
+    bool isUpToDate;
+
+    tmp(uint64_t last, uint64_t term, bool uptodate)
+      : lastindex(last), term(term), isUpToDate(uptodate){}
+  };
+
+  MemoryStorage s(&kDefaultLogger);
+  raftLog *log = newLog(&s, &kDefaultLogger);
+  log->append(entries);
+
+  vector<tmp> tests;
+  // greater term, ignore lastIndex
+  tests.push_back(tmp(log->lastIndex() - 1, 4, true));
+  tests.push_back(tmp(log->lastIndex()    , 4, true));
+  tests.push_back(tmp(log->lastIndex() + 1, 4, true));
+  // smaller term, ignore lastIndex
+  tests.push_back(tmp(log->lastIndex() - 1, 2, false));
+  tests.push_back(tmp(log->lastIndex()    , 2, false));
+  tests.push_back(tmp(log->lastIndex() + 1, 2, false));
+  // equal term, equal or lager lastIndex wins
+  tests.push_back(tmp(log->lastIndex() - 1, 3, false));
+  tests.push_back(tmp(log->lastIndex()    , 3, true));
+  tests.push_back(tmp(log->lastIndex() + 1, 3, true));
+  int i = 0;
+  for (i = 0; i < tests.size(); ++i) {
+    const tmp &test = tests[i];
+    bool isuptodate = log->isUpToDate(test.lastindex, test.term);
+    EXPECT_EQ(isuptodate, test.isUpToDate) << "i: " << i;
+  }
+
+  delete log;
+}
+
+TEST(logTests, TestAppend) {
+  EntryVec entries;
+
+  {
+    Entry entry;
+
+    entry.set_index(1);
+    entry.set_term(1);
+    entries.push_back(entry);
+
+    entry.set_index(2);
+    entry.set_term(2);
+    entries.push_back(entry);
+  }
+}
