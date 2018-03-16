@@ -55,15 +55,14 @@ bool isDeepEqualEntries(const EntryVec& ents1, const EntryVec& ents2) {
 }
 
 void limitSize(uint64_t maxSize, EntryVec *entries) {
-  uint64_t num = (uint64_t)entries->size();
-
-  if (num == 0) {
+  if (entries->empty()) {
     return;
   }
 
   int limit;
+  int num = entries->size();
   uint64_t size = (*entries)[0].ByteSize();
-  for (limit = 1; limit < size; ++limit) {
+  for (limit = 1; limit < num; ++limit) {
     size += (*entries)[limit].ByteSize();
     if (size > maxSize) {
       break;

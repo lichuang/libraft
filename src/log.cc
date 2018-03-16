@@ -231,7 +231,7 @@ int raftLog::snapshot(Snapshot **snapshot) {
     return OK;
   }
 
-  return storage_->Snapshot(snapshot);
+  return storage_->GetSnapshot(snapshot);
 }
 
 uint64_t raftLog::zeroTermOnErrCompacted(uint64_t t, int err) {

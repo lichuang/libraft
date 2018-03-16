@@ -29,11 +29,7 @@ test:$(TEST_OBJS)
 	$(CC) $(TEST_OBJS) -o test/all_test -lgtest -lprotobuf $(LIB_DIR)/$(LIB)
 
 $(TEST_DIR)/%.o:$(TEST_DIR)/%.$(EXTENSION)
-	$(CC) $< -o $@ -c $(CFLAGS) $(INCLUDE) 
-
-unstable_log_test:$(TEST_DIR)/unstable_log_test.cc
-	$(CC) $< -o ./test/unstable_log_test.o -c $(CFLAGS) $(INCLUDE)  
-	$(CC) ./test/unstable_log_test.o -o ./test/unstable_log_test -lgtest -lprotobuf $(LIB_DIR)/$(LIB)
+	$(CC) $< -o $@ -c $(CFLAGS) $(INCLUDE)
 
 $(OBJ_DIR)/%.o:$(SRC_DIR)/%.$(EXTENSION) 
 	$(CC) $< -o $@ -c $(CFLAGS) $(INCLUDE) 

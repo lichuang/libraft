@@ -61,12 +61,15 @@ struct Ready {
 
 class Storage {
 public:
+  virtual ~Storage() {}
+
   virtual int InitialState(HardState *, ConfState *) = 0;
   virtual int FirstIndex(uint64_t *index) = 0;
   virtual int LastIndex(uint64_t *index) = 0;
   virtual int Term(uint64_t i, uint64_t *term) = 0;
   virtual int Entries(uint64_t lo, uint64_t hi, uint64_t maxSize, vector<Entry> *entries) = 0;
-  virtual int Snapshot(Snapshot **snapshot) = 0;
+  virtual int GetSnapshot(Snapshot **snapshot) = 0;
+  virtual int SetHardState(const HardState& ) = 0;
 };
 
 class Logger {
