@@ -48,7 +48,7 @@ uint64_t raftLog::maybeAppend(uint64_t index, uint64_t logTerm,
   ci = findConflict(entries);
 
   if (ci == 0 || ci <= committed_) {
-    logger_->Fatalf(__FILE__, __LINE__, "entry %d conflict with committed entry [committed(%d)]", ci, committed_);
+    logger_->Fatalf(__FILE__, __LINE__, "entry %llu conflict with committed entry [committed(%llu)]", ci, committed_);
   }
 
   offset = index + 1;
@@ -66,7 +66,7 @@ void raftLog::commitTo(uint64_t tocommit) {
 
   if (lastIndex() < tocommit) {
     logger_->Fatalf(__FILE__, __LINE__, 
-      "tocommit(%d) is out of range [lastIndex(%d)]. Was the raft log corrupted, truncated, or lost?",
+      "tocommit(%llu) is out of range [lastIndex(%llu)]. Was the raft log corrupted, truncated, or lost?",
       tocommit, lastIndex());
   }
 
@@ -79,7 +79,7 @@ void raftLog::appliedTo(uint64_t i) {
   }
 
   if (committed_ < i || i < applied_) {
-    logger_->Fatalf(__FILE__, __LINE__, "applied(%d) is out of range [prevApplied(%d), committed(%d)]", i, applied_, committed_);
+    logger_->Fatalf(__FILE__, __LINE__, "applied(%llu) is out of range [prevApplied(%llu), committed(%llu)]", i, applied_, committed_);
   }
   applied_ = i;
 }
@@ -143,7 +143,7 @@ bool raftLog::maybeCommit(uint64_t maxIndex, uint64_t term) {
 }
 
 void raftLog::restore(Snapshot *snapshot) {
-  logger_->Infof(__FILE__, __LINE__, "log [%s] starts to restore snapshot [index: %d, term: %d]", 
+  logger_->Infof(__FILE__, __LINE__, "log [%s] starts to restore snapshot [index: %llu, term: %llu]", 
     String().c_str(), snapshot->metadata().index(), snapshot->metadata().term());
   committed_ = snapshot->metadata().index();
   unstable_.restore(snapshot);
@@ -158,7 +158,7 @@ uint64_t raftLog::append(const EntryVec& entries) {
 
   uint64_t after = entries[0].index() - 1;
   if (after < committed_) {
-    logger_->Fatalf(__FILE__, __LINE__, "after(%d) is out of range [committed(%d)]", after, committed_);
+    logger_->Fatalf(__FILE__, __LINE__, "after(%llu) is out of range [committed(%llu)]", after, committed_);
   }
 
   unstable_.truncateAndAppend(entries);
@@ -187,7 +187,7 @@ uint64_t raftLog::findConflict(const EntryVec& entries) {
       if (index <= lastIndex()) {
         uint64_t dummy;
         int err = this->term(index, &dummy);
-        logger_->Infof(__FILE__, __LINE__, "found conflict at index %d [existing term: %d, conflicting term: %d]",
+        logger_->Infof(__FILE__, __LINE__, "found conflict at index %llu [existing term: %llu, conflicting term: %llu]",
           index, zeroTermOnErrCompacted(dummy, err), term);
       }
 
@@ -217,6 +217,14 @@ void raftLog::nextEntries(EntryVec* entries) {
       logger_->Fatalf(__FILE__, __LINE__, "unexpected error when getting unapplied entries (%s)", GetErrorString(err));
     }
   }
+}
+
+string raftLog::String() {
+  char tmp[200];
+  snprintf(tmp, sizeof(tmp), "committed=%llu, applied=%llu, unstable.offset=%llu, len(unstable.Entries)=%lu",
+    committed_, applied_, unstable_.offset_, unstable_.entries_.size());
+
+  return tmp;
 }
 
 // hasNextEntries returns if there is any available entries for execution. This
@@ -339,7 +347,7 @@ int raftLog::slice(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec* entries
     if (err == ErrCompacted) {
       return err;
     } else if (err == ErrUnavailable) {
-      logger_->Fatalf(__FILE__, __LINE__, "entries[%d:%d) is unavailable from storage", lo, min(hi, unstable_.offset_));
+      logger_->Fatalf(__FILE__, __LINE__, "entries[%llu:%llu) is unavailable from storage", lo, min(hi, unstable_.offset_));
     } else if (!SUCCESS(err)) {
       logger_->Fatalf(__FILE__, __LINE__, "storage entries err:%s", GetErrorString(err));
     }
@@ -365,7 +373,7 @@ int raftLog::slice(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec* entries
 
 int raftLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
   if (lo > hi) {
-    logger_->Fatalf(__FILE__, __LINE__, "invalid slice %d > %d", lo, hi);
+    logger_->Fatalf(__FILE__, __LINE__, "invalid slice %llu > %llu", lo, hi);
   }
 
   uint64_t fi = firstIndex();
@@ -375,7 +383,7 @@ int raftLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
 
   uint64_t li = lastIndex();
   if (hi > li + 1) {
-    logger_->Fatalf(__FILE__, __LINE__, "slice[%d,%d) out of bound [%d,%d]", lo, hi, fi, li);
+    logger_->Fatalf(__FILE__, __LINE__, "slice[%llu,%llu) out of bound [%llu,%llu]", lo, hi, fi, li);
   }
 
   return OK;

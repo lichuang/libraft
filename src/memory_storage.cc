@@ -96,7 +96,7 @@ int MemoryStorage::Compact(uint64_t compactIndex) {
     return ErrCompacted;
   }
   if (compactIndex > lastIndex()) {
-    logger_->Fatalf(__FILE__, __LINE__, "compact %d is out of bound lastindex(%d)", compactIndex, lastIndex());
+    logger_->Fatalf(__FILE__, __LINE__, "compact %llu is out of bound lastindex(%llu)", compactIndex, lastIndex());
   }
 
   uint64_t i = compactIndex - offset;
@@ -152,7 +152,7 @@ int MemoryStorage::Append(EntryVec* entries) {
     return OK;
   }
 
-  logger_->Fatalf(__FILE__, __LINE__, "missing log entry [last: %d, append at: %d]",
+  logger_->Fatalf(__FILE__, __LINE__, "missing log entry [last: %llu, append at: %llu]",
     lastIndex(), (*entries)[0].index());
   return OK;
 }
