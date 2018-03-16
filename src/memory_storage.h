@@ -6,7 +6,7 @@
 
 class MemoryStorage : public Storage {
 public:
-  MemoryStorage();
+  MemoryStorage(Logger *logger);
   virtual ~MemoryStorage();
 
   int InitialState(HardState *, ConfState *);
@@ -17,6 +17,8 @@ public:
   int GetSnapshot(Snapshot **snapshot);
   int SetHardState(const HardState& );
 
+  int Append(EntryVec* entries);
+  int Compact(uint64_t compactIndex);
 private:
   uint64_t firstIndex();
   uint64_t lastIndex();
@@ -28,6 +30,7 @@ public:
   EntryVec entries_;
 
   Locker locker_;
+  Logger *logger_;
 };
 
 #endif  // __MEMORY_STORAGE_H__
