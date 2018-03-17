@@ -112,6 +112,27 @@ int MemoryStorage::Compact(uint64_t compactIndex) {
   return OK;
 }
 
+// ApplySnapshot overwrites the contents of this Storage object with
+// those of the given snapshot.
+int MemoryStorage::ApplySnapshot(const Snapshot& snapshot) {
+  Mutex mutex(&locker_);
+
+  //handle check for old snapshot being applied
+  uint64_t index = snapShot_->metadata().index();
+  uint64_t snapIndex = snapshot.metadata().index();
+  if (index >= snapIndex) {
+    return ErrSnapOutOfDate;
+  }
+
+  snapShot_->CopyFrom(snapshot);
+  entries_.clear();
+  Entry entry;
+  entry.set_index(snapshot.metadata().index());
+  entry.set_term(snapshot.metadata().term());
+  entries_.push_back(entry);
+  return OK;
+}
+
 // Append the new entries to storage.
 // entries[0].Index > ms.entries[0].Index
 int MemoryStorage::Append(EntryVec* entries) {

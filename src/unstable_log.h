@@ -24,9 +24,9 @@ struct unstableLog {
 
   uint64_t maybeFirstIndex();
 
-  uint64_t maybeLastIndex();
+  bool  maybeLastIndex(uint64_t* last);
 
-  uint64_t maybeTerm(uint64_t i);
+  bool maybeTerm(uint64_t i, uint64_t *term);
 
   void stableTo(uint64_t i, uint64_t t);
 

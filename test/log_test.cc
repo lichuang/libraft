@@ -609,3 +609,275 @@ TEST(logTests, TestLogMaybeAppend) {
     delete log;
   }
 }
+
+// TestCompactionSideEffects ensures that all the log related functionality works correctly after
+// a compaction.
+TEST(logTests, TestCompactionSideEffects) {
+  // Populate the log with 1000 entries; 750 in stable storage and 250 in unstable.
+  uint64_t lastIndex = 1000;
+  uint64_t unstableIndex = 750;
+  uint64_t lastTerm = lastIndex;
+  MemoryStorage s(&kDefaultLogger);
+  int i;
+  
+  for (i = 1; i <= unstableIndex; ++i) {
+    EntryVec entries;
+    Entry entry;
+    
+    entry.set_index(i);
+    entry.set_term(i);
+    entries.push_back(entry);
+
+    s.Append(&entries);
+  }
+
+  raftLog *log = newLog(&s, &kDefaultLogger);
+  for (i = unstableIndex; i < lastIndex; ++i) {
+    EntryVec entries;
+    Entry entry;
+    
+    entry.set_index(i + 1);
+    entry.set_term(i + 1);
+    entries.push_back(entry);
+
+    log->append(entries);
+  }
+
+  bool ok = log->maybeCommit(lastIndex, lastTerm);
+  EXPECT_TRUE(ok);
+
+  log->appliedTo(log->committed_);
+
+  uint64_t offset = 500;
+  s.Compact(offset);
+
+  EXPECT_EQ(log->lastIndex(), lastIndex);
+
+  for (i = offset; i <= log->lastIndex(); ++i) {
+    uint64_t t;
+    int err = log->term(i, &t);
+    EXPECT_EQ(err, OK);
+    EXPECT_EQ(t, i);
+  }
+
+  for (i = offset; i <= log->lastIndex(); ++i) {
+    EXPECT_TRUE(log->matchTerm(i, i));
+  }
+
+  EntryVec unstableEntries;
+  log->unstableEntries(&unstableEntries);
+  EXPECT_EQ(unstableEntries.size(), 250);
+  EXPECT_EQ(unstableEntries[0].index(), 751);
+
+  uint64_t prev = log->lastIndex();
+  {
+    EntryVec entries;
+    Entry entry;
+    
+    entry.set_index(log->lastIndex() + 1);
+    entry.set_term(log->lastIndex() + 1);
+    entries.push_back(entry);
+
+    log->append(entries);
+  } 
+  EXPECT_EQ(log->lastIndex(), prev + 1);
+
+  {
+    EntryVec entries;
+    int err = log->entries(log->lastIndex(), noLimit, &entries);
+    EXPECT_EQ(err, OK);
+    EXPECT_EQ(entries.size(), 1);
+  }
+
+  delete log;
+}
+
+TEST(logTests, TestHasNextEnts) {
+  Snapshot sn;
+  sn.mutable_metadata()->set_index(3);
+  sn.mutable_metadata()->set_term(1);
+
+  EntryVec entries;
+  {
+    Entry entry;
+    
+    entry.set_index(4);
+    entry.set_term(1);
+    entries.push_back(entry);
+    
+    entry.set_index(5);
+    entry.set_term(1);
+    entries.push_back(entry);
+    
+    entry.set_index(6);
+    entry.set_term(1);
+    entries.push_back(entry);
+  }
+  struct tmp {
+    uint64_t applied;
+    bool hasNext;
+
+    tmp(uint64_t applied, bool hasnext)
+      : applied(applied), hasNext(hasnext) {}
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp(0, true));
+  tests.push_back(tmp(3, true));
+  tests.push_back(tmp(4, true));
+  tests.push_back(tmp(5, false));
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    MemoryStorage s(&kDefaultLogger);
+    s.ApplySnapshot(sn);
+    raftLog *log = newLog(&s, &kDefaultLogger);
+    
+    log->append(entries);
+    log->maybeCommit(5, 1);
+    log->appliedTo(tests[i].applied);
+
+    EXPECT_EQ(log->hasNextEntries(), tests[i].hasNext);
+
+    delete log;
+  }
+}
+
+TEST(logTests, TestNextEnts) {
+  Snapshot sn;
+  sn.mutable_metadata()->set_index(3);
+  sn.mutable_metadata()->set_term(1);
+
+  EntryVec entries;
+  {
+    Entry entry;
+    
+    entry.set_index(4);
+    entry.set_term(1);
+    entries.push_back(entry);
+    
+    entry.set_index(5);
+    entry.set_term(1);
+    entries.push_back(entry);
+    
+    entry.set_index(6);
+    entry.set_term(1);
+    entries.push_back(entry);
+  }
+  struct tmp {
+    uint64_t applied;
+    EntryVec entries;
+
+    tmp(uint64_t applied)
+      : applied(applied) {}
+  };
+
+  vector<tmp> tests;
+  {
+    tmp t(0);
+    t.entries.insert(t.entries.begin(), entries.begin(), entries.begin() + 2);
+    tests.push_back(t);
+  }
+  {
+    tmp t(3);
+    t.entries.insert(t.entries.begin(), entries.begin(), entries.begin() + 2);
+    tests.push_back(t);
+  }
+  {
+    tmp t(4);
+    t.entries.insert(t.entries.begin(), entries.begin() + 1, entries.begin() + 2);
+    tests.push_back(t);
+  }
+  {
+    tmp t(5);
+    tests.push_back(t);
+  }
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    MemoryStorage s(&kDefaultLogger);
+    s.ApplySnapshot(sn);
+    raftLog *log = newLog(&s, &kDefaultLogger);
+    
+    log->append(entries);
+    log->maybeCommit(5, 1);
+    log->appliedTo(tests[i].applied);
+
+    EntryVec nextEntries;
+    log->nextEntries(&nextEntries);
+
+    EXPECT_TRUE(isDeepEqualEntries(nextEntries, tests[i].entries));
+
+    delete log;
+  }
+}
+
+// TestUnstableEnts ensures unstableEntries returns the unstable part of the
+// entries correctly.
+TEST(logTests, TestUnstableEnts) {
+  EntryVec entries;
+
+  {
+    Entry entry;
+
+    entry.set_index(1);
+    entry.set_term(1);
+    entries.push_back(entry);
+
+    entry.set_index(2);
+    entry.set_term(2);
+    entries.push_back(entry);
+  }
+  struct tmp {
+    uint64_t unstable;
+    EntryVec entries;
+
+    tmp(uint64_t unstable) : unstable(unstable) {}
+  };
+
+  vector<tmp> tests;
+  {
+    tmp t(3);
+    tests.push_back(t);
+  }
+  {
+    tmp t(1);
+    t.entries = entries;
+    tests.push_back(t);
+  }
+
+  int i = 0;
+  for (i = 0; i < tests.size(); ++i) {
+    const tmp &t = tests[i];
+
+    // append stable entries to storage
+    MemoryStorage s(&kDefaultLogger);
+    {
+      EntryVec ents;
+      ents.insert(ents.end(), entries.begin(),  entries.begin() + t.unstable - 1);
+      s.Append(&ents);
+    }
+
+    // append unstable entries to raftlog
+    raftLog *log = newLog(&s, &kDefaultLogger);    
+    {
+      EntryVec ents;
+      ents.insert(ents.end(), entries.begin() + t.unstable - 1, entries.end());
+      log->append(ents);
+    }
+
+    EntryVec unstableEntries;
+    log->unstableEntries(&unstableEntries);
+
+    int len = unstableEntries.size();
+    if (len > 0) {
+      log->stableTo(unstableEntries[len - 1].index(), unstableEntries[len - i].term());
+    }
+    EXPECT_TRUE(isDeepEqualEntries(unstableEntries, t.entries)) << "i: " << i << ", size:" << unstableEntries.size();
+
+    uint64_t w = entries[entries.size() - 1].index() + 1;
+    EXPECT_EQ(log->unstable_.offset_, w);
+
+    delete log;
+  }
+}

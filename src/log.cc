@@ -110,6 +110,7 @@ uint64_t raftLog::lastTerm() {
 }
 
 int raftLog::entries(uint64_t i, uint64_t maxSize, EntryVec *entries) {
+  entries->clear();
   uint64_t lasti = lastIndex();
 
   if (i > lasti) {
@@ -203,12 +204,12 @@ uint64_t raftLog::findConflict(const EntryVec& entries) {
   return 0;
 }
 
-void raftLog::unstableEntries(EntryVec **entries) {
-  if (unstable_.entries_.size() == 0) {
-    *entries = NULL;
+void raftLog::unstableEntries(EntryVec *entries) {
+  entries->clear();
+  int i;
+  for (i = 0; i < unstable_.entries_.size(); ++i) {
+    entries->push_back(unstable_.entries_[i]);
   }
-
-  *entries = &unstable_.entries_;
 }
 
 // nextEntries returns all the available entries for execution.
@@ -283,8 +284,8 @@ int raftLog::term(uint64_t i, uint64_t *t) {
     return OK;
   }
 
-  *t = unstable_.maybeTerm(i);
-  if (*t > 0) {
+  bool ok = unstable_.maybeTerm(i, t);
+  if (ok) {
     goto out;
   }
 
@@ -322,8 +323,8 @@ uint64_t raftLog::lastIndex() {
   uint64_t i;
   int err;
 
-  i = unstable_.maybeLastIndex();
-  if (i > 0) {
+  bool ok = unstable_.maybeLastIndex(&i);
+  if (ok) {
     return i;
   }
 

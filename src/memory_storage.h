@@ -19,6 +19,7 @@ public:
 
   int Append(EntryVec* entries);
   int Compact(uint64_t compactIndex);
+  int ApplySnapshot(const Snapshot& snapshot);
 private:
   uint64_t firstIndex();
   uint64_t lastIndex();

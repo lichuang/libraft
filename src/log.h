@@ -33,7 +33,7 @@ struct raftLog {
 
   uint64_t findConflict(const EntryVec& entries);
 
-  void unstableEntries(EntryVec **entries);
+  void unstableEntries(EntryVec *entries);
 
   void nextEntries(EntryVec* entries);
 

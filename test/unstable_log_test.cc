@@ -142,8 +142,9 @@ TEST(unstableLogTests, TestMaybeLastIndex) {
     unstable.snapshot_  = tests[i].snapshot;
     unstable.logger_  = NULL;
 
-    uint64_t index = unstable.maybeLastIndex();
-    EXPECT_EQ(tests[i].wok, index != 0);
+    uint64_t index;
+    bool ok = unstable.maybeLastIndex(&index);
+    EXPECT_EQ(tests[i].wok, ok);
   }
 }
 
@@ -285,8 +286,9 @@ TEST(unstableLogTests, TestUnstableMaybeTerm) {
     unstable.snapshot_  = tests[i].snapshot;
     unstable.logger_  = NULL;
 
-    uint64_t term = unstable.maybeTerm(tests[i].index);
-    EXPECT_EQ(tests[i].wok, term != 0) << "i: " << i << ", index: " << tests[i].index;
+    uint64_t term;
+    bool ok = unstable.maybeTerm(tests[i].index, &term);
+    EXPECT_EQ(tests[i].wok, ok) << "i: " << i << ", index: " << tests[i].index;
     EXPECT_EQ(tests[i].wterm, term);
   }
 }
