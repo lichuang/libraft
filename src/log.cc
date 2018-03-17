@@ -343,7 +343,7 @@ int raftLog::slice(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec* entries
   }
 
   if (lo < unstable_.offset_) {
-    err = storage_->Entries(lo, hi, maxSize, entries);
+    err = storage_->Entries(lo, min(hi,unstable_.offset_), maxSize, entries);
     if (err == ErrCompacted) {
       return err;
     } else if (err == ErrUnavailable) {

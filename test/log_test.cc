@@ -300,4 +300,104 @@ TEST(logTests, TestAppend) {
     entry.set_term(2);
     entries.push_back(entry);
   }
+
+  struct tmp {
+    uint64_t windex, wunstable;
+    EntryVec entries, wentries;
+
+    tmp(uint64_t index, uint64_t unstable) : windex(index), wunstable(unstable){}
+  };
+  vector<tmp> tests;
+  {
+    tmp t(2, 3);
+    Entry entry;
+    entry.set_index(1);
+    entry.set_term(1);
+    t.wentries.push_back(entry);
+    entry.set_index(2);
+    entry.set_term(2);
+    t.wentries.push_back(entry);
+    tests.push_back(t);
+  }
+  {
+    tmp t(3, 3);
+    Entry entry;
+
+    entry.set_index(3);
+    entry.set_term(2);
+    t.entries.push_back(entry);
+
+    entry.set_index(1);
+    entry.set_term(1);
+    t.wentries.push_back(entry);
+
+    entry.set_index(2);
+    entry.set_term(2);
+    t.wentries.push_back(entry);
+
+    entry.set_index(3);
+    entry.set_term(2);
+    t.wentries.push_back(entry);
+
+    tests.push_back(t);
+  }
+  // conflicts with index 1
+  {
+    tmp t(1, 1);
+    Entry entry;
+
+    entry.set_index(1);
+    entry.set_term(2);
+    t.entries.push_back(entry);
+
+    entry.set_index(1);
+    entry.set_term(2);
+    t.wentries.push_back(entry);
+
+    tests.push_back(t);
+  }
+  // conflicts with index 2
+  {
+    tmp t(3, 2);
+    Entry entry;
+
+    entry.set_index(2);
+    entry.set_term(3);
+    t.entries.push_back(entry);
+
+    entry.set_index(3);
+    entry.set_term(3);
+    t.entries.push_back(entry);
+
+    entry.set_index(1);
+    entry.set_term(1);
+    t.wentries.push_back(entry);
+
+    entry.set_index(2);
+    entry.set_term(3);
+    t.wentries.push_back(entry);
+
+    entry.set_index(3);
+    entry.set_term(3);
+    t.wentries.push_back(entry);
+    tests.push_back(t);
+  }
+  int i = 0;
+  for (i = 0; i < tests.size(); ++i) {
+    const tmp &test = tests[i];
+    MemoryStorage s(&kDefaultLogger);
+    s.Append(&entries);
+    raftLog *log = newLog(&s, &kDefaultLogger);
+    
+    uint64_t index = log->append(test.entries);
+
+    EXPECT_EQ(index, test.windex);
+
+    EntryVec entries;
+    int err = log->entries(1, noLimit, &entries);
+    EXPECT_EQ(err, OK);
+    EXPECT_TRUE(isDeepEqualEntries(entries, test.wentries));
+    EXPECT_EQ(log->unstable_.offset_, test.wunstable);
+    delete log;
+  }
 }
