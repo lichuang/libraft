@@ -881,3 +881,195 @@ TEST(logTests, TestUnstableEnts) {
     delete log;
   }
 }
+
+TEST(logTests, TestCommitTo) {
+  EntryVec entries;
+  uint64_t commit = 2;
+
+  {
+    Entry entry;
+
+    entry.set_index(1);
+    entry.set_term(1);
+    entries.push_back(entry);
+
+    entry.set_index(2);
+    entry.set_term(2);
+    entries.push_back(entry);
+
+    entry.set_index(3);
+    entry.set_term(3);
+    entries.push_back(entry);
+  }
+  struct tmp {
+    uint64_t commit, wcommit;
+    bool panic;
+
+    tmp(uint64_t commit, uint64_t wcommit, bool panic)
+      : commit(commit), wcommit(wcommit), panic(panic) {}
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp(3,3,false));
+  tests.push_back(tmp(1,2,false));  // never decrease
+  //tests.push_back(tmp(4,0,true));   // commit out of range -> panic
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    const tmp &t = tests[i];
+
+    MemoryStorage s(&kDefaultLogger);
+    raftLog *log = newLog(&s, &kDefaultLogger);
+
+    log->append(entries);
+    log->committed_ = commit;
+    log->commitTo(t.commit);
+    EXPECT_EQ(log->committed_, t.wcommit);
+    delete log;
+  }
+}
+
+TEST(logTests, TestStableTo) {
+  EntryVec entries;
+
+  {
+    Entry entry;
+
+    entry.set_index(1);
+    entry.set_term(1);
+    entries.push_back(entry);
+
+    entry.set_index(2);
+    entry.set_term(2);
+    entries.push_back(entry);
+  }
+  struct tmp {
+    uint64_t stablei, stablet, wunstable;
+
+    tmp(uint64_t stablei, uint64_t stablet, uint64_t wunstable)
+      : stablei(stablei), stablet(stablet), wunstable(wunstable) {}
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp(1,1,2));
+  tests.push_back(tmp(2,2,3));
+  tests.push_back(tmp(2,1,1));  // bad term
+  tests.push_back(tmp(3,1,1));  // bad index
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    const tmp &t = tests[i];
+
+    MemoryStorage s(&kDefaultLogger);
+    raftLog *log = newLog(&s, &kDefaultLogger);
+
+    log->append(entries);
+    log->stableTo(t.stablei, t.stablet);
+    EXPECT_EQ(log->unstable_.offset_, t.wunstable);
+    delete log;
+  }
+}
+
+TEST(logTests, TestStableToWithSnap) {
+  uint64_t snapi = 5, snapt = 2;
+
+  struct tmp {
+    uint64_t stablei, stablet, wunstable;
+    EntryVec entries;
+
+    tmp(uint64_t stablei, uint64_t stablet, uint64_t wunstable)
+      : stablei(stablei), stablet(stablet), wunstable(wunstable) {}
+  };
+
+  vector<tmp> tests;
+  {
+    tmp t(snapi + 1, snapt, snapi + 1);
+    tests.push_back(t);
+  }
+  {
+    tmp t(snapi, snapt + 1, snapi + 1);
+    tests.push_back(t);
+  }
+  {
+    tmp t(snapi - 1, snapt, snapi + 1);
+    tests.push_back(t);
+  }
+  {
+    tmp t(snapi + 1, snapt + 1, snapi + 1);
+    tests.push_back(t);
+  }
+  {
+    tmp t(snapi, snapt + 1, snapi + 1);
+    tests.push_back(t);
+  }
+  {
+    tmp t(snapi - 1, snapt + 1, snapi + 1);
+    tests.push_back(t);
+  }
+  {
+    tmp t(snapi + 1, snapt, snapi + 2);
+    Entry entry;
+    entry.set_index(snapi + 1);
+    entry.set_term(snapt);
+    t.entries.push_back(entry);
+    tests.push_back(t);
+  }
+  {
+    tmp t(snapi, snapt, snapi + 1);
+    Entry entry;
+    entry.set_index(snapi + 1);
+    entry.set_term(snapt);
+    t.entries.push_back(entry);
+    tests.push_back(t);
+  }
+  {
+    tmp t(snapi - 1, snapt, snapi + 1);
+    Entry entry;
+    entry.set_index(snapi + 1);
+    entry.set_term(snapt);
+    t.entries.push_back(entry);
+    tests.push_back(t);
+  }
+  {
+    tmp t(snapi + 1, snapt + 1, snapi + 1);
+    Entry entry;
+    entry.set_index(snapi + 1);
+    entry.set_term(snapt);
+    t.entries.push_back(entry);
+    tests.push_back(t);
+  }
+  {
+    tmp t(snapi, snapt + 1, snapi + 1);
+    Entry entry;
+    entry.set_index(snapi + 1);
+    entry.set_term(snapt);
+    t.entries.push_back(entry);
+    tests.push_back(t);
+  }
+  {
+    tmp t(snapi - 1, snapt + 1, snapi + 1);
+    Entry entry;
+    entry.set_index(snapi + 1);
+    entry.set_term(snapt);
+    t.entries.push_back(entry);
+    tests.push_back(t);
+  }
+
+  int i = 0;
+  for (i = 0; i < tests.size(); ++i) {
+    const tmp &t = tests[i];
+
+    MemoryStorage s(&kDefaultLogger);
+
+    Snapshot sn;
+    sn.mutable_metadata()->set_index(snapi);
+    sn.mutable_metadata()->set_term(snapt);
+    s.ApplySnapshot(sn);
+
+    raftLog *log = newLog(&s, &kDefaultLogger);
+    log->append(t.entries);
+    log->stableTo(t.stablei, t.stablet);
+    EXPECT_EQ(log->unstable_.offset_, t.wunstable);
+    delete log;
+  }
+}
