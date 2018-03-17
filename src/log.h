@@ -26,8 +26,8 @@ struct raftLog {
   raftLog(Storage *, Logger *);
   string String();
 
-  uint64_t maybeAppend(uint64_t index, uint64_t logTerm, 
-                       uint64_t committed, const EntryVec& entries);
+  bool maybeAppend(uint64_t index, uint64_t logTerm, 
+                   uint64_t committed, const EntryVec& entries, uint64_t *lasti);
 
   uint64_t append(const EntryVec& entries);
 

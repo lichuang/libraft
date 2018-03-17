@@ -34,12 +34,13 @@ raftLog::raftLog(Storage *storage, Logger *logger)
   , logger_(logger) {
 }
 
-// maybeAppend returns 0 if the entries cannot be appended. Otherwise,
+// maybeAppend returns false if the entries cannot be appended. Otherwise,
 // it returns last index of new entries.
-uint64_t raftLog::maybeAppend(uint64_t index, uint64_t logTerm, 
-                              uint64_t committed, const EntryVec& entries) {
+bool raftLog::maybeAppend(uint64_t index, uint64_t logTerm, 
+                          uint64_t committed, const EntryVec& entries, uint64_t *lasti) {
+  *lasti = 0;
   if (!matchTerm(index, logTerm)) {
-    return 0;
+    return false;
   }
 
   uint64_t lastNewI, ci, offset;
@@ -47,15 +48,19 @@ uint64_t raftLog::maybeAppend(uint64_t index, uint64_t logTerm,
   lastNewI = index + (uint64_t)entries.size();
   ci = findConflict(entries);
 
-  if (ci == 0 || ci <= committed_) {
+  if (ci != 0 && ci <= committed_) {
     logger_->Fatalf(__FILE__, __LINE__, "entry %llu conflict with committed entry [committed(%llu)]", ci, committed_);
   }
 
-  offset = index + 1;
-  EntryVec appendEntries(entries.begin() + ci - offset, entries.end());
-  append(appendEntries);
-  commitTo(min(committed_, lastNewI));
-  return lastNewI;
+  if (ci != 0) {
+    offset = index + 1;
+    EntryVec appendEntries(entries.begin() + ci - offset, entries.end());
+    append(appendEntries);
+  }
+
+  commitTo(min(committed, lastNewI));
+  *lasti = lastNewI;
+  return true;
 }
 
 void raftLog::commitTo(uint64_t tocommit) {
@@ -272,6 +277,7 @@ int raftLog::term(uint64_t i, uint64_t *t) {
   int err = OK;
 
   *t = 0;
+  // the valid term range is [index of dummy entry, last index]
   dummyIndex = firstIndex() - 1;
   if (i < dummyIndex || i > lastIndex()) {
     return OK;

@@ -1050,8 +1050,9 @@ void raft::handleAppendEntries(Message *msg) {
 
   EntryVec entries;
   copyEntries(msg, &entries);
-  uint64_t lasti = raftLog_->maybeAppend(msg->index(), msg->logterm(), msg->commit(), entries);
-  if (lasti != 0) {
+  uint64_t lasti;
+  bool ret = raftLog_->maybeAppend(msg->index(), msg->logterm(), msg->commit(), entries, &lasti);
+  if (ret) {
     Message *resp = new Message();
     resp->set_to(msg->from());
     resp->set_type(MsgAppResp);
