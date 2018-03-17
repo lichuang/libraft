@@ -1169,3 +1169,151 @@ TEST(logTests, TestLogRestore) {
 
   delete log;
 }
+
+TEST(logTests, TestIsOutOfBounds) {
+  uint64_t offset = 100;
+  uint64_t num  = 100;
+
+  Snapshot sn;
+  sn.mutable_metadata()->set_index(offset);
+
+  MemoryStorage s(&kDefaultLogger);
+  s.ApplySnapshot(sn);
+
+  raftLog *log = newLog(&s, &kDefaultLogger);
+
+  int i = 0;
+  EntryVec entries;
+  for (i = 1; i <= num; ++i) {
+    Entry entry;
+    entry.set_index(i + offset);
+    entries.push_back(entry);
+  }
+  log->append(entries);
+
+  uint64_t first = offset + 1;
+
+  struct tmp {
+    uint64_t lo, hi;
+    bool wpanic;
+    bool errCompacted;
+
+    tmp(uint64_t lo, uint64_t hi, bool panic, bool err)
+      : lo(lo), hi(hi), wpanic(panic), errCompacted(err) {
+    }
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp(first - 2, first + 1, false, true));
+  tests.push_back(tmp(first - 1, first + 1, false, true));
+  tests.push_back(tmp(first,     first    , false, false));
+  tests.push_back(tmp(first + num/2, first + num/2, false, false));
+  tests.push_back(tmp(first + num - 1, first + num - 1, false, false));
+  tests.push_back(tmp(first + num, first + num, false, false));
+
+  for (i = 0; i < tests.size(); ++i) {
+    const tmp &t = tests[i];
+
+    int err = log->mustCheckOutOfBounds(t.lo, t.hi);
+    EXPECT_FALSE(t.errCompacted && err != ErrCompacted);
+    EXPECT_FALSE(!t.errCompacted && !SUCCESS(err));
+  }
+
+  delete log;
+}
+
+TEST(logTests, TestTerm) {
+  uint64_t offset = 100;
+  uint64_t num  = 100;
+
+  Snapshot sn;
+  sn.mutable_metadata()->set_index(offset);
+  sn.mutable_metadata()->set_term(1);
+
+  MemoryStorage s(&kDefaultLogger);
+  s.ApplySnapshot(sn);
+
+  raftLog *log = newLog(&s, &kDefaultLogger);
+
+  int i = 0;
+  EntryVec entries;
+  for (i = 1; i < num; ++i) {
+    Entry entry;
+    entry.set_index(i + offset);
+    entry.set_term(i);
+    entries.push_back(entry);
+  }
+  log->append(entries);
+
+  struct tmp {
+    uint64_t index, w;
+
+    tmp(uint64_t index, uint64_t w)
+      : index(index), w(w) {}
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp(offset - 1, 0));
+  tests.push_back(tmp(offset,     1));
+  tests.push_back(tmp(offset + num/2, num/2));
+  tests.push_back(tmp(offset + num - 1, num - 1));
+  tests.push_back(tmp(offset + num, 0));
+
+  for (i = 0; i < tests.size(); ++i) {
+    const tmp &t = tests[i];
+    uint64_t tm;
+    int err = log->term(t.index, &tm);
+    EXPECT_TRUE(SUCCESS(err));
+    EXPECT_EQ(tm, t.w);
+  }
+
+  delete log;
+}
+
+TEST(logTests, TestTermWithUnstableSnapshot) {
+  uint64_t storagesnapi = 100;
+  uint64_t unstablesnapi = storagesnapi + 5;
+
+  Snapshot sn;
+  sn.mutable_metadata()->set_index(storagesnapi);
+  sn.mutable_metadata()->set_term(1);
+
+  MemoryStorage s(&kDefaultLogger);
+  s.ApplySnapshot(sn);
+
+  raftLog *log = newLog(&s, &kDefaultLogger);
+  {
+    Snapshot sn;
+    sn.mutable_metadata()->set_index(unstablesnapi);
+    sn.mutable_metadata()->set_term(1);
+
+    log->restore(sn);
+  }
+  int i = 0;
+
+  struct tmp {
+    uint64_t index, w;
+
+    tmp(uint64_t index, uint64_t w)
+      : index(index), w(w) {}
+  };
+
+  vector<tmp> tests;
+  // cannot get term from storage
+  tests.push_back(tmp(storagesnapi, 0));
+  // cannot get term from the gap between storage ents and unstable snapshot
+  tests.push_back(tmp(storagesnapi + 1, 0));
+  tests.push_back(tmp(unstablesnapi - 1, 0));
+  // get term from unstable snapshot index
+  tests.push_back(tmp(unstablesnapi, 1));
+
+  for (i = 0; i < tests.size(); ++i) {
+    const tmp &t = tests[i];
+    uint64_t tm;
+    int err = log->term(t.index, &tm);
+    EXPECT_TRUE(SUCCESS(err));
+    EXPECT_EQ(tm, t.w) << "i: " << i;
+  }
+
+  delete log;
+}

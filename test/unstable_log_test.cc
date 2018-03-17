@@ -310,17 +310,17 @@ TEST(unstableLogTests, TestUnstableRestore) {
   unstable.snapshot_  = snapshot;
   unstable.logger_  = NULL;
 
-  Snapshot *s = new Snapshot();
+  Snapshot s;
   {
-    SnapshotMetadata *meta = s->mutable_metadata();
+    SnapshotMetadata *meta = s.mutable_metadata();
     meta->set_index(6);
     meta->set_term(2);
     unstable.restore(s);
   }
 
-  EXPECT_EQ(unstable.offset_, s->metadata().index() + 1);
+  EXPECT_EQ(unstable.offset_, s.metadata().index() + 1);
   EXPECT_EQ(unstable.entries_.size(), 0);
-  EXPECT_EQ(true, isDeepEqualSnapshot(unstable.snapshot_, s));
+  EXPECT_EQ(true, isDeepEqualSnapshot(unstable.snapshot_, &s));
 }
 
 TEST(unstableLogTests, TestUnstableStableTo) {

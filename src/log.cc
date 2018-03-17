@@ -148,10 +148,10 @@ bool raftLog::maybeCommit(uint64_t maxIndex, uint64_t term) {
   return false;
 }
 
-void raftLog::restore(Snapshot *snapshot) {
+void raftLog::restore(const Snapshot& snapshot) {
   logger_->Infof(__FILE__, __LINE__, "log [%s] starts to restore snapshot [index: %llu, term: %llu]", 
-    String().c_str(), snapshot->metadata().index(), snapshot->metadata().term());
-  committed_ = snapshot->metadata().index();
+    String().c_str(), snapshot.metadata().index(), snapshot.metadata().term());
+  committed_ = snapshot.metadata().index();
   unstable_.restore(snapshot);
 }
 

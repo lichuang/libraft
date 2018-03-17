@@ -65,7 +65,7 @@ struct raftLog {
 
   bool maybeCommit(uint64_t maxIndex, uint64_t term);
 
-  void restore(Snapshot *snapshot);
+  void restore(const Snapshot& snapshot);
 
   int slice(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec* entries);
 

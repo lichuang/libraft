@@ -78,10 +78,13 @@ void unstableLog::stableSnapTo(uint64_t i) {
   }
 }
 
-void unstableLog::restore(Snapshot *snapshot) {
-  offset_ = snapshot->metadata().index() + 1;
+void unstableLog::restore(const Snapshot& snapshot) {
+  offset_ = snapshot.metadata().index() + 1;
   entries_.clear();
-  snapshot_ = snapshot;
+  if (snapshot_ == NULL) {
+    snapshot_ = new Snapshot();
+  }
+  snapshot_->CopyFrom(snapshot);
 }
 
 void unstableLog::truncateAndAppend(const EntryVec& entries) {

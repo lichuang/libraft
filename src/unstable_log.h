@@ -8,12 +8,11 @@
 // position in storage; this means that the next write to storage
 // might need to truncate the log before persisting unstable.entries.
 struct unstableLog {
-  unstableLog()
-    : snapshot_(NULL) {
+  unstableLog() : snapshot_(NULL) {
   }
 
   // the incoming unstable snapshot, if any.
-  Snapshot *snapshot_;
+  Snapshot* snapshot_;
 
   // all entries that have not yet been written to storage.
   EntryVec entries_;
@@ -32,7 +31,7 @@ struct unstableLog {
 
   void stableSnapTo(uint64_t i);
 
-  void restore(Snapshot *snapshot);
+  void restore(const Snapshot& snapshot);
 
   void slice(uint64_t lo, uint64_t hi, EntryVec *entries);
 

@@ -994,7 +994,7 @@ bool raft::restore(const Snapshot& snapshot) {
   logger_->Infof(__FILE__, __LINE__, "%x [commit: %llu, lastindex: %llu, lastterm: %llu] starts to restore snapshot [index: %llu, term: %llu]",
     id_, raftLog_->committed_, raftLog_->lastIndex(), raftLog_->lastTerm(),
     snapshot.metadata().index(), snapshot.metadata().term());
-  raftLog_->restore(new Snapshot(snapshot));
+  raftLog_->restore(snapshot);
   prs_.clear();
   int i;
   for (i = 0; i < snapshot.metadata().conf_state().nodes_size(); ++i) {
