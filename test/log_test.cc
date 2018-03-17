@@ -1073,3 +1073,99 @@ TEST(logTests, TestStableToWithSnap) {
     delete log;
   }
 }
+
+//TestCompaction ensures that the number of log entries is correct after compactions.
+TEST(logTests, TestCompaction) {
+  struct tmp {
+    uint64_t lastIndex;
+    vector<uint64_t> compact;
+    vector<int> wleft;
+    bool wallow;
+
+    tmp(uint64_t i, bool allow)
+      : lastIndex(i), wallow(allow) {}
+  };
+
+  vector<tmp> tests;
+  {
+    // out of upper bound
+    tmp t(1000, false);
+    t.compact.push_back(1001);
+    t.wleft.push_back(-1);
+
+    //tests.push_back(t);
+  }
+  {
+    // out of upper bound
+    tmp t(1000, true);
+    t.compact.push_back(300);
+    t.compact.push_back(500);
+    t.compact.push_back(800);
+    t.compact.push_back(900);
+    t.wleft.push_back(700);
+    t.wleft.push_back(500);
+    t.wleft.push_back(200);
+    t.wleft.push_back(100);
+
+    tests.push_back(t);
+  }
+
+  int i = 0;
+  for (i = 0; i < tests.size(); ++i) {
+    const tmp &t = tests[i];
+    int j = 0;
+
+    MemoryStorage s(&kDefaultLogger);
+    EntryVec entries;
+    for (j = 1; j <= t.lastIndex; ++j) {
+      Entry entry;
+      entry.set_index(j);
+      entries.push_back(entry);
+    }
+    s.Append(&entries);
+
+    raftLog *log = newLog(&s, &kDefaultLogger);
+    log->maybeCommit(t.lastIndex, 0);
+    log->appliedTo(log->committed_);
+
+    for (j = 0; j < t.compact.size(); ++j) {
+      int err = s.Compact(t.compact[j]);
+      if (!SUCCESS(err)) {
+        EXPECT_TRUE(t.wallow);
+        continue;
+      }
+      EntryVec all;
+      log->allEntries(&all);
+      EXPECT_EQ(t.wleft[j], all.size());
+    }
+    delete log;
+  }
+}
+
+TEST(logTests, TestLogRestore) {
+  uint64_t index = 1000;
+  uint64_t term  = 1000;
+
+  Snapshot sn;
+  sn.mutable_metadata()->set_index(index);
+  sn.mutable_metadata()->set_term(term);
+
+  MemoryStorage s(&kDefaultLogger);
+  s.ApplySnapshot(sn);
+
+  raftLog *log = newLog(&s, &kDefaultLogger);
+
+  EntryVec all;
+  log->allEntries(&all);
+
+  EXPECT_TRUE(all.empty());
+  EXPECT_EQ(log->firstIndex(), index + 1);
+  EXPECT_EQ(log->committed_, index);
+  EXPECT_EQ(log->unstable_.offset_, index + 1);
+  uint64_t t;
+  int err = log->term(index, &t);
+  EXPECT_TRUE(SUCCESS(err));
+  EXPECT_EQ(t, term);
+
+  delete log;
+}
