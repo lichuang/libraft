@@ -1317,3 +1317,183 @@ TEST(logTests, TestTermWithUnstableSnapshot) {
 
   delete log;
 }
+
+TEST(logTests, TestSlice) {
+  uint64_t offset = 100;
+  uint64_t num = 100;
+  uint64_t last = offset + num;
+  uint64_t half = offset + num / 2;
+
+  Entry halfe;
+  halfe.set_index(half);
+  halfe.set_term(half);
+
+  Snapshot sn;
+  sn.mutable_metadata()->set_index(offset);
+
+  MemoryStorage s(&kDefaultLogger);
+  s.ApplySnapshot(sn);
+
+  raftLog *log = newLog(&s, &kDefaultLogger);
+
+  int i = 0;
+  EntryVec entries;
+  for (i = 1; i < num; ++i) {
+    Entry entry;
+    entry.set_index(i + offset);
+    entry.set_term(i + offset);
+    entries.push_back(entry);
+  }
+  log->append(entries);
+
+  struct tmp {
+    uint64_t from, to, limit;
+    EntryVec entries;
+    bool wpanic;
+
+    tmp(uint64_t from, uint64_t to, uint64_t limit, bool panic)
+      : from(from), to(to), limit(limit), wpanic(panic) {}
+  };
+
+  vector<tmp> tests;
+  // test no limit
+  {
+    tmp t(offset - 1, offset + 1, noLimit, false);
+    tests.push_back(t);
+  }
+  {
+    tmp t(offset, offset + 1, noLimit, false);
+    tests.push_back(t);
+  }
+  {
+    tmp t(half - 1, half + 1, noLimit, false);
+    Entry entry;
+
+    entry.set_index(half - 1);
+    entry.set_term(half - 1);
+    t.entries.push_back(entry);
+
+    entry.set_index(half);
+    entry.set_term(half);
+    t.entries.push_back(entry);
+
+    tests.push_back(t);
+  }
+  {
+    tmp t(half, half + 1, noLimit, false);
+    Entry entry;
+
+    entry.set_index(half);
+    entry.set_term(half);
+    t.entries.push_back(entry);
+
+    tests.push_back(t);
+  }
+  {
+    tmp t(last - 1, last, noLimit, false);
+    Entry entry;
+
+    entry.set_index(last - 1);
+    entry.set_term(last - 1);
+    t.entries.push_back(entry);
+
+    tests.push_back(t);
+  }
+  // test limit
+  {
+    tmp t(half - 1, half + 1, 0, false);
+    Entry entry;
+
+    entry.set_index(half - 1);
+    entry.set_term(half - 1);
+    t.entries.push_back(entry);
+
+    tests.push_back(t);
+  }
+  {
+    tmp t(half - 1, half + 1, halfe.ByteSize() + 1, false);
+    Entry entry;
+
+    entry.set_index(half - 1);
+    entry.set_term(half - 1);
+    t.entries.push_back(entry);
+
+    tests.push_back(t);
+  }
+  {
+    tmp t(half - 2, half + 1, halfe.ByteSize() + 1, false);
+    Entry entry;
+
+    entry.set_index(half - 2);
+    entry.set_term(half - 2);
+    t.entries.push_back(entry);
+
+    tests.push_back(t);
+  }
+  {
+    tmp t(half - 1, half + 1, halfe.ByteSize() * 2, false);
+    Entry entry;
+
+    entry.set_index(half - 1);
+    entry.set_term(half - 1);
+    t.entries.push_back(entry);
+
+    entry.set_index(half);
+    entry.set_term(half);
+    t.entries.push_back(entry);
+    tests.push_back(t);
+  }
+  {
+    tmp t(half - 1, half + 2, halfe.ByteSize() * 3, false);
+    Entry entry;
+
+    entry.set_index(half - 1);
+    entry.set_term(half - 1);
+    t.entries.push_back(entry);
+
+    entry.set_index(half);
+    entry.set_term(half);
+    t.entries.push_back(entry);
+
+    entry.set_index(half + 1);
+    entry.set_term(half + 1);
+    t.entries.push_back(entry);
+
+    tests.push_back(t);
+  }
+  {
+    tmp t(half, half + 2, halfe.ByteSize(), false);
+    Entry entry;
+
+    entry.set_index(half);
+    entry.set_term(half);
+    t.entries.push_back(entry);
+    tests.push_back(t);
+  }
+  {
+    tmp t(half, half + 2, halfe.ByteSize() * 2, false);
+    Entry entry;
+
+    entry.set_index(half);
+    entry.set_term(half);
+    t.entries.push_back(entry);
+
+    entry.set_index(half + 1);
+    entry.set_term(half + 1);
+    t.entries.push_back(entry);
+    tests.push_back(t);
+  }
+
+  for (i = 0; i < tests.size(); ++i) {
+    const tmp &t = tests[i];
+    EntryVec ents;
+
+    int err = log->slice(t.from, t.to, t.limit, &ents);
+
+    EXPECT_FALSE(t.from <= offset && err != ErrCompacted);
+    EXPECT_FALSE(t.from > offset && !SUCCESS(err)) << "i: " << i;
+    EXPECT_TRUE(isDeepEqualEntries(ents, t.entries)) << "i: " << i << ",size: " << ents.size();
+  }
+
+  delete log;
+} 
