@@ -50,3 +50,14 @@ TEST(raftTests, TestProgressBecomeProbe) {
     EXPECT_EQ(t.p.next_, t.wnext);
   }
 }
+
+TEST(raftTests, TestProgressBecomeReplicate) {
+  Progress p(5, 256, &kDefaultLogger);
+  p.state_ = ProgressStateProbe;
+  p.match_ = 1;
+
+  p.becomeReplicate();
+  EXPECT_EQ(p.state_, ProgressStateReplicate);
+  EXPECT_EQ(p.match_, 1);
+  EXPECT_EQ(p.next_, p.match_ + 1);
+}
