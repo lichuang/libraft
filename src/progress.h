@@ -89,7 +89,7 @@ struct Progress {
   // When a leader receives a reply, the previous inflights should
   // be freed by calling inflights.freeTo with the index of the last
   // received entry.
-  inflights *ins_;
+  inflights ins_;
   Logger* logger_;
 
   const char* stateString();

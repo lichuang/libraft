@@ -2,12 +2,14 @@
 
 // maybeFirstIndex returns the index of the first possible entry in entries
 // if it has a snapshot.
-uint64_t unstableLog::maybeFirstIndex() {
+bool unstableLog::maybeFirstIndex(uint64_t *first) {
   if (snapshot_ != NULL) {
-    return snapshot_->metadata().index() + 1;
+    *first = snapshot_->metadata().index() + 1;
+    return true;
   }
 
-  return 0;
+  *first = 0;
+  return false;
 }
 
 // maybeLastIndex returns the last index if it has at least one

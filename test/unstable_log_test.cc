@@ -70,8 +70,9 @@ TEST(unstableLogTests, TestUnstableMaybeFirstIndex) {
     unstable.snapshot_  = tests[i].snapshot;
     unstable.logger_  = NULL;
 
-    uint64_t index = unstable.maybeFirstIndex();
-    EXPECT_EQ(tests[i].wok, index != 0);
+    uint64_t index;
+    bool ok = unstable.maybeFirstIndex(&index);
+    EXPECT_EQ(tests[i].wok, ok);
   }
 }
 

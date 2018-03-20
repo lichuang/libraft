@@ -306,8 +306,8 @@ uint64_t raftLog::firstIndex() {
   uint64_t i;
   int err;
 
-  i = unstable_.maybeFirstIndex();
-  if (i) {
+  bool ok = unstable_.maybeFirstIndex(&i);
+  if (ok) {
     return i;
   }
 

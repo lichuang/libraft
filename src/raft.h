@@ -40,6 +40,7 @@ struct raft {
   // leadTransferee is id of the leader transfer target when its value is not zero.
   // Follow the procedure defined in raft thesis 3.10.
   uint64_t leadTransferee_;
+  // New configuration is ignored if there exists unapplied configuration.
   bool pendingConf_;
   readOnly* readOnly_;
 
@@ -75,6 +76,7 @@ struct raft {
   void hardState(HardState *hs);
   int quorum();
   void send(Message *msg);
+
   void sendAppend(uint64_t to);
   void sendHeartbeat(uint64_t to, const string &ctx);
   void bcastAppend();

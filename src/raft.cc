@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <time.h>
 #include <algorithm>
 #include "raft.h"
 #include "util.h"
@@ -56,6 +58,7 @@ raft::raft(Config *config, raftLog *log)
     heartbeatTimeout_(config->heartbeatTick),
     electionTimeout_(config->electionTick),
     logger_(config->logger) {
+  srand((unsigned)time(NULL));
 }
 
 //TODO:
@@ -151,8 +154,6 @@ void raft::nodes(vector<uint64_t> *nodes) {
     nodes->push_back(iter->first);
     ++iter;
   }
-
-  sort(nodes->begin(), nodes->end());
 }
 
 void raft::loadState(const HardState &hs) {
@@ -261,7 +262,7 @@ void raft::sendAppend(uint64_t to) {
       case ProgressStateReplicate:
         last = entries[entries.size() - 1].index();
         pr->optimisticUpdate(last);
-        pr->ins_->add(last);
+        pr->ins_.add(last);
         break;
       case ProgressStateProbe:
         pr->pause();
@@ -367,6 +368,7 @@ void raft::reset(uint64_t term) {
     }
   }
   pendingConf_ = false;
+  delete readOnly_;
   readOnly_ = new readOnly(readOnly_->option_, logger_);
 }
 
@@ -379,6 +381,7 @@ void raft::appendEntry(EntryVec* entries) {
   }
   raftLog_->append(*entries);
   prs_[id_]->maybeUpdate(raftLog_->lastIndex());
+  // Regardless of maybeCommit's return, our caller will call bcastAppend.
   maybeCommit();
 }
 
@@ -438,10 +441,11 @@ bool raft::promotable() {
 // than or equal to the randomized election timeout in
 // [electiontimeout, 2 * electiontimeout - 1].
 bool raft::pastElectionTimeout() {
-  return electionElapsed_ >- randomizedElectionTimeout_;
+  return electionElapsed_ >= randomizedElectionTimeout_;
 }
 
 void raft::resetRandomizedElectionTimeout() {
+  randomizedElectionTimeout_ = electionTimeout_ + rand() % electionTimeout_;
 }
 
 void raft::becomeFollower(uint64_t term, uint64_t leader) {
@@ -790,7 +794,7 @@ bool raft::stepLeader(Message *msg) {
             id_, from, pr->string().c_str());
           pr->becomeProbe();
         } else if (pr->state_ == ProgressStateReplicate) {
-          pr->ins_->freeTo(index);
+          pr->ins_.freeTo(index);
         }
       }
       if (maybeCommit()) {
@@ -809,8 +813,8 @@ bool raft::stepLeader(Message *msg) {
     pr->resume();
 
     // free one slot for the full inflights window to allow progress.
-    if (pr->state_ == ProgressStateReplicate && pr->ins_->full()) {
-      pr->ins_->freeFirstOne();
+    if (pr->state_ == ProgressStateReplicate && pr->ins_.full()) {
+      pr->ins_.freeFirstOne();
     }
     if (pr->match_ < raftLog_->lastIndex()) {
       sendAppend(from);

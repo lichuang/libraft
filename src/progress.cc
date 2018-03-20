@@ -2,18 +2,17 @@
 
 Progress::Progress(uint64_t next, int maxInfilght, Logger *logger)
   : next_(next),
-    ins_(new inflights(maxInfilght, logger)) {
+    ins_(inflights(maxInfilght, logger)) {
 }
 
 Progress::~Progress() {
-  delete ins_;
 }
 
 void Progress::resetState(ProgressState state) {
   paused_ = false;
   pendingSnapshot_ = 0;
   state_ = state;
-  ins_->reset();
+  ins_.reset();
 }
 
 void Progress::becomeProbe() {
@@ -121,7 +120,7 @@ bool Progress::isPaused() {
   case ProgressStateProbe:
     return paused_;
   case ProgressStateReplicate:
-    return ins_->full();
+    return ins_.full();
   case ProgressStateSnapshot:
     return true;
   }

@@ -21,7 +21,7 @@ struct unstableLog {
 
   void truncateAndAppend(const EntryVec& entries);
 
-  uint64_t maybeFirstIndex();
+  bool maybeFirstIndex(uint64_t *first);
 
   bool  maybeLastIndex(uint64_t* last);
 
