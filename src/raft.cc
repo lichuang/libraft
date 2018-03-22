@@ -591,7 +591,7 @@ int raft::step(Message *msg) {
   int type = msg->type();
   uint64_t from = msg->from();
 
-  if (term > 0) {
+  if (term_ != 0 && term > term_) {
     uint64_t leader = from;
     if (type == MsgVote || type == MsgPreVote) {
       bool force = msg->context() == kCampaignTransfer;
@@ -905,9 +905,9 @@ bool raft::stepCandidate(Message *msg) {
   int granted;
 
   if (type == voteRespType) {
-    granted = poll(msg->from(), msg->type(), msg->reject());
+    granted = poll(msg->from(), msg->type(), !msg->reject());
     logger_->Infof(__FILE__, __LINE__, "%x [quorum:%llu] has received %llu %s votes and %llu vote rejections",
-      id_, quorum(), granted, msg->type(), votes_.size() - granted);
+      id_, quorum(), granted, msgTypeString(type), votes_.size() - granted);
     if (granted == quorum()) {
       if (state_ == StatePreCandidate) {
         // TODO
@@ -1141,4 +1141,5 @@ void raft::removeNode(uint64_t id) {
 
 void raft::readMessages(vector<Message*> *msgs) {
   *msgs = msgs_;
+  msgs_.clear();
 }

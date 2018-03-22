@@ -38,7 +38,6 @@ void testLeaderElection(bool prevote) {
   int i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
-    raft *r = (raft*)t.net->peers[1]->data();
     Message *msg = new Message(); 
     msg->set_from(1);
     msg->set_to(1);
@@ -46,6 +45,7 @@ void testLeaderElection(bool prevote) {
     vector<Message*> msgs;
     msgs.push_back(msg);
     t.net->send(&msgs);
+    raft *r = (raft*)t.net->peers[1]->data();
     StateType expState;
     uint64_t expTerm;
     if (t.state == StateCandidate && prevote) {
