@@ -1,8 +1,14 @@
 #include "progress.h"
 
 Progress::Progress(uint64_t next, int maxInfilght, Logger *logger)
-  : next_(next),
-    ins_(inflights(maxInfilght, logger)) {
+  : match_(0),
+    next_(next),
+    state_(ProgressStateProbe),
+    paused_(false),  
+    pendingSnapshot_(0),
+    recentActive_(false),
+    ins_(inflights(maxInfilght, logger)),
+    logger_(logger) {
 }
 
 Progress::~Progress() {
@@ -64,7 +70,7 @@ void Progress::snapshotFailure() {
 
 // maybeDecrTo returns false if the given to index comes from an out of order message.
 // Otherwise it decreases the progress next index to min(rejected, last) and returns true.
-bool Progress::maybeDecrTo(uint64_t last, uint64_t rejected) {
+bool Progress::maybeDecrTo(uint64_t rejected, uint64_t last) {
   if (state_ == ProgressStateReplicate) {
     // the rejection must be stale if the progress has matched and "rejected"
     // is smaller than "match".

@@ -49,6 +49,8 @@ void copyEntries(const Message* msg, EntryVec *entries) {
 
 raft::raft(Config *config, raftLog *log)
   : id_(config->id),
+    term_(0),
+    vote_(0),
     raftLog_(log),
     maxInfilght_(config->maxInflightMsgs),
     maxMsgSize_(config->maxSizePerMsg),
@@ -57,6 +59,7 @@ raft::raft(Config *config, raftLog *log)
     readOnly_(new readOnly(config->readOnlyOption, config->logger)),
     heartbeatTimeout_(config->heartbeatTick),
     electionTimeout_(config->electionTick),
+    preVote_(config->preVote),
     logger_(config->logger) {
   srand((unsigned)time(NULL));
 }
@@ -107,10 +110,9 @@ raft* newRaft(Config *config) {
   vector<string> peerStrs;
   map<uint64_t, Progress*>::const_iterator iter;
   char tmp[32];
-  while (iter != r->prs_.end()) {
+  for (iter = r->prs_.begin(); iter != r->prs_.end(); ++iter) {
     snprintf(tmp, sizeof(tmp), "%llu", iter->first);
     peerStrs.push_back(tmp);
-    ++iter;
   }
   string nodeStr = joinStrings(peerStrs, ",");
 
@@ -177,7 +179,7 @@ void raft::send(Message *msg) {
   int type = msg->type();
 
   // TODO: MsgPreVote
-  if (type == MsgVote) {
+  if (type == MsgVote || type == MsgPreVote) {
     if (msg->term() == 0) {
       // PreVote RPCs are sent at a term other than our actual term, so the code
       // that sends these messages is responsible for setting the term.
@@ -455,11 +457,24 @@ void raft::becomeFollower(uint64_t term, uint64_t leader) {
   logger_->Infof(__FILE__, __LINE__, "%x became follower at term %llu", id_, term_);
 }
 
+void raft::becomePreCandidate() {
+  // TODO(xiangli) remove the panic when the raft implementation is stable
+  if (state_ == StateLeader) {
+    logger_->Fatalf(__FILE__, __LINE__, "invalid transition [leader -> pre-candidate]");
+  }
+  // Becoming a pre-candidate changes our step functions and state,
+  // but doesn't change anything else. In particular it does not increase
+  // r.Term or change r.Vote.
+  state_ = StatePreCandidate;
+  logger_->Infof(__FILE__, __LINE__, "%x became pre-candidate at term %llu", id_, term_);
+}
+
 void raft::becomeCandidate() {
   if (state_ == StateLeader) {
     logger_->Fatalf(__FILE__, __LINE__, "invalid transition [leader -> candidate]");
   }
 
+  reset(term_ + 1);
   vote_ = id_;
   state_ = StateCandidate;
   logger_->Infof(__FILE__, __LINE__, "%x became candidate at term %llu", id_, term_);
@@ -509,8 +524,9 @@ void raft::campaign(CampaignType t) {
   uint64_t term;
   MessageType voteMsg;
   if (t == campaignPreElection) {
-    // TODO
+    becomePreCandidate();
     voteMsg = MsgPreVote;
+    term = term_ + 1;
   } else {
     becomeCandidate();
     voteMsg = MsgVote;
@@ -521,7 +537,7 @@ void raft::campaign(CampaignType t) {
     // We won the election after voting for ourselves (which must mean that
     // this is a single-node cluster). Advance to the next state.
     if (t == campaignPreElection) {
-      // TODO
+      campaign(campaignElection);
     } else {
       becomeLeader();
     }
@@ -552,9 +568,9 @@ void raft::campaign(CampaignType t) {
 
 int raft::poll(uint64_t id, MessageType t, bool v) {
   if (v) {
-    logger_->Infof(__FILE__, __LINE__, "%x received %s from %x at term %llu", id_, t, id, term_);
+    logger_->Infof(__FILE__, __LINE__, "%x received %s from %x at term %llu", id_, msgTypeString(t), id, term_);
   } else {
-    logger_->Infof(__FILE__, __LINE__, "%x received %s rejection from %x at term %llu", id_, t, id, term_);
+    logger_->Infof(__FILE__, __LINE__, "%x received %s rejection from %x at term %llu", id_, msgTypeString(t), id, term_);
   }
   if (votes_.find(id) == votes_.end()) {
     votes_[id] = v;
@@ -596,7 +612,7 @@ int raft::step(Message *msg) {
       //TODO
     } else {
       logger_->Infof(__FILE__, __LINE__, "%x [term: %llu] received a %s message with higher term from %x [term: %llu]",
-        id_, term_, type, from, term);
+        id_, term_, msgTypeString(type), from, term);
       becomeFollower(term, leader);
     }
   } else if (term < term_) {
@@ -604,7 +620,7 @@ int raft::step(Message *msg) {
       //TODO
     } else {
       logger_->Infof(__FILE__, __LINE__, "%x [term: %llu] ignored a %s message with lower term from %x [term: %llu]",
-        id_, term_, type, from, term);
+        id_, term_, msgTypeString(type), from, term);
     }
   }
 
@@ -628,7 +644,7 @@ int raft::step(Message *msg) {
       }
       logger_->Infof(__FILE__, __LINE__, "%x is starting a new election at term %llu", id_, term_);
       if (preVote_) {
-        //TODO
+        campaign(campaignPreElection);
       } else {
         campaign(campaignElection);
       }
@@ -642,7 +658,7 @@ int raft::step(Message *msg) {
     // always equal r.Term.
     if ((vote_ == None || term > term_ || vote_ == from) && raftLog_->isUpToDate(msg->index(), msg->logterm())) {
       logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] cast %s for %x [logterm: %llu, index: %llu] at term %llu",
-        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, type, from, msg->logterm(), msg->index(), term_);
+        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from, msg->logterm(), msg->index(), term_);
       respMsg = new Message();
       respMsg->set_to(from);      
       respMsg->set_type(voteRespMsgType(type));
@@ -654,7 +670,7 @@ int raft::step(Message *msg) {
     } else {
       logger_->Infof(__FILE__, __LINE__,
         "%x [logterm: %llu, index: %llu, vote: %x] rejected %s from %x [logterm: %llu, index: %llu] at term %llu",
-        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, type, from, msg->logterm(), msg->index(), term_);
+        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from, msg->logterm(), msg->index(), term_);
       respMsg = new Message();
       respMsg->set_to(from);      
       respMsg->set_reject(true);      
@@ -1121,4 +1137,8 @@ void raft::removeNode(uint64_t id) {
   if (state_ == StateLeader && leadTransferee_ == id) {
     abortLeaderTransfer();
   }
+}
+
+void raft::readMessages(vector<Message*> *msgs) {
+  *msgs = msgs_;
 }

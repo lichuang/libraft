@@ -38,9 +38,9 @@ struct inflights {
 };
 
 enum ProgressState {
-  ProgressStateProbe     = 1,
-  ProgressStateReplicate = 2,
-  ProgressStateSnapshot  = 3
+  ProgressStateProbe     = 0,
+  ProgressStateReplicate = 1,
+  ProgressStateSnapshot  = 2 
 };
 
 // Progress represents a follower’s progress in the view of the leader. Leader maintains
@@ -99,7 +99,7 @@ struct Progress {
   void becomeSnapshot(uint64_t snapshoti);
   bool maybeUpdate(uint64_t n);
   void optimisticUpdate(uint64_t n);
-  bool maybeDecrTo(uint64_t last, uint64_t rejected);
+  bool maybeDecrTo(uint64_t rejected, uint64_t last);
   void snapshotFailure();
   void pause();
   void resume();

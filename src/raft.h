@@ -84,6 +84,7 @@ struct raft {
   void bcastHeartbeatWithCtx(const string &ctx);
   void becomeFollower(uint64_t term, uint64_t leader);
   void becomeCandidate();
+  void becomePreCandidate();
   void becomeLeader();
   void campaign(CampaignType t);
   bool maybeCommit();
@@ -109,6 +110,7 @@ struct raft {
   void setProgress(uint64_t id, uint64_t match, uint64_t next);
   void abortLeaderTransfer();
   bool proxyMessage(Message *msg);
+  void readMessages(vector<Message*> *);
 };
 extern raft* newRaft(Config *);
 

@@ -143,6 +143,15 @@ struct Config {
   // limit the proposal rate?
   uint64_t          maxInflightMsgs;
 
+  // CheckQuorum specifies if the leader should check quorum activity. Leader
+  // steps down when quorum is not active for an electionTimeout.
+  bool checkQuorum;
+
+  // PreVote enables the Pre-Vote algorithm described in raft thesis section
+  // 9.6. This prevents disruption when a node that has been partitioned away
+  // rejoins the cluster.
+  bool preVote;
+
   // Logger is the logger used for raft log. For multinode which can host
   // multiple raft group, each raft group can have its own logger
   Logger*           logger;            
