@@ -52,7 +52,6 @@ void testLeaderElection(bool prevote) {
   };
 
   vector<tmp> tests;
-/*
   {
     vector<stateMachine*> peers;
     peers.push_back(NULL);
@@ -86,7 +85,6 @@ void testLeaderElection(bool prevote) {
     tmp t(newNetworkWithConfig(fun, peers), StateCandidate, 1);
     tests.push_back(t);
   }
-*/
   {
     vector<stateMachine*> peers;
     peers.push_back(NULL);
@@ -99,7 +97,6 @@ void testLeaderElection(bool prevote) {
   }
   // three logs further along than 0, but in the same term so rejections
   // are returned instead of the votes being ignored.
-/*
   {
     vector<uint64_t> terms;
     terms.push_back(1);
@@ -114,7 +111,6 @@ void testLeaderElection(bool prevote) {
     tmp t(newNetworkWithConfig(fun, peers), StateFollower, 1);
     tests.push_back(t);
   }
-*/
   int i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];

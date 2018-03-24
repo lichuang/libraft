@@ -587,7 +587,7 @@ int raft::poll(uint64_t id, MessageType t, bool v) {
 }
 
 int raft::step(Message *msg) {
-  logger_->Debugf(__FILE__, __LINE__, "!!!%llu > %llu %s", msg->from(), msg->to(), msgTypeString(msg->type()));
+  logger_->Debugf(__FILE__, __LINE__, "msg %s %llu -> %llu", msgTypeString(msg->type()), msg->from(), msg->to());
   // Handle the message term, which may result in our stepping down to a follower.
   uint64_t term = msg->term();
   int type = msg->type();
@@ -612,7 +612,11 @@ int raft::step(Message *msg) {
     if (type == MsgPreVote) {
       // Never change our term in response to a PreVote
     } else if (type == MsgPreVoteResp && !msg->reject()) {
-      //TODO
+      // We send pre-vote requests with a term in our future. If the
+      // pre-vote is granted, we will increment our term when we get a
+      // quorum. If it is not, the term comes from the node that
+      // rejected our vote so we should become a follower at the new
+      // term.
     } else {
       logger_->Infof(__FILE__, __LINE__, "%x [term: %llu] received a %s message with higher term from %x [term: %llu]",
         id_, term_, msgTypeString(type), from, term);
@@ -914,7 +918,7 @@ bool raft::stepCandidate(Message *msg) {
       id_, quorum(), granted, msgTypeString(type), votes_.size() - granted);
     if (granted == quorum()) {
       if (state_ == StatePreCandidate) {
-        // TODO
+        campaign(campaignPreElection);
       } else {
         becomeLeader();
         bcastAppend();
