@@ -40,10 +40,10 @@ string entryString(const Entry& entry) {
   return tmp;
 }
 
-void copyEntries(const Message* msg, EntryVec *entries) {
+void copyEntries(const Message& msg, EntryVec *entries) {
   int i = 0;
-  for (i = 0; i < msg->entries_size(); ++i) {
-    entries->push_back(msg->entries(i));
+  for (i = 0; i < msg.entries_size(); ++i) {
+    entries->push_back(msg.entries(i));
   }
 }
 
@@ -136,6 +136,10 @@ void raft::tick() {
     logger_->Fatalf(__FILE__, __LINE__, "unsport state %d", state_);
     break;
   }
+}
+
+Message* raft::cloneMessage(const Message& msg) {
+  return new Message(msg);
 }
 
 bool raft::hasLeader() {
@@ -396,9 +400,9 @@ void raft::tickElection() {
   
   if (promotable() && pastElectionTimeout()) {
     electionElapsed_ = 0;
-    Message *msg = new Message();
-    msg->set_from(id_);
-    msg->set_type(MsgHup);
+    Message msg;
+    msg.set_from(id_);
+    msg.set_type(MsgHup);
     step(msg);
   }
 }
@@ -411,9 +415,9 @@ void raft::tickHeartbeat() {
   if (electionElapsed_ >- electionTimeout_) {
     electionElapsed_ = 0;
     if (checkQuorum_) {
-      Message *msg = new Message();
-      msg->set_from(id_);
-      msg->set_type(MsgCheckQuorum);
+      Message msg;
+      msg.set_from(id_);
+      msg.set_type(MsgCheckQuorum);
       step(msg);
     }
     // If current leader cannot transfer leadership in electionTimeout, it becomes leader again.
@@ -429,9 +433,9 @@ void raft::tickHeartbeat() {
   if (heartbeatElapsed_ >= heartbeatTimeout_) {
     heartbeatElapsed_ = 0;
 
-    Message *msg = new Message();
-    msg->set_from(id_);
-    msg->set_type(MsgBeat);
+    Message msg;
+    msg.set_from(id_);
+    msg.set_type(MsgBeat);
     step(msg);
   }
 }
@@ -589,33 +593,32 @@ int raft::poll(uint64_t id, MessageType t, bool v) {
   return granted;
 }
 
-int raft::step(Message *msg) {
-  logger_->Debugf(__FILE__, __LINE__, "msg %s %llu -> %llu", msgTypeString(msg->type()), msg->from(), msg->to());
+int raft::step(const Message& msg) {
+  logger_->Debugf(__FILE__, __LINE__, "msg %s %llu -> %llu", msgTypeString(msg.type()), msg.from(), msg.to());
   // Handle the message term, which may result in our stepping down to a follower.
-  uint64_t term = msg->term();
-  int type = msg->type();
-  uint64_t from = msg->from();
+  uint64_t term = msg.term();
+  int type = msg.type();
+  uint64_t from = msg.from();
 
   if (term == 0) {
   } else if (term > term_) {
     uint64_t leader = from;
     if (type == MsgVote || type == MsgPreVote) {
-      bool force = msg->context() == kCampaignTransfer;
+      bool force = msg.context() == kCampaignTransfer;
       bool inLease = checkQuorum_ && leader_ != None && electionElapsed_ < electionTimeout_;
       if (!force && inLease) {
         // If a server receives a RequestVote request within the minimum election timeout
         // of hearing from a current leader, it does not update its term or grant its vote
         logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] ignored %s from %x [logterm: %llu, index: %llu] at term %llu: lease is not expired (remaining ticks: %llu",
           id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from,
-          msg->logterm(), msg->index(), term, electionTimeout_ - electionElapsed_);
-        delete msg;
+          msg.logterm(), msg.index(), term, electionTimeout_ - electionElapsed_);
         return OK;
       }
       leader = None;
     }
     if (type == MsgPreVote) {
       // Never change our term in response to a PreVote
-    } else if (type == MsgPreVoteResp && !msg->reject()) {
+    } else if (type == MsgPreVoteResp && !msg.reject()) {
       // We send pre-vote requests with a term in our future. If the
       // pre-vote is granted, we will increment our term when we get a
       // quorum. If it is not, the term comes from the node that
@@ -652,7 +655,6 @@ int raft::step(Message *msg) {
       if (n != 0 && raftLog_->committed_ > raftLog_->applied_) {
         logger_->Warningf(__FILE__, __LINE__, "%x cannot campaign at term %llu since there are still %llu pending configuration changes to apply",
           id_, term_, n);
-        delete msg;
         return OK;
       }
       logger_->Infof(__FILE__, __LINE__, "%x is starting a new election at term %llu", id_, term_);
@@ -669,9 +671,9 @@ int raft::step(Message *msg) {
   case MsgPreVote:
     // The m.Term > r.Term clause is for MsgPreVote. For MsgVote m.Term should
     // always equal r.Term.
-    if ((vote_ == None || term > term_ || vote_ == from) && raftLog_->isUpToDate(msg->index(), msg->logterm())) {
+    if ((vote_ == None || term > term_ || vote_ == from) && raftLog_->isUpToDate(msg.index(), msg.logterm())) {
       logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] cast %s for %x [logterm: %llu, index: %llu] at term %llu",
-        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from, msg->logterm(), msg->index(), term_);
+        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from, msg.logterm(), msg.index(), term_);
       respMsg = new Message();
       respMsg->set_to(from);      
       respMsg->set_type(voteRespMsgType(type));
@@ -683,7 +685,7 @@ int raft::step(Message *msg) {
     } else {
       logger_->Infof(__FILE__, __LINE__,
         "%x [logterm: %llu, index: %llu, vote: %x] rejected %s from %x [logterm: %llu, index: %llu] at term %llu",
-        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from, msg->logterm(), msg->index(), term_);
+        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from, msg.logterm(), msg.index(), term_);
       respMsg = new Message();
       respMsg->set_to(from);      
       respMsg->set_reject(true);      
@@ -692,58 +694,56 @@ int raft::step(Message *msg) {
     }
     break;
   default:
-    if (proxyMessage(msg)) {
-      delete msg;
-    }
-    return OK;
+    proxyMessage(msg);
     break;
   }
 
-  delete msg;
   return OK;
 }
 
-bool raft::proxyMessage(Message *msg) {
+void raft::proxyMessage(const Message& msg) {
   if (state_ == StateFollower) {
-    return stepFollower(msg);
+    stepFollower(msg);
   }
   if (state_ == StateLeader) {
-    return stepLeader(msg);
+    stepLeader(msg);
   }
 
-  return stepCandidate(msg);
+  stepCandidate(msg);
 }
 
-bool raft::stepLeader(Message *msg) {
-  int type = msg->type();
+void raft::stepLeader(const Message& msg) {
+  int type = msg.type();
   size_t i;
   uint64_t term;
   int err;
   EntryVec entries;
+  Message *n;
 
   switch (type) {
   case MsgBeat:
     bcastHeartbeat();
-    return true;
+    return;
     break;
   case MsgCheckQuorum:
     // TODO
     break;
   case MsgProp:
-    if (msg->entries_size() == 0) {
+    if (msg.entries_size() == 0) {
       logger_->Fatalf(__FILE__, __LINE__, "%x stepped empty MsgProp", id_);
     }
     if (prs_.find(id_) == prs_.end()) {
       // If we are not currently a member of the range (i.e. this node
       // was removed from the configuration while serving as leader),
       // drop any new proposals.
-      return true;
+      return;
     }
+    n = cloneMessage(msg);
     if (leadTransferee_ != None) {
       // TODO
     }
-    for (i = 0; i < msg->entries_size(); ++i) {
-      Entry *entry = msg->mutable_entries(i);
+    for (i = 0; i < n->entries_size(); ++i) {
+      Entry *entry = n->mutable_entries(i);
       if (entry->type() != EntryConfChange) {
         continue;
       }
@@ -757,46 +757,48 @@ bool raft::stepLeader(Message *msg) {
       }
       pendingConf_ = true;
     }
-    copyEntries(msg, &entries);
+    copyEntries(*n, &entries);
     appendEntry(&entries);
     bcastAppend();
-    return true;
+    delete n;
+    return;
     break;
   case MsgReadIndex:
     if (quorum() > 1) {
       err = raftLog_->term(raftLog_->committed_, &term);
       if (raftLog_->zeroTermOnErrCompacted(term, err) != term_) {
         // Reject read only request when this leader has not committed any log entry at its term.
-        return true;
+        return;
       }
       // thinking: use an interally defined context instead of the user given context.
       // We can express this in terms of the term and index instead of a user-supplied value.
       // This would allow multiple reads to piggyback on the same message.
       if (readOnly_->option_ == ReadOnlySafe) {
-        readOnly_->addRequest(raftLog_->committed_, msg);
-        bcastHeartbeatWithCtx(msg->entries(0).data());
-        return false; 
+        n = cloneMessage(msg);
+        readOnly_->addRequest(raftLog_->committed_, n);
+        bcastHeartbeatWithCtx(n->entries(0).data());
+        return;
       } else if (readOnly_->option_ == ReadOnlyLeaseBased) {
         // TODO
       }
     } else {
-      readStates_.push_back(new ReadState(raftLog_->committed_, msg->entries(0).data())); 
+      readStates_.push_back(new ReadState(raftLog_->committed_, msg.entries(0).data())); 
     }
-    return true;
+    return;
     break;
   }
 
   // All other message types require a progress for m.From (pr).
   Progress *pr;
-  uint64_t from = msg->from();
-  uint64_t index = msg->index();
+  uint64_t from = msg.from();
+  uint64_t index = msg.index();
   bool oldPaused;
   vector<readIndexStatus*> rss;
   Message *req, *respMsg;
   map<uint64_t, Progress*>::iterator iter = prs_.find(from);
   if (iter == prs_.end()) {
     logger_->Debugf(__FILE__, __LINE__, "%x no progress available for %x", id_, from);
-    return true;
+    return;
   }
   pr = iter->second;
   int ackCnt;
@@ -804,10 +806,10 @@ bool raft::stepLeader(Message *msg) {
   switch (type) {
   case MsgAppResp:
     pr->recentActive_ = true;
-    if (msg->reject()) {
+    if (msg.reject()) {
       logger_->Debugf(__FILE__, __LINE__, "%x received msgApp rejection(lastindex: %llu) from %x for index %llu",
-        id_, msg->rejecthint(), from, index);
-      if (pr->maybeDecrTo(index, msg->rejecthint())) {
+        id_, msg.rejecthint(), from, index);
+      if (pr->maybeDecrTo(index, msg.rejecthint())) {
         logger_->Debugf(__FILE__, __LINE__, "%x decreased progress of %x to [%s]",
           id_, from, pr->string().c_str());
         if (pr->state_ == ProgressStateReplicate) {
@@ -851,13 +853,13 @@ bool raft::stepLeader(Message *msg) {
       sendAppend(from);
     }
 
-    if (readOnly_->option_ != ReadOnlySafe || msg->context().size() == 0) {
-      return true;
+    if (readOnly_->option_ != ReadOnlySafe || msg.context().size() == 0) {
+      return;
     }
 
     ackCnt = readOnly_->recvAck(msg);
     if (ackCnt < quorum()) {
-      return true;
+      return;
     }
     readOnly_->advance(msg, &rss);
     for (i = 0; i < rss.size(); ++i) {
@@ -876,9 +878,9 @@ bool raft::stepLeader(Message *msg) {
     break;
   case MsgSnapStatus:
     if (pr->state_ != ProgressStateSnapshot) {
-      return true;
+      return;
     }
-    if (!msg->reject()) {
+    if (!msg.reject()) {
       pr->becomeProbe();
       logger_->Debugf(__FILE__, __LINE__, "%x snapshot succeeded, resumed sending replication messages to %x [%s]",
         id_, from, pr->string().c_str());
@@ -900,13 +902,11 @@ bool raft::stepLeader(Message *msg) {
     //TODO
     break;
   }
-  
-  return true;
 }
 
 // stepCandidate is shared by StateCandidate and StatePreCandidate; the difference is
 // whether they respond to MsgVoteResp or MsgPreVoteResp.
-bool raft::stepCandidate(Message *msg) {
+void raft::stepCandidate(const Message& msg) {
   // Only handle vote responses corresponding to our candidacy (while in
   // StateCandidate, we may get stale MsgPreVoteResp messages in this term from
   // our pre-candidate state).
@@ -916,11 +916,11 @@ bool raft::stepCandidate(Message *msg) {
   } else {
     voteRespType = MsgVoteResp;
   }
-  int type = msg->type();
+  int type = msg.type();
   int granted = 0;
 
   if (type == voteRespType) {
-    granted = poll(msg->from(), msg->type(), !msg->reject());
+    granted = poll(msg.from(), msg.type(), !msg.reject());
     logger_->Infof(__FILE__, __LINE__, "%x [quorum:%llu] has received %d %s votes and %llu vote rejections",
       id_, quorum(), granted, msgTypeString(type), votes_.size() - granted);
     if (granted == quorum()) {
@@ -933,55 +933,55 @@ bool raft::stepCandidate(Message *msg) {
     } else if (granted == votes_.size() - granted) {
       becomeFollower(term_, None);
     }
-    return true;
+    return;
   }
 
   switch (type) {
   case MsgProp:
     logger_->Infof(__FILE__, __LINE__, "%x no leader at term %llu; dropping proposal", id_, term_);
-    return true;
+    return;
     break;
   case MsgApp:
-    becomeFollower(term_, msg->from());
+    becomeFollower(term_, msg.from());
     handleAppendEntries(msg);
     break;
   case MsgHeartbeat:
-    becomeFollower(term_, msg->from());
+    becomeFollower(term_, msg.from());
     handleHeartbeat(msg);
     break;
   case MsgTimeoutNow:
     // TODO
     break;
   }
-
-  return true;
 }
 
-bool raft::stepFollower(Message *msg) {
-  int type = msg->type();
+void raft::stepFollower(const Message& msg) {
+  int type = msg.type();
+  Message *n;
 
   switch (type) {
   case MsgProp:
     if (leader_ == None) {
-      return true;
+      return;
     }
-    msg->set_to(leader_);
-    send(msg);
-    return false;
+    n = cloneMessage(msg);
+    n->set_to(leader_);
+    send(n);
+    return;
     break;
   case MsgApp:
     electionElapsed_ = 0;
-    leader_ = msg->from();
+    leader_ = msg.from();
     handleAppendEntries(msg);
     break;
   case MsgHeartbeat:
     electionElapsed_ = 0;
-    leader_ = msg->from();
+    leader_ = msg.from();
     handleHeartbeat(msg);
     break;
   case MsgSnap:
     electionElapsed_ = 0;
-    leader_ = msg->from();
+    leader_ = msg.from();
     handleSnapshot(msg);
     break;
   case MsgTransferLeader:
@@ -993,23 +993,22 @@ bool raft::stepFollower(Message *msg) {
   case MsgReadIndex:
     if (leader_ == None) {
       logger_->Infof(__FILE__, __LINE__, "%x no leader at term %llu; dropping index reading msg", id_, term_);
-      return true;
-    }   
-    msg->set_to(leader_);
-    send(msg);
-    return false;
+      return;
+    }
+    n = cloneMessage(msg);
+    n->set_to(leader_);
+    send(n);
+    return;
     break;
   case MsgReadIndexResp:
-    if (msg->entries_size() != 1) {
+    if (msg.entries_size() != 1) {
       logger_->Errorf(__FILE__, __LINE__, "%x invalid format of MsgReadIndexResp from %x, entries count: %llu",
-        id_, msg->from(), msg->entries_size());
-      return true;
+        id_, msg.from(), msg.entries_size());
+      return;
     }
-    readStates_.push_back(new ReadState(msg->index(), msg->entries(0).data()));
+    readStates_.push_back(new ReadState(msg.index(), msg.entries(0).data()));
     break;
   }
-
-  return true;
 }
 
 // restore recovers the state machine from a snapshot. It restores the log and the
@@ -1045,14 +1044,14 @@ bool raft::restore(const Snapshot& snapshot) {
   return true;
 }
 
-void raft::handleSnapshot(Message *msg) {
-  uint64_t sindex = msg->snapshot().metadata().index();
-  uint64_t sterm  = msg->snapshot().metadata().term();
+void raft::handleSnapshot(const Message& msg) {
+  uint64_t sindex = msg.snapshot().metadata().index();
+  uint64_t sterm  = msg.snapshot().metadata().term();
   Message *resp = new Message;
 
-  resp->set_to(msg->from());
+  resp->set_to(msg.from());
   resp->set_type(MsgAppResp);
-  if (restore(msg->snapshot())) {
+  if (restore(msg.snapshot())) {
     logger_->Infof(__FILE__, __LINE__, "%x [commit: %d] restored snapshot [index: %d, term: %d]",
       id_, raftLog_->committed_, sindex, sterm);
     resp->set_index(raftLog_->lastIndex());
@@ -1064,19 +1063,19 @@ void raft::handleSnapshot(Message *msg) {
   send(resp);
 }
 
-void raft::handleHeartbeat(Message *msg) {
-  raftLog_->commitTo(msg->commit());
+void raft::handleHeartbeat(const Message& msg) {
+  raftLog_->commitTo(msg.commit());
   Message *resp = new Message();
-  resp->set_to(msg->from());
+  resp->set_to(msg.from());
   resp->set_type(MsgHeartbeatResp);
-  resp->set_context(msg->context());
+  resp->set_context(msg.context());
   send(resp);
 }
 
-void raft::handleAppendEntries(Message *msg) {
-  if (msg->index() < raftLog_->committed_) {
+void raft::handleAppendEntries(const Message& msg) {
+  if (msg.index() < raftLog_->committed_) {
     Message *resp = new Message();
-    resp->set_to(msg->from());
+    resp->set_to(msg.from());
     resp->set_type(MsgAppResp);
     resp->set_index(raftLog_->committed_);
     send(resp);
@@ -1086,22 +1085,23 @@ void raft::handleAppendEntries(Message *msg) {
   EntryVec entries;
   copyEntries(msg, &entries);
   uint64_t lasti;
-  bool ret = raftLog_->maybeAppend(msg->index(), msg->logterm(), msg->commit(), entries, &lasti);
+  bool ret = raftLog_->maybeAppend(msg.index(), msg.logterm(), msg.commit(), entries, &lasti);
   if (ret) {
     Message *resp = new Message();
-    resp->set_to(msg->from());
+    resp->set_to(msg.from());
     resp->set_type(MsgAppResp);
     resp->set_index(lasti);
     send(resp);
   } else {
     uint64_t term;
-    int err = raftLog_->term(msg->index(), &term);
-    logger_->Debugf(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu] rejected msgApp [logterm: %llu, index: %llu] from %x",
-      id_, raftLog_->zeroTermOnErrCompacted(term, err), msg->index(), msg->logterm(), msg->index(), msg->from());
+    int err = raftLog_->term(msg.index(), &term);
+    logger_->Debugf(__FILE__, __LINE__,
+      "%x [logterm: %llu, index: %llu] rejected msgApp [logterm: %llu, index: %llu] from %x",
+      id_, raftLog_->zeroTermOnErrCompacted(term, err), msg.index(), msg.logterm(), msg.index(), msg.from());
     Message *resp = new Message();
-    resp->set_to(msg->from());
+    resp->set_to(msg.from());
     resp->set_type(MsgAppResp);
-    resp->set_index(msg->index());
+    resp->set_index(msg.index());
     resp->set_reject(true);
     resp->set_rejecthint(raftLog_->lastIndex());
     send(resp);

@@ -267,10 +267,10 @@ TEST(raftTests, TestProgressResumeByHeartbeatResp) {
   r->prs_[2]->paused_ = true;
 
   {
-    Message *msg = new Message();
-    msg->set_from(1);
-    msg->set_to(1);
-    msg->set_type(MsgBeat);
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgBeat);
 
     r->step(msg);
     EXPECT_TRUE(r->prs_[2]->paused_);
@@ -278,10 +278,10 @@ TEST(raftTests, TestProgressResumeByHeartbeatResp) {
 
   r->prs_[2]->becomeReplicate();
   {
-    Message *msg = new Message();
-    msg->set_from(2);
-    msg->set_to(1);
-    msg->set_type(MsgHeartbeatResp);
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(1);
+    msg.set_type(MsgHeartbeatResp);
 
     r->step(msg);
     EXPECT_FALSE(r->prs_[2]->paused_);
@@ -302,29 +302,29 @@ TEST(raftTests, TestProgressPaused) {
   r->becomeLeader();
 
   {
-    Message *msg = new Message();
-    msg->set_from(1);
-    msg->set_to(1);
-    msg->set_type(MsgProp);
-    Entry *entry = msg->add_entries();
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
     entry->set_data("somedata");
     r->step(msg);
   }
   {
-    Message *msg = new Message();
-    msg->set_from(1);
-    msg->set_to(1);
-    msg->set_type(MsgProp);
-    Entry *entry = msg->add_entries();
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
     entry->set_data("somedata");
     r->step(msg);
   }
   {
-    Message *msg = new Message();
-    msg->set_from(1);
-    msg->set_to(1);
-    msg->set_type(MsgProp);
-    Entry *entry = msg->add_entries();
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
     entry->set_data("somedata");
     r->step(msg);
   }
@@ -627,13 +627,13 @@ void testVoteFromAnyState(MessageType vt) {
     uint64_t origTerm = r->term_;
     uint64_t newTerm  = r->term_ + 1;
 
-    Message *msg = new Message();
-    msg->set_from(2);
-    msg->set_to(1);
-    msg->set_type(vt);
-    msg->set_term(newTerm);
-    msg->set_logterm(newTerm);
-    msg->set_index(42);
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(1);
+    msg.set_type(vt);
+    msg.set_term(newTerm);
+    msg.set_logterm(newTerm);
+    msg.set_index(42);
     int err = r->step(msg);
 
     EXPECT_EQ(err, OK);
@@ -712,6 +712,7 @@ TEST(raftTests, TestLogReplication) {
       Entry *entry = msg->add_entries();
       entry->set_data("somedata");
 
+      kDefaultLogger.Infof(__FILE__, __LINE__, "msg:%p", msg);
       msgs.push_back(msg);
     }
     {
@@ -731,6 +732,7 @@ TEST(raftTests, TestLogReplication) {
       Entry *entry = msg->add_entries();
       entry->set_data("somedata");
       msgs.push_back(msg);
+      kDefaultLogger.Infof(__FILE__, __LINE__, "msg:%p", msg);
     }
     tests.push_back(tmp(newNetwork(peers), msgs, 4));
   }
@@ -751,6 +753,7 @@ TEST(raftTests, TestLogReplication) {
       msgs.push_back(t.msgs[j]);
       t.net->send(&msgs);
     }
+
     map<uint64_t, stateMachine*>::iterator iter;
     for (iter = t.net->peers.begin(); iter != t.net->peers.end(); ++iter) {
       raft *r = (raft*)iter->second->data();
@@ -767,8 +770,11 @@ TEST(raftTests, TestLogReplication) {
 
       vector<Message*> props;
       for (m = 0; m < t.msgs.size(); ++m) {
-        if (t.msgs[m]->type() == MsgProp) {
-          props.push_back(t.msgs[m]);
+        Message *msg = t.msgs[m];
+        if (msg->type() == MsgProp) {
+          props.push_back(msg);
+          kDefaultLogger.Infof(__FILE__, __LINE__, "== msg:%p", msg);
+          kDefaultLogger.Infof(__FILE__, __LINE__, "entry size:%d", msg->entries_size());
         }
       } 
       for (m = 0; m < props.size(); ++m) {

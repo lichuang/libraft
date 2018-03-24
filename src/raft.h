@@ -90,16 +90,16 @@ struct raft {
   bool maybeCommit();
   void reset(uint64_t term);
   void appendEntry(EntryVec* entries);
-  void handleAppendEntries(Message *msg);
-  void handleHeartbeat(Message *msg);
-  void handleSnapshot(Message *msg);
+  void handleAppendEntries(const Message& msg);
+  void handleHeartbeat(const Message& msg);
+  void handleSnapshot(const Message& msg);
   void tickElection();
   void tickHeartbeat();
   int  poll(uint64_t id, MessageType t, bool v);
-  int  step(Message *msg);
-  bool stepFollower(Message *msg);
-  bool stepCandidate(Message *msg);
-  bool stepLeader(Message *msg);
+  int  step(const Message& msg);
+  void stepFollower(const Message& msg);
+  void stepCandidate(const Message& msg);
+  void stepLeader(const Message& msg);
   bool promotable();
   bool restore(const Snapshot& snapshot);
   void delProgress(uint64_t id);
@@ -109,8 +109,9 @@ struct raft {
   void resetRandomizedElectionTimeout();
   void setProgress(uint64_t id, uint64_t match, uint64_t next);
   void abortLeaderTransfer();
-  bool proxyMessage(Message *msg);
+  void proxyMessage(const Message& msg);
   void readMessages(vector<Message*> *);
+  Message* cloneMessage(const Message& msg);
 };
 extern raft* newRaft(Config *);
 

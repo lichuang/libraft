@@ -35,7 +35,7 @@ raftStateMachine::~raftStateMachine() {
 }
 
 int raftStateMachine::step(Message *msg) {
-  return raft->step(msg);
+  return raft->step(*msg);
 }
 
 void raftStateMachine::readMessages(vector<Message*> *msgs) {

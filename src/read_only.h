@@ -26,8 +26,8 @@ struct readOnly {
 
   readOnly(ReadOnlyOption option, Logger *logger);
   void addRequest(uint64_t index, Message *msg);
-  int recvAck(Message *msg);
-  void advance(Message *msg, vector<readIndexStatus*>* rss);
+  int recvAck(const Message& msg);
+  void advance(const Message& msg, vector<readIndexStatus*>* rss);
   string lastPendingRequestCtx();
 };
 

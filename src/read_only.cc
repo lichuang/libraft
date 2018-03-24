@@ -21,27 +21,27 @@ void readOnly::addRequest(uint64_t index, Message *msg) {
 // recvAck notifies the readonly struct that the raft state machine received
 // an acknowledgment of the heartbeat that attached with the read only request
 // context.
-int readOnly::recvAck(Message *msg) {
-  map<string, readIndexStatus*>::iterator iter = pendingReadIndex_.find(msg->context());
+int readOnly::recvAck(const Message& msg) {
+  map<string, readIndexStatus*>::iterator iter = pendingReadIndex_.find(msg.context());
   if (iter == pendingReadIndex_.end()) {
     return 0;
   }
 
   readIndexStatus* rs = iter->second;
-  rs->acks_[msg->from()] = true; 
+  rs->acks_[msg.from()] = true; 
   return rs->acks_.size() + 1;
 }
 
 // advance advances the read only request queue kept by the readonly struct.
 // It dequeues the requests until it finds the read only request that has
 // the same context as the given `m`.
-void readOnly::advance(Message *msg, vector<readIndexStatus*> *rss) {
+void readOnly::advance(const Message& msg, vector<readIndexStatus*> *rss) {
   size_t i;
   bool found = false;
-  string ctx = msg->context();
+  string ctx = msg.context();
 
   for (i = 0; i < readIndexQueue_.size(); ++i) {
-    map<string, readIndexStatus*>::iterator iter = pendingReadIndex_.find(msg->context());
+    map<string, readIndexStatus*>::iterator iter = pendingReadIndex_.find(ctx);
     if (iter == pendingReadIndex_.end()) {
       logger_->Fatalf(__FILE__, __LINE__, "cannot find corresponding read state from pending map");
     }
