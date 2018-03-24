@@ -7,8 +7,34 @@
 #include "progress.h"
 #include "raft_test_util.h"
 
+stateMachine *nopStepper = new blackHole();
+
 void preVoteConfig(Config *c) {
   c->preVote = true; 
+}
+
+raftStateMachine* entsWithConfig(ConfigFun fun, const vector<uint64_t>& terms) {
+  Storage *s = new MemoryStorage(&kDefaultLogger);
+
+  vector<Entry> entries;
+  int i;
+  for (i = 0; i < terms.size(); ++i) {
+    Entry entry;
+    entry.set_index(i + 1);
+    entry.set_term(terms[i]);
+    entries.push_back(entry);
+  }
+  s->Append(&entries);
+
+  vector<uint64_t> peers;
+  Config *c = newTestConfig(1, peers, 5, 1, s);
+  if (fun != NULL) {
+    fun(c);
+  }
+  raftStateMachine *sm = new raftStateMachine(c);
+  raft *r = (raft*)sm->data();
+  r->reset(terms[terms.size() - 1]);
+  return sm;
 }
 
 void testLeaderElection(bool prevote) {
@@ -26,6 +52,7 @@ void testLeaderElection(bool prevote) {
   };
 
   vector<tmp> tests;
+/*
   {
     vector<stateMachine*> peers;
     peers.push_back(NULL);
@@ -34,7 +61,60 @@ void testLeaderElection(bool prevote) {
     tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
     tests.push_back(t);
   }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+    tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
+    tests.push_back(t);
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+    peers.push_back(nopStepper);
+    tmp t(newNetworkWithConfig(fun, peers), StateCandidate, 1);
+    tests.push_back(t);
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+    peers.push_back(nopStepper);
+    peers.push_back(NULL);
+    tmp t(newNetworkWithConfig(fun, peers), StateCandidate, 1);
+    tests.push_back(t);
+  }
+*/
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+    peers.push_back(nopStepper);
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
+    tests.push_back(t);
+  }
+  // three logs further along than 0, but in the same term so rejections
+  // are returned instead of the votes being ignored.
+/*
+  {
+    vector<uint64_t> terms;
+    terms.push_back(1);
 
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(entsWithConfig(fun, terms));
+    peers.push_back(entsWithConfig(fun, terms));
+    terms.push_back(1);
+    peers.push_back(entsWithConfig(fun, terms));
+    peers.push_back(NULL);
+    tmp t(newNetworkWithConfig(fun, peers), StateFollower, 1);
+    tests.push_back(t);
+  }
+*/
   int i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
@@ -59,7 +139,7 @@ void testLeaderElection(bool prevote) {
       expTerm  = t.expTerm;
     }
 
-    EXPECT_EQ(r->state_, expState);
+    EXPECT_EQ(r->state_, expState) << "i: " << i;
     EXPECT_EQ(r->term_, expTerm);
   }
 }
@@ -345,5 +425,9 @@ TEST(raftTests, TestProgressPaused) {
 }
 
 TEST(raftTests, TestLeaderElection) {
-  testLeaderElection(false);
+  //testLeaderElection(false);
+}
+
+TEST(raftTests, TestLeaderElectionPreVote) {
+  testLeaderElection(true);
 }

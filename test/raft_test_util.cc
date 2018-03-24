@@ -39,7 +39,7 @@ void idsBySize(int size, vector<uint64_t>* ids) {
 
 // newNetworkWithConfig is like newNetwork but calls the given func to
 // modify the configuration of any state machines it creates.
-network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*> peers) {
+network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*>& peers) {
   srand(time(NULL));
   int size = peers.size();
   vector<uint64_t> peerAddrs;
@@ -59,6 +59,9 @@ network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*> peers) 
       s = new MemoryStorage(&kDefaultLogger);
       net->storage[id] = s;
       c = newTestConfig(id, peerAddrs, 10, 1, s);
+      if (fun) {
+        fun(c);
+      }
       r = new raftStateMachine(c);
       net->peers[id] = r;
       continue;
@@ -75,6 +78,7 @@ network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*> peers) 
       net->peers[id] = p;
       break;
     case blackHoleType:
+      net->peers[id] = p;
       break;
     }
   }

@@ -70,6 +70,7 @@ public:
   virtual int Entries(uint64_t lo, uint64_t hi, uint64_t maxSize, vector<Entry> *entries) = 0;
   virtual int GetSnapshot(Snapshot **snapshot) = 0;
   virtual int SetHardState(const HardState& ) = 0;
+  virtual int Append(EntryVec* entries) = 0;
 };
 
 class Logger {

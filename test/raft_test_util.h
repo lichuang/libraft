@@ -64,10 +64,21 @@ struct raftStateMachine : public stateMachine {
   raft *raft;
 };
 
+struct blackHole : public stateMachine {
+  blackHole() {}
+  virtual ~blackHole() {}
+
+  int step(Message *) { return OK; }
+  void readMessages(vector<Message*> *) {}
+
+  int type() { return blackHoleType; }
+  void* data() { return NULL; } 
+};
+
 typedef void (*ConfigFun)(Config*);
 
 extern Config* newTestConfig(uint64_t id, const vector<uint64_t>& peers, int election, int hb, Storage *s);
 extern raft* newTestRaft(uint64_t id, const vector<uint64_t>& peers, int election, int hb, Storage *s);
-extern network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*> peers);
+extern network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*>& peers);
 
 #endif  // __RAFT_TEST_UTIL_H__

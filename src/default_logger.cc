@@ -8,7 +8,8 @@ void DefaultLogger::log(const char *level, const char *file, int line, const cha
   buf_[n++] += '\n';
   buf_[n++] += '\0';
 
-  printf("%s", buf_);
+  fprintf(stdout, "%s", buf_);
+  fflush(stdout);
 }
 
 DefaultLogger kDefaultLogger;
