@@ -37,107 +37,24 @@ raftStateMachine* entsWithConfig(ConfigFun fun, const vector<uint64_t>& terms) {
   return sm;
 }
 
-void testLeaderElection(bool prevote) {
-  ConfigFun fun = NULL;
-  if (prevote) {
-    fun = &preVoteConfig;
+// votedWithConfig creates a raft state machine with Vote and Term set
+// to the given value but no log entries (indicating that it voted in
+// the given term but has not received any logs).
+raftStateMachine* votedWithConfig(ConfigFun fun, uint64_t vote, uint64_t term) {
+  Storage *s = new MemoryStorage(&kDefaultLogger);
+  HardState hs;
+  hs.set_vote(vote);
+  hs.set_term(term);
+  s->SetHardState(hs);
+  Config *c = newTestConfig(1, vector<uint64_t>(), 5, 1, s);
+  if (fun != NULL) {
+    fun(c);
   }
-  struct tmp {
-    network *net;
-    StateType state;
-    uint64_t expTerm;
-
-    tmp(network *net, StateType state, uint64_t t)
-      : net(net), state(state), expTerm(t) {}
-  };
-
-  vector<tmp> tests;
-  {
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(NULL);
-    peers.push_back(NULL);
-    tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
-    tests.push_back(t);
-  }
-  {
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(NULL);
-    peers.push_back(nopStepper);
-    tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
-    tests.push_back(t);
-  }
-  {
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(nopStepper);
-    peers.push_back(nopStepper);
-    tmp t(newNetworkWithConfig(fun, peers), StateCandidate, 1);
-    tests.push_back(t);
-  }
-  {
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(nopStepper);
-    peers.push_back(nopStepper);
-    peers.push_back(NULL);
-    tmp t(newNetworkWithConfig(fun, peers), StateCandidate, 1);
-    tests.push_back(t);
-  }
-  {
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(nopStepper);
-    peers.push_back(nopStepper);
-    peers.push_back(NULL);
-    peers.push_back(NULL);
-    tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
-    tests.push_back(t);
-  }
-  // three logs further along than 0, but in the same term so rejections
-  // are returned instead of the votes being ignored.
-  {
-    vector<uint64_t> terms;
-    terms.push_back(1);
-
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(entsWithConfig(fun, terms));
-    peers.push_back(entsWithConfig(fun, terms));
-    terms.push_back(1);
-    peers.push_back(entsWithConfig(fun, terms));
-    peers.push_back(NULL);
-    tmp t(newNetworkWithConfig(fun, peers), StateFollower, 1);
-    tests.push_back(t);
-  }
-  int i;
-  for (i = 0; i < tests.size(); ++i) {
-    tmp& t = tests[i];
-    Message *msg = new Message(); 
-    msg->set_from(1);
-    msg->set_to(1);
-    msg->set_type(MsgHup);
-    vector<Message*> msgs;
-    msgs.push_back(msg);
-    t.net->send(&msgs);
-    raft *r = (raft*)t.net->peers[1]->data();
-    StateType expState;
-    uint64_t expTerm;
-    if (t.state == StateCandidate && prevote) {
-      // In pre-vote mode, an election that fails to complete
-      // leaves the node in pre-candidate state without advancing
-      // the term. 
-      expState = StatePreCandidate;
-      expTerm = 0;
-    } else {
-      expState = t.state;
-      expTerm  = t.expTerm;
-    }
-
-    EXPECT_EQ(r->state_, expState) << "i: " << i;
-    EXPECT_EQ(r->term_, expTerm);
-  }
+  
+  raftStateMachine *sm = new raftStateMachine(c);
+  raft *r = (raft*)sm->data();
+  r->reset(term);
+  return sm;
 }
 
 TEST(raftTests, TestProgressBecomeProbe) {
@@ -420,10 +337,447 @@ TEST(raftTests, TestProgressPaused) {
   delete r;
 }
 
+void testLeaderElection(bool prevote) {
+  ConfigFun fun = NULL;
+  if (prevote) {
+    fun = &preVoteConfig;
+  }
+  struct tmp {
+    network *net;
+    StateType state;
+    uint64_t expTerm;
+
+    tmp(network *net, StateType state, uint64_t t)
+      : net(net), state(state), expTerm(t) {}
+  };
+
+  vector<tmp> tests;
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
+    tests.push_back(t);
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+    tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
+    tests.push_back(t);
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+    peers.push_back(nopStepper);
+    tmp t(newNetworkWithConfig(fun, peers), StateCandidate, 1);
+    tests.push_back(t);
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+    peers.push_back(nopStepper);
+    peers.push_back(NULL);
+    tmp t(newNetworkWithConfig(fun, peers), StateCandidate, 1);
+    tests.push_back(t);
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+    peers.push_back(nopStepper);
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
+    tests.push_back(t);
+  }
+  // three logs further along than 0, but in the same term so rejections
+  // are returned instead of the votes being ignored.
+  {
+    vector<uint64_t> terms;
+    terms.push_back(1);
+
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(entsWithConfig(fun, terms));
+    peers.push_back(entsWithConfig(fun, terms));
+    terms.push_back(1);
+    peers.push_back(entsWithConfig(fun, terms));
+    peers.push_back(NULL);
+    tmp t(newNetworkWithConfig(fun, peers), StateFollower, 1);
+    tests.push_back(t);
+  }
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+    Message *msg = new Message(); 
+    msg->set_from(1);
+    msg->set_to(1);
+    msg->set_type(MsgHup);
+    vector<Message*> msgs;
+    msgs.push_back(msg);
+    t.net->send(&msgs);
+    raft *r = (raft*)t.net->peers[1]->data();
+    StateType expState;
+    uint64_t expTerm;
+    if (t.state == StateCandidate && prevote) {
+      // In pre-vote mode, an election that fails to complete
+      // leaves the node in pre-candidate state without advancing
+      // the term. 
+      expState = StatePreCandidate;
+      expTerm = 0;
+    } else {
+      expState = t.state;
+      expTerm  = t.expTerm;
+    }
+
+    EXPECT_EQ(r->state_, expState) << "i: " << i;
+    EXPECT_EQ(r->term_, expTerm);
+  }
+}
+
 TEST(raftTests, TestLeaderElection) {
-  //testLeaderElection(false);
+  testLeaderElection(false);
 }
 
 TEST(raftTests, TestLeaderElectionPreVote) {
   testLeaderElection(true);
+}
+
+// testLeaderCycle verifies that each node in a cluster can campaign
+// and be elected in turn. This ensures that elections (including
+// pre-vote) work when not starting from a clean slate (as they do in
+// TestLeaderElection)
+void testLeaderCycle(bool prevote) {
+  ConfigFun fun = NULL;
+  if (prevote) {
+    fun = &preVoteConfig;
+  }
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetworkWithConfig(fun, peers);
+  int i;
+  for (i = 1; i <= 3; i++) {
+    Message *msg = new Message();
+    msg->set_from(i);
+    msg->set_to(i);
+    msg->set_type(MsgHup);
+    vector<Message*> msgs;
+    msgs.push_back(msg);
+    net->send(&msgs);
+
+    map<uint64_t, stateMachine*>::iterator iter;
+    for (iter = net->peers.begin(); iter != net->peers.end(); ++iter) {
+      stateMachine *s = iter->second;
+      raft *r = (raft*)s->data();
+      EXPECT_FALSE(r->id_ == i && r->state_ != StateLeader);
+      EXPECT_FALSE(r->id_ != i && r->state_ != StateFollower);
+    }
+  }
+}
+
+TEST(raftTests, TestLeaderCycle) {
+  testLeaderCycle(false);
+}
+
+TEST(raftTests, TestLeaderCyclePreVote) {
+  testLeaderCycle(true);
+}
+
+void testLeaderElectionOverwriteNewerLogs(bool preVote) {
+  ConfigFun fun = NULL;
+  if (preVote) {
+    fun = &preVoteConfig;
+  }
+  // This network represents the results of the following sequence of
+  // events:
+  // - Node 1 won the election in term 1.
+  // - Node 1 replicated a log entry to node 2 but died before sending
+  //   it to other nodes.
+  // - Node 3 won the second election in term 2.
+  // - Node 3 wrote an entry to its logs but died without sending it
+  //   to any other nodes.
+  //
+  // At this point, nodes 1, 2, and 3 all have uncommitted entries in
+  // their logs and could win an election at term 3. The winner's log
+  // entry overwrites the losers'. (TestLeaderSyncFollowerLog tests
+  // the case where older log entries are overwritten, so this test
+  // focuses on the case where the newer entries are lost).
+  vector<stateMachine*> peers;
+  {
+    // Node 1: Won first election
+    vector<uint64_t> terms;
+    terms.push_back(1);
+    peers.push_back(entsWithConfig(fun, terms));
+  }
+  {
+    // Node 2: Got logs from node 1
+    vector<uint64_t> terms;
+    terms.push_back(1);
+    peers.push_back(entsWithConfig(fun, terms));
+  }
+  {
+    // Node 3: Won second election
+    vector<uint64_t> terms;
+    terms.push_back(2);
+    peers.push_back(entsWithConfig(fun, terms));
+  }
+  {
+    // Node 4: Voted but didn't get logs
+    peers.push_back(votedWithConfig(fun, 3, 2));
+  }
+  {
+    // Node 5: Voted but didn't get logs
+    peers.push_back(votedWithConfig(fun, 3, 2));
+  }
+  network *net = newNetworkWithConfig(fun, peers);
+
+  // Node 1 campaigns. The election fails because a quorum of nodes
+  // know about the election that already happened at term 2. Node 1's
+  // term is pushed ahead to 2.
+  {
+    Message *msg = new Message();
+    msg->set_from(1);
+    msg->set_to(1);
+    msg->set_type(MsgHup);
+    vector<Message*> msgs;
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  
+  raft *r1 = (raft*)net->peers[1]->data();
+  EXPECT_EQ(r1->state_, StateFollower);
+  EXPECT_EQ(r1->term_, 2);
+
+  // Node 1 campaigns again with a higher term. This time it succeeds.
+  {
+    Message *msg = new Message();
+    msg->set_from(1);
+    msg->set_to(1);
+    msg->set_type(MsgHup);
+    vector<Message*> msgs;
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(r1->state_, StateLeader);
+  EXPECT_EQ(r1->term_, 3);
+
+  // Now all nodes agree on a log entry with term 1 at index 1 (and
+  // term 3 at index 2).
+  map<uint64_t, stateMachine*>::iterator iter;
+  for (iter = net->peers.begin(); iter != net->peers.end(); ++iter) {
+    raft *r = (raft*)iter->second->data();
+    EntryVec entries;
+    r->raftLog_->allEntries(&entries);
+    EXPECT_EQ(entries.size(), 2);
+    EXPECT_EQ(entries[0].term(), 1);
+    EXPECT_EQ(entries[1].term(), 3);
+  }
+}
+
+// TestLeaderElectionOverwriteNewerLogs tests a scenario in which a
+// newly-elected leader does *not* have the newest (i.e. highest term)
+// log entries, and must overwrite higher-term log entries with
+// lower-term ones.
+TEST(raftTests, TestLeaderElectionOverwriteNewerLogs) {
+  testLeaderElectionOverwriteNewerLogs(false);
+}
+
+TEST(raftTests, TestLeaderElectionOverwriteNewerLogsPreVote) {
+  testLeaderElectionOverwriteNewerLogs(true);
+}
+
+void testVoteFromAnyState(MessageType vt) {
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  peers.push_back(3);
+
+  int i;
+  for (i = 0; i < (int)numStates; ++i) {
+    raft *r = newTestRaft(1, peers, 10, 1, new MemoryStorage(&kDefaultLogger));
+    r->term_ = 1;
+
+    StateType st = (StateType)i;
+    switch (st) {
+    case StateFollower:
+      r->becomeFollower(r->term_, 3);
+      break;
+    case StatePreCandidate:
+      r->becomePreCandidate();
+      break;
+    case StateCandidate:
+      r->becomeCandidate();
+      break;
+    case StateLeader:
+      r->becomeCandidate();
+      r->becomeLeader();
+      break;
+    }
+
+    // Note that setting our state above may have advanced r.Term
+    // past its initial value.
+    uint64_t origTerm = r->term_;
+    uint64_t newTerm  = r->term_ + 1;
+
+    Message *msg = new Message();
+    msg->set_from(2);
+    msg->set_to(1);
+    msg->set_type(vt);
+    msg->set_term(newTerm);
+    msg->set_logterm(newTerm);
+    msg->set_index(42);
+    int err = r->step(msg);
+
+    EXPECT_EQ(err, OK);
+    EXPECT_EQ(r->msgs_.size(), 1);
+    Message *resp = r->msgs_[0];
+    EXPECT_EQ(resp->type(), voteRespMsgType(vt));
+    EXPECT_FALSE(resp->reject());
+
+    if (vt == MsgVote) {
+      // If this was a real vote, we reset our state and term.
+      EXPECT_EQ(r->state_, StateFollower);
+      EXPECT_EQ(r->term_, newTerm);
+      EXPECT_EQ(r->vote_, 2);
+    } else {
+      // In a prevote, nothing changes.
+      EXPECT_EQ(r->state_, st);
+      EXPECT_EQ(r->term_, origTerm);
+      // if st == StateFollower or StatePreCandidate, r hasn't voted yet.
+      // In StateCandidate or StateLeader, it's voted for itself.
+      EXPECT_FALSE(r->vote_ != None && r->vote_ != 1);
+    }
+  }
+}
+
+TEST(raftTests, TestVoteFromAnyState) {
+  testVoteFromAnyState(MsgVote);
+}
+
+TEST(raftTests, TestPreVoteFromAnyState) {
+  testVoteFromAnyState(MsgPreVote);
+}
+
+TEST(raftTests, TestLogReplication) {
+  struct tmp {
+    network *net;
+    vector<Message*> msgs;
+    uint64_t wcommitted;
+
+    tmp(network *net, vector<Message*> msgs, uint64_t w)
+      : net(net), msgs(msgs), wcommitted(w) {
+    }
+  };
+
+  vector<tmp> tests;
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+
+    vector<Message*> msgs;
+    {
+      Message *msg = new Message();
+      msg->set_from(1);
+      msg->set_to(1);
+      msg->set_type(MsgProp);
+      Entry *entry = msg->add_entries();
+      entry->set_data("somedata");
+
+      msgs.push_back(msg);
+    }
+    //tests.push_back(tmp(newNetwork(peers), msgs, 2));
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+
+    vector<Message*> msgs;
+    {
+      Message *msg = new Message();
+      msg->set_from(1);
+      msg->set_to(1);
+      msg->set_type(MsgProp);
+      Entry *entry = msg->add_entries();
+      entry->set_data("somedata");
+
+      msgs.push_back(msg);
+    }
+    {
+      Message *msg = new Message();
+      msg->set_from(1);
+      msg->set_to(2);
+      msg->set_type(MsgHup);
+
+      msgs.push_back(msg);
+    }
+    {
+      Message *msg = new Message();
+      msg->set_from(1);
+      msg->set_to(2);
+      msg->set_type(MsgProp);
+
+      Entry *entry = msg->add_entries();
+      entry->set_data("somedata");
+      msgs.push_back(msg);
+    }
+    tests.push_back(tmp(newNetwork(peers), msgs, 4));
+  }
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp &t = tests[i];
+    Message *msg = new Message();
+    msg->set_from(1);
+    msg->set_to(1);
+    msg->set_type(MsgHup);
+    vector<Message*> msgs;
+    msgs.push_back(msg);
+    t.net->send(&msgs);
+
+    int j;
+    for (j = 0; j < t.msgs.size(); ++j) {
+      vector<Message*> msgs;
+      msgs.push_back(t.msgs[j]);
+      t.net->send(&msgs);
+    }
+    map<uint64_t, stateMachine*>::iterator iter;
+    for (iter = t.net->peers.begin(); iter != t.net->peers.end(); ++iter) {
+      raft *r = (raft*)iter->second->data();
+      EXPECT_EQ(r->raftLog_->committed_, t.wcommitted);
+      
+      EntryVec entries, ents;
+      nextEnts(r, t.net->storage[iter->first], &entries);
+      int m;
+      for (m = 0; m < entries.size(); ++m) {
+        if (entries[m].has_data()) {
+          ents.push_back(entries[m]);
+        }
+      }
+
+      vector<Message*> props;
+      for (m = 0; m < t.msgs.size(); ++m) {
+        if (t.msgs[m]->type() == MsgProp) {
+          props.push_back(t.msgs[m]);
+        }
+      } 
+      for (m = 0; m < props.size(); ++m) {
+        Message *msg = props[m];
+        kDefaultLogger.Infof(__FILE__, __LINE__, "m:%d, size:%d", props.size(), msg->entries_size());
+        //const Entry& entry = msg->entries(0);
+        kDefaultLogger.Infof(__FILE__, __LINE__, "m:%d, data:%s", m, ents[m].data().c_str());
+        EXPECT_TRUE(ents[m].data() == msg->entries(0).data());
+      }
+    }
+  }
 }

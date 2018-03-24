@@ -132,6 +132,9 @@ void raft::tick() {
   case StateLeader:
     tickHeartbeat();
     break;
+  default:
+    logger_->Fatalf(__FILE__, __LINE__, "unsport state %d", state_);
+    break;
   }
 }
 
@@ -605,6 +608,7 @@ int raft::step(Message *msg) {
         logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] ignored %s from %x [logterm: %llu, index: %llu] at term %llu: lease is not expired (remaining ticks: %llu",
           id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from,
           msg->logterm(), msg->index(), term, electionTimeout_ - electionElapsed_);
+        delete msg;
         return OK;
       }
       leader = None;
@@ -648,6 +652,7 @@ int raft::step(Message *msg) {
       if (n != 0 && raftLog_->committed_ > raftLog_->applied_) {
         logger_->Warningf(__FILE__, __LINE__, "%x cannot campaign at term %llu since there are still %llu pending configuration changes to apply",
           id_, term_, n);
+        delete msg;
         return OK;
       }
       logger_->Infof(__FILE__, __LINE__, "%x is starting a new election at term %llu", id_, term_);
@@ -690,9 +695,11 @@ int raft::step(Message *msg) {
     if (proxyMessage(msg)) {
       delete msg;
     }
+    return OK;
     break;
   }
 
+  delete msg;
   return OK;
 }
 

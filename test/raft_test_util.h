@@ -80,5 +80,7 @@ typedef void (*ConfigFun)(Config*);
 extern Config* newTestConfig(uint64_t id, const vector<uint64_t>& peers, int election, int hb, Storage *s);
 extern raft* newTestRaft(uint64_t id, const vector<uint64_t>& peers, int election, int hb, Storage *s);
 extern network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*>& peers);
+extern network* newNetwork(const vector<stateMachine*>& peers);
+extern void nextEnts(raft *r, Storage *s, EntryVec *entries);
 
 #endif  // __RAFT_TEST_UTIL_H__

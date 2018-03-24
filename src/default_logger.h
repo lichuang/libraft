@@ -13,7 +13,6 @@
 class DefaultLogger : public Logger {
 public:
   const static int kMaxLogBufSize = 2048;
-  char buf_[kMaxLogBufSize];
   bool panic_;
 
   void log(const char *level, const char *file, int line, const char *fmt, va_list args);

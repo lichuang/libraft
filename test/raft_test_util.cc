@@ -4,6 +4,18 @@
 #include "raft.h"
 #include "default_logger.h"
 
+// nextEnts returns the appliable entries and updates the applied index
+void nextEnts(raft *r, Storage *s, EntryVec *entries) {
+  // Transfer all unstable entries to "stable" storage.
+  EntryVec tmp;
+  r->raftLog_->unstableEntries(&tmp); 
+  s->Append(&tmp);
+  r->raftLog_->stableTo(r->raftLog_->lastIndex(), r->raftLog_->lastTerm());
+
+  r->raftLog_->nextEntries(entries);
+  r->raftLog_->appliedTo(r->raftLog_->committed_);
+}
+
 bool operator < (const connem& c1, const connem& c2) {
   if (c1.from < c2.from) {
     return true;
@@ -86,6 +98,10 @@ network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*>& peers)
   return net;
 }
 
+network* newNetwork(const vector<stateMachine*>& peers) {
+  return newNetworkWithConfig(NULL, peers);
+}
+
 void network::send(vector<Message*> *msgs) {
   while (!msgs->empty()) {
     Message *msg = (*msgs)[0];
@@ -142,7 +158,7 @@ void network::filter(const vector<Message *>& msgs, vector<Message*> *out) {
       break;
     default:
       perc = dropm[connem(msg->from(), msg->to())];
-      if (rand() % 10 < perc) {
+      if (rand() < perc) {
         continue;
       }
     }

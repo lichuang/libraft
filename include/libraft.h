@@ -27,7 +27,8 @@ enum StateType {
   StateFollower = 0,
   StateCandidate = 1,
   StateLeader = 2,
-  StatePreCandidate = 3
+  StatePreCandidate = 3,
+  numStates
 };
 
 struct SoftState {
