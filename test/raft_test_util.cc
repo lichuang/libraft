@@ -34,8 +34,8 @@ raftStateMachine::~raftStateMachine() {
   delete raft;
 }
 
-int raftStateMachine::step(Message *msg) {
-  return raft->step(*msg);
+int raftStateMachine::step(const Message& msg) {
+  return raft->step(msg);
 }
 
 void raftStateMachine::readMessages(vector<Message*> *msgs) {
@@ -102,12 +102,13 @@ network* newNetwork(const vector<stateMachine*>& peers) {
   return newNetworkWithConfig(NULL, peers);
 }
 
-void network::send(vector<Message*> *msgs) {
+void network::send(vector<Message> *msgs) {
   while (!msgs->empty()) {
-    Message *msg = (*msgs)[0];
-    stateMachine *sm = peers[msg->to()]; 
+    const Message& msg = (*msgs)[0];
+    stateMachine *sm = peers[msg.to()]; 
     sm->step(msg);
-    vector<Message*> out, readMsgs;
+    vector<Message> out;
+    vector<Message*> readMsgs;
     msgs->erase(msgs->begin(), msgs->begin() + 1);
     sm->readMessages(&readMsgs);
     filter(readMsgs, &out);
@@ -144,7 +145,7 @@ void network::recover() {
   ignorem.clear();
 }
 
-void network::filter(const vector<Message *>& msgs, vector<Message*> *out) {
+void network::filter(const vector<Message *>& msgs, vector<Message> *out) {
   int i;
   for (i = 0; i < msgs.size(); ++i) {
     Message *msg = msgs[i];
@@ -163,7 +164,7 @@ void network::filter(const vector<Message *>& msgs, vector<Message*> *out) {
       }
     }
 
-    out->push_back(msg);
+    out->push_back(*msg);
   }
 }
 

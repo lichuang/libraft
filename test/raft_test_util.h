@@ -13,7 +13,7 @@ enum stateMachineType {
 struct stateMachine {
   virtual ~stateMachine() {}
 
-  virtual int step(Message *) = 0;
+  virtual int step(const Message& ) = 0;
   virtual void readMessages(vector<Message*> *) = 0;
 
   virtual int type() = 0;
@@ -42,20 +42,20 @@ struct network {
   map<connem, int> dropm;
   map<MessageType, bool> ignorem;
 
-  void send(vector<Message*>* msgs);
+  void send(vector<Message>* msgs);
   void drop(uint64_t from, uint64_t to, int perc);
   void cut(uint64_t one, uint64_t other);
   void isolate(uint64_t id);
   void ignore(MessageType t);
   void recover();
-  void filter(const vector<Message *>& msg, vector<Message*> *out);
+  void filter(const vector<Message *>& msg, vector<Message> *out);
 };
 
 struct raftStateMachine : public stateMachine {
   raftStateMachine(Config *c);
   virtual ~raftStateMachine();
 
-  virtual int step(Message *);
+  virtual int step(const Message& );
   virtual void readMessages(vector<Message*> *);
 
   virtual int type() { return raftType; }
@@ -68,7 +68,7 @@ struct blackHole : public stateMachine {
   blackHole() {}
   virtual ~blackHole() {}
 
-  int step(Message *) { return OK; }
+  int step(const Message& ) { return OK; }
   void readMessages(vector<Message*> *) {}
 
   int type() { return blackHoleType; }

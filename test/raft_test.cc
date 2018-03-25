@@ -414,11 +414,11 @@ void testLeaderElection(bool prevote) {
   int i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
-    Message *msg = new Message(); 
-    msg->set_from(1);
-    msg->set_to(1);
-    msg->set_type(MsgHup);
-    vector<Message*> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    vector<Message> msgs;
     msgs.push_back(msg);
     t.net->send(&msgs);
     raft *r = (raft*)t.net->peers[1]->data();
@@ -465,11 +465,11 @@ void testLeaderCycle(bool prevote) {
   network *net = newNetworkWithConfig(fun, peers);
   int i;
   for (i = 1; i <= 3; i++) {
-    Message *msg = new Message();
-    msg->set_from(i);
-    msg->set_to(i);
-    msg->set_type(MsgHup);
-    vector<Message*> msgs;
+    Message msg;
+    msg.set_from(i);
+    msg.set_to(i);
+    msg.set_type(MsgHup);
+    vector<Message> msgs;
     msgs.push_back(msg);
     net->send(&msgs);
 
@@ -543,11 +543,11 @@ void testLeaderElectionOverwriteNewerLogs(bool preVote) {
   // know about the election that already happened at term 2. Node 1's
   // term is pushed ahead to 2.
   {
-    Message *msg = new Message();
-    msg->set_from(1);
-    msg->set_to(1);
-    msg->set_type(MsgHup);
-    vector<Message*> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    vector<Message> msgs;
     msgs.push_back(msg);
     net->send(&msgs);
   }
@@ -558,11 +558,11 @@ void testLeaderElectionOverwriteNewerLogs(bool preVote) {
 
   // Node 1 campaigns again with a higher term. This time it succeeds.
   {
-    Message *msg = new Message();
-    msg->set_from(1);
-    msg->set_to(1);
-    msg->set_type(MsgHup);
-    vector<Message*> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    vector<Message> msgs;
     msgs.push_back(msg);
     net->send(&msgs);
   }
@@ -669,10 +669,10 @@ TEST(raftTests, TestPreVoteFromAnyState) {
 TEST(raftTests, TestLogReplication) {
   struct tmp {
     network *net;
-    vector<Message*> msgs;
+    vector<Message> msgs;
     uint64_t wcommitted;
 
-    tmp(network *net, vector<Message*> msgs, uint64_t w)
+    tmp(network *net, vector<Message> msgs, uint64_t w)
       : net(net), msgs(msgs), wcommitted(w) {
     }
   };
@@ -684,18 +684,18 @@ TEST(raftTests, TestLogReplication) {
     peers.push_back(NULL);
     peers.push_back(NULL);
 
-    vector<Message*> msgs;
+    vector<Message> msgs;
     {
-      Message *msg = new Message();
-      msg->set_from(1);
-      msg->set_to(1);
-      msg->set_type(MsgProp);
-      Entry *entry = msg->add_entries();
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(1);
+      msg.set_type(MsgProp);
+      Entry *entry = msg.add_entries();
       entry->set_data("somedata");
 
       msgs.push_back(msg);
     }
-    //tests.push_back(tmp(newNetwork(peers), msgs, 2));
+    tests.push_back(tmp(newNetwork(peers), msgs, 2));
   }
   {
     vector<stateMachine*> peers;
@@ -703,53 +703,51 @@ TEST(raftTests, TestLogReplication) {
     peers.push_back(NULL);
     peers.push_back(NULL);
 
-    vector<Message*> msgs;
+    vector<Message> msgs;
     {
-      Message *msg = new Message();
-      msg->set_from(1);
-      msg->set_to(1);
-      msg->set_type(MsgProp);
-      Entry *entry = msg->add_entries();
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(1);
+      msg.set_type(MsgProp);
+      Entry *entry = msg.add_entries();
       entry->set_data("somedata");
-
-      kDefaultLogger.Infof(__FILE__, __LINE__, "msg:%p", msg);
-      msgs.push_back(msg);
-    }
-    {
-      Message *msg = new Message();
-      msg->set_from(1);
-      msg->set_to(2);
-      msg->set_type(MsgHup);
 
       msgs.push_back(msg);
     }
     {
-      Message *msg = new Message();
-      msg->set_from(1);
-      msg->set_to(2);
-      msg->set_type(MsgProp);
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(2);
+      msg.set_type(MsgHup);
 
-      Entry *entry = msg->add_entries();
+      msgs.push_back(msg);
+    }
+    {
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(2);
+      msg.set_type(MsgProp);
+
+      Entry *entry = msg.add_entries();
       entry->set_data("somedata");
       msgs.push_back(msg);
-      kDefaultLogger.Infof(__FILE__, __LINE__, "msg:%p", msg);
     }
     tests.push_back(tmp(newNetwork(peers), msgs, 4));
   }
   int i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
-    Message *msg = new Message();
-    msg->set_from(1);
-    msg->set_to(1);
-    msg->set_type(MsgHup);
-    vector<Message*> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    vector<Message> msgs;
     msgs.push_back(msg);
     t.net->send(&msgs);
 
     int j;
     for (j = 0; j < t.msgs.size(); ++j) {
-      vector<Message*> msgs;
+      vector<Message> msgs;
       msgs.push_back(t.msgs[j]);
       t.net->send(&msgs);
     }
@@ -768,17 +766,21 @@ TEST(raftTests, TestLogReplication) {
         }
       }
 
-      vector<Message*> props;
+      vector<Message> props;
       for (m = 0; m < t.msgs.size(); ++m) {
-        Message *msg = t.msgs[m];
-        if (msg->type() == MsgProp) {
+        const Message& msg = t.msgs[m];
+        if (msg.type() == MsgProp) {
           props.push_back(msg);
         }
       } 
       for (m = 0; m < props.size(); ++m) {
-        Message *msg = props[m];
-        EXPECT_TRUE(ents[m].data() == msg->entries(0).data());
+        const Message& msg = props[m];
+        EXPECT_EQ(ents[m].data(),  msg.entries(0).data());
       }
     }
   }
+}
+
+TEST(raftTests, TestSingleNodeCommit) {
+  //vector<stateMachine*>
 }
