@@ -59,6 +59,7 @@ raft::raft(Config *config, raftLog *log)
     readOnly_(new readOnly(config->readOnlyOption, config->logger)),
     heartbeatTimeout_(config->heartbeatTick),
     electionTimeout_(config->electionTick),
+    checkQuorum_(config->checkQuorum),
     preVote_(config->preVote),
     logger_(config->logger) {
   srand((unsigned)time(NULL));
@@ -704,9 +705,11 @@ int raft::step(const Message& msg) {
 void raft::proxyMessage(const Message& msg) {
   if (state_ == StateFollower) {
     stepFollower(msg);
+    return;
   }
   if (state_ == StateLeader) {
     stepLeader(msg);
+    return;
   }
 
   stepCandidate(msg);

@@ -773,15 +773,10 @@ TEST(raftTests, TestLogReplication) {
         Message *msg = t.msgs[m];
         if (msg->type() == MsgProp) {
           props.push_back(msg);
-          kDefaultLogger.Infof(__FILE__, __LINE__, "== msg:%p", msg);
-          kDefaultLogger.Infof(__FILE__, __LINE__, "entry size:%d", msg->entries_size());
         }
       } 
       for (m = 0; m < props.size(); ++m) {
         Message *msg = props[m];
-        kDefaultLogger.Infof(__FILE__, __LINE__, "m:%d, size:%d", props.size(), msg->entries_size());
-        //const Entry& entry = msg->entries(0);
-        kDefaultLogger.Infof(__FILE__, __LINE__, "m:%d, data:%s", m, ents[m].data().c_str());
         EXPECT_TRUE(ents[m].data() == msg->entries(0).data());
       }
     }
