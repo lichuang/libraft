@@ -782,5 +782,141 @@ TEST(raftTests, TestLogReplication) {
 }
 
 TEST(raftTests, TestSingleNodeCommit) {
-  //vector<stateMachine*>
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
+    entry->set_data("some data");
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
+    entry->set_data("some data");
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  raft *r = (raft*)net->peers[1]->data();
+  EXPECT_EQ(r->raftLog_->committed_, 3);
+}
+
+// TestCannotCommitWithoutNewTermEntry tests the entries cannot be committed
+// when leader changes, no new proposal comes in and ChangeTerm proposal is
+// filtered.
+TEST(raftTests, TestCannotCommitWithoutNewTermEntry) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  // 0 cannot reach 2,3,4
+  net->cut(1,3); 
+  net->cut(1,4); 
+  net->cut(1,5); 
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
+    entry->set_data("some data");
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
+    entry->set_data("some data");
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  raft *r = (raft*)net->peers[1]->data();
+  EXPECT_EQ(r->raftLog_->committed_, 1);
+
+  // network recovery
+  net->recover();
+  // avoid committing ChangeTerm proposal
+  net->ignore(MsgApp);
+
+  // elect 2 as the new leader with term 2
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(2);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  // no log entries from previous term should be committed
+  r = (raft*)net->peers[2]->data();
+  EXPECT_EQ(r->raftLog_->committed_, 1);
+
+  net->recover();
+  // send heartbeat; reset wait
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(2);
+    msg.set_type(MsgBeat);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  // append an entry at current term
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(2);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
+    entry->set_data("somedata");
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(r->raftLog_->committed_, 5);
 }

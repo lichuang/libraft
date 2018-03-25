@@ -121,8 +121,8 @@ void network::drop(uint64_t from, uint64_t to, int perc) {
 }
 
 void network::cut(uint64_t one, uint64_t other) {
-  drop(one, other, 1);
-  drop(other, one, 1);
+  drop(one, other, 10);
+  drop(other, one, 10);
 }
 
 void network::isolate(uint64_t id) {
@@ -130,8 +130,8 @@ void network::isolate(uint64_t id) {
   for (i = 0; i < peers.size(); ++i) {
     uint64_t nid = i + 1;
     if (nid != id) {
-      drop(id, nid, 1.0);
-      drop(nid, id, 1.0);
+      drop(id, nid, 10);
+      drop(nid, id, 10);
     }
   }
 }
@@ -159,7 +159,7 @@ void network::filter(const vector<Message *>& msgs, vector<Message> *out) {
       break;
     default:
       perc = dropm[connem(msg->from(), msg->to())];
-      if (rand() < perc) {
+      if (rand() % 10 < perc) {
         continue;
       }
     }

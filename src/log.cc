@@ -76,6 +76,7 @@ void raftLog::commitTo(uint64_t tocommit) {
   }
 
   committed_ = tocommit;
+  logger_->Debugf(__FILE__, __LINE__, "commit to %llu", committed_);
 }
 
 void raftLog::appliedTo(uint64_t i) {

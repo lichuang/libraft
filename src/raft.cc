@@ -335,8 +335,8 @@ void raft::bcastHeartbeatWithCtx(const string &ctx) {
 
 template <typename T>  
 struct reverseCompartor {  
-  bool operator()(const T &x, const T &y)  {  
-    return y > x;  
+  bool operator()(const T &x, const T &y)  {
+    return y < x;
   }  
 };
 
@@ -595,7 +595,8 @@ int raft::poll(uint64_t id, MessageType t, bool v) {
 }
 
 int raft::step(const Message& msg) {
-  logger_->Debugf(__FILE__, __LINE__, "msg %s %llu -> %llu", msgTypeString(msg.type()), msg.from(), msg.to());
+  logger_->Debugf(__FILE__, __LINE__, "msg %s %llu -> %llu, term:%llu",
+                  msgTypeString(msg.type()), msg.from(), msg.to(), term_);
   // Handle the message term, which may result in our stepping down to a follower.
   uint64_t term = msg.term();
   int type = msg.type();
@@ -832,16 +833,16 @@ void raft::stepLeader(const Message& msg) {
         } else if (pr->state_ == ProgressStateReplicate) {
           pr->ins_.freeTo(index);
         }
+        if (maybeCommit()) {
+          bcastAppend();
+        } else if (oldPaused) {
+          // update() reset the wait state on this node. If we had delayed sending
+          // an update before, send it now.
+          sendAppend(from);
+        }
+        // Transfer leadership is in progress.
+        // TODO
       }
-      if (maybeCommit()) {
-        bcastAppend();
-      } else if (oldPaused) {
-        // update() reset the wait state on this node. If we had delayed sending
-        // an update before, send it now.
-        sendAppend(from);
-      }
-      // Transfer leadership is in progress.
-      // TODO
     }
     break;
   case MsgHeartbeatResp:
