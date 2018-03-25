@@ -114,5 +114,6 @@ struct raft {
   Message* cloneMessage(const Message& msg);
 };
 extern raft* newRaft(Config *);
+string entryString(const Entry& entry);
 
 #endif  // __RAFT_H__

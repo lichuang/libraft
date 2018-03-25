@@ -53,6 +53,7 @@ struct network {
 
 struct raftStateMachine : public stateMachine {
   raftStateMachine(Config *c);
+  raftStateMachine(raft *);
   virtual ~raftStateMachine();
 
   virtual int step(const Message& );
@@ -82,5 +83,6 @@ extern raft* newTestRaft(uint64_t id, const vector<uint64_t>& peers, int electio
 extern network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*>& peers);
 extern network* newNetwork(const vector<stateMachine*>& peers);
 extern void nextEnts(raft *r, Storage *s, EntryVec *entries);
+extern string raftLogString(raftLog *log);
 
 #endif  // __RAFT_TEST_UTIL_H__

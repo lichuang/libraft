@@ -35,9 +35,11 @@ static const char* msgTypeString(int t) {
 
 string entryString(const Entry& entry) {
   char tmp[100];
-  snprintf(tmp, sizeof(tmp), "term: %llu, index: %llu, data: %s", 
-    entry.term(), entry.index(), entry.data().c_str());
-  return tmp;
+  snprintf(tmp, sizeof(tmp), "term:%llu, index:%llu, type:%d", 
+    entry.term(), entry.index(), entry.type());
+  string str = tmp;
+  str += ", data:" + entry.data() + "\n";
+  return str;
 }
 
 void copyEntries(const Message& msg, EntryVec *entries) {
@@ -934,7 +936,7 @@ void raft::stepCandidate(const Message& msg) {
         becomeLeader();
         bcastAppend();
       }
-    } else if (granted == votes_.size() - granted) {
+    } else if (quorum() == votes_.size() - granted) {
       becomeFollower(term_, None);
     }
     return;

@@ -920,3 +920,193 @@ TEST(raftTests, TestCannotCommitWithoutNewTermEntry) {
   }
   EXPECT_EQ(r->raftLog_->committed_, 5);
 }
+
+// TestCommitWithoutNewTermEntry tests the entries could be committed
+// when leader changes, no new proposal comes in.
+TEST(raftTests, TestCommitWithoutNewTermEntry) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  // 0 cannot reach 2,3,4
+  net->cut(1,3); 
+  net->cut(1,4); 
+  net->cut(1,5); 
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
+    entry->set_data("some data");
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
+    entry->set_data("some data");
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  raft *r = (raft*)net->peers[1]->data();
+  EXPECT_EQ(r->raftLog_->committed_, 1);
+
+  // network recovery
+  net->recover();
+
+  // elect 1 as the new leader with term 2
+  // after append a ChangeTerm entry from the current term, all entries
+  // should be committed
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(2);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  EXPECT_EQ(r->raftLog_->committed_, 4);
+}
+
+TEST(raftTests, TestDuelingCandidates) {
+  vector<stateMachine*> peers;
+
+  {
+    vector<uint64_t> ids;
+    ids.push_back(1);
+    ids.push_back(2);
+    ids.push_back(3);
+    raft *r = newTestRaft(1, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    peers.push_back(new raftStateMachine(r)); 
+  }
+  {
+    vector<uint64_t> ids;
+    ids.push_back(1);
+    ids.push_back(2);
+    ids.push_back(3);
+    raft *r = newTestRaft(2, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    peers.push_back(new raftStateMachine(r)); 
+  }
+  {
+    vector<uint64_t> ids;
+    ids.push_back(1);
+    ids.push_back(2);
+    ids.push_back(3);
+    raft *r = newTestRaft(3, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    peers.push_back(new raftStateMachine(r)); 
+  }
+  network *net = newNetwork(peers);
+
+  net->cut(1,3);
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  // 1 becomes leader since it receives votes from 1 and 2
+  raft *r = (raft*)net->peers[1]->data();
+  EXPECT_EQ(r->state_, StateLeader);
+
+  // 3 stays as candidate since it receives a vote from 3 and a rejection from 2
+  r = (raft*)net->peers[3]->data();
+  EXPECT_EQ(r->state_, StateCandidate);
+
+  net->recover();
+
+  // candidate 3 now increases its term and tries to vote again
+  // we expect it to disrupt the leader 1 since it has a higher term
+  // 3 will be follower again since both 1 and 2 rejects its vote request since 3 does not have a long enough log
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+  {
+    EntryVec entries;
+    entries.push_back(Entry());
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    entries.push_back(entry);
+
+    s->Append(&entries);
+  }
+
+  raftLog *log = new raftLog(s, &kDefaultLogger);
+  log->committed_ = 1;
+  log->unstable_.offset_ = 2;
+
+  struct tmp {
+    raft *r;
+    StateType state;
+    uint64_t term;
+    raftLog* log;
+
+    tmp(raft *r, StateType state, uint64_t term, raftLog *log)
+      : r(r), state(state), term(term), log(log) {}
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp((raft*)peers[0]->data(), StateFollower, 2, log)); 
+  tests.push_back(tmp((raft*)peers[1]->data(), StateFollower, 2, log)); 
+  tests.push_back(tmp((raft*)peers[2]->data(), StateFollower, 2, new raftLog(new MemoryStorage(&kDefaultLogger), &kDefaultLogger))); 
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+    EXPECT_EQ(t.r->state_, t.state);
+    EXPECT_EQ(t.r->term_, t.term);
+
+    string base = raftLogString(t.log);
+    if (net->peers[i + 1]->type() == raftType) {
+      raft *r = (raft*)net->peers[i + 1]->data();
+      string str = raftLogString(r->raftLog_);
+      EXPECT_EQ(base, str) << "i: " << i;
+    }
+  }
+}

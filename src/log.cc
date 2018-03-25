@@ -30,8 +30,10 @@ raftLog* newLog(Storage *storage, Logger *logger) {
 }
 
 raftLog::raftLog(Storage *storage, Logger *logger) 
-  : storage_(storage)
-  , logger_(logger) {
+  : storage_(storage),
+    committed_(0),
+    applied_(0),
+    logger_(logger) {
 }
 
 // maybeAppend returns false if the entries cannot be appended. Otherwise,

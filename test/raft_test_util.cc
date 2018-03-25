@@ -3,6 +3,7 @@
 #include "raft_test_util.h"
 #include "raft.h"
 #include "default_logger.h"
+#include "util.h"
 
 // nextEnts returns the appliable entries and updates the applied index
 void nextEnts(raft *r, Storage *s, EntryVec *entries) {
@@ -14,6 +15,30 @@ void nextEnts(raft *r, Storage *s, EntryVec *entries) {
 
   r->raftLog_->nextEntries(entries);
   r->raftLog_->appliedTo(r->raftLog_->committed_);
+}
+
+string raftLogString(raftLog *log) {
+  char buf[1024] = {'\0'};
+  string str = "";
+
+  snprintf(buf, sizeof(buf), "committed: %llu\n", log->committed_);
+  str += buf;
+
+  snprintf(buf, sizeof(buf), "applied: %llu\n", log->applied_);
+  str += buf;
+
+  EntryVec entries;
+  log->allEntries(&entries);
+
+  snprintf(buf, sizeof(buf), "entries size: %lu\n", entries.size());
+  str += buf;
+
+  int i;
+  for (i = 0; i < entries.size(); ++i) {
+    str += entryString(entries[i]);
+  }
+
+  return str;
 }
 
 bool operator < (const connem& c1, const connem& c2) {
@@ -28,6 +53,10 @@ bool operator < (const connem& c1, const connem& c2) {
 
 raftStateMachine::raftStateMachine(Config *c) {
   raft = newRaft(c);
+}
+
+raftStateMachine::raftStateMachine(struct raft *r)
+  : raft(r) {
 }
 
 raftStateMachine::~raftStateMachine() {
