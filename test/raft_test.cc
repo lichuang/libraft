@@ -1110,3 +1110,944 @@ TEST(raftTests, TestDuelingCandidates) {
     }
   }
 }
+
+TEST(raftTests, TestDuelingPreCandidates) {
+  vector<stateMachine*> peers;
+
+  {
+    vector<uint64_t> ids;
+    ids.push_back(1);
+    ids.push_back(2);
+    ids.push_back(3);
+    raft *r = newTestRaft(1, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    r->preVote_ = true;
+    peers.push_back(new raftStateMachine(r)); 
+  }
+  {
+    vector<uint64_t> ids;
+    ids.push_back(1);
+    ids.push_back(2);
+    ids.push_back(3);
+    raft *r = newTestRaft(2, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    r->preVote_ = true;
+    peers.push_back(new raftStateMachine(r)); 
+  }
+  {
+    vector<uint64_t> ids;
+    ids.push_back(1);
+    ids.push_back(2);
+    ids.push_back(3);
+    raft *r = newTestRaft(3, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    r->preVote_ = true;
+    peers.push_back(new raftStateMachine(r)); 
+  }
+  network *net = newNetwork(peers);
+
+  net->cut(1,3);
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  // 1 becomes leader since it receives votes from 1 and 2
+  raft *r = (raft*)net->peers[1]->data();
+  EXPECT_EQ(r->state_, StateLeader);
+
+  // 3 campaigns then reverts to follower when its PreVote is rejected
+  r = (raft*)net->peers[3]->data();
+  EXPECT_EQ(r->state_, StateFollower);
+
+  net->recover();
+
+  // candidate 3 now increases its term and tries to vote again
+  // we expect it to disrupt the leader 1 since it has a higher term
+  // 3 will be follower again since both 1 and 2 rejects its vote request since 3 does not have a long enough log
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+  {
+    EntryVec entries;
+    entries.push_back(Entry());
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    entries.push_back(entry);
+
+    s->Append(&entries);
+  }
+
+  raftLog *log = new raftLog(s, &kDefaultLogger);
+  log->committed_ = 1;
+  log->unstable_.offset_ = 2;
+
+  struct tmp {
+    raft *r;
+    StateType state;
+    uint64_t term;
+    raftLog* log;
+
+    tmp(raft *r, StateType state, uint64_t term, raftLog *log)
+      : r(r), state(state), term(term), log(log) {}
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp((raft*)peers[0]->data(), StateLeader, 1, log)); 
+  tests.push_back(tmp((raft*)peers[1]->data(), StateFollower, 1, log)); 
+  tests.push_back(tmp((raft*)peers[2]->data(), StateFollower, 1, new raftLog(new MemoryStorage(&kDefaultLogger), &kDefaultLogger))); 
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+    EXPECT_EQ(t.r->state_, t.state);
+    EXPECT_EQ(t.r->term_, t.term);
+
+    string base = raftLogString(t.log);
+    if (net->peers[i + 1]->type() == raftType) {
+      raft *r = (raft*)net->peers[i + 1]->data();
+      string str = raftLogString(r->raftLog_);
+      EXPECT_EQ(base, str) << "i: " << i;
+    }
+  }
+}
+
+TEST(raftTests, TestCandidateConcede) {
+  vector<stateMachine*> peers;
+
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+  net->isolate(1);
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  // heal the partition
+  net->recover();
+
+  // send heartbeat; reset wait
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgBeat);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  string data = "force follower";
+  // send a proposal to 3 to flush out a MsgApp to 1
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
+    entry->set_data(data);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  // send heartbeat; flush out commit
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgBeat);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  raft *r = (raft*)net->peers[1]->data();
+  EXPECT_EQ(r->state_, StateFollower);
+  EXPECT_EQ(r->term_, 1);
+
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+  EntryVec entries;
+
+  entries.push_back(Entry());
+  {
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    entries.push_back(entry);
+  }
+  {
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(2);
+    entry.set_data(data);
+    entries.push_back(entry);
+  }
+  s->entries_.clear();
+  s->entries_.insert(s->entries_.end(), entries.begin(), entries.end());
+
+  raftLog *log = new raftLog(s, &kDefaultLogger);
+  log->committed_ = 2;
+  log->unstable_.offset_ = 3;
+  string logStr = raftLogString(log);
+
+  map<uint64_t, stateMachine*>::iterator iter;
+  for (iter = net->peers.begin(); iter != net->peers.end(); ++iter) {
+    stateMachine *s = iter->second;
+    if (s->type() != raftType) {
+      continue;
+    }
+    raft *r = (raft*)s->data();
+    string str = raftLogString(r->raftLog_);
+    EXPECT_EQ(str, logStr);
+  }
+}
+
+TEST(raftTests, TestSingleNodeCandidate) {
+  vector<stateMachine*> peers;
+
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  raft *r = (raft*)net->peers[1]->data();
+  EXPECT_EQ(r->state_, StateLeader);
+}
+
+TEST(raftTests, TestSingleNodePreCandidate) {
+  vector<stateMachine*> peers;
+
+  peers.push_back(NULL);
+
+  network *net = newNetworkWithConfig(preVoteConfig, peers);
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  raft *r = (raft*)net->peers[1]->data();
+  EXPECT_EQ(r->state_, StateLeader);
+}
+
+TEST(raftTests, TestOldMessages) {
+  vector<stateMachine*> peers;
+
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  // make 0 leader @ term 3
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(2);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  // pretend we're an old leader trying to make progress; this entry is expected to be ignored.
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(1);
+    msg.set_term(2);
+    msg.set_type(MsgApp);
+    Entry *entry = msg.add_entries();
+    entry->set_index(3);
+    entry->set_term(2);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  // commit a new entry
+  string data = "somedata";
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
+    entry->set_data(data);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+  EntryVec entries;
+
+  entries.push_back(Entry());
+  {
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    entries.push_back(entry);
+  }
+  {
+    Entry entry;
+    entry.set_term(2);
+    entry.set_index(2);
+    entries.push_back(entry);
+  }
+  {
+    Entry entry;
+    entry.set_term(3);
+    entry.set_index(3);
+    entries.push_back(entry);
+  }
+  {
+    Entry entry;
+    entry.set_term(3);
+    entry.set_index(4);
+    entry.set_data(data);
+    entries.push_back(entry);
+  }
+  s->entries_.clear();
+  s->entries_.insert(s->entries_.end(), entries.begin(), entries.end());
+  raftLog *log = new raftLog(s, &kDefaultLogger);
+  log->committed_ = 4;
+  log->unstable_.offset_ = 5;
+  string logStr = raftLogString(log);
+
+  map<uint64_t, stateMachine*>::iterator iter;
+  for (iter = net->peers.begin(); iter != net->peers.end(); ++iter) {
+    stateMachine *s = iter->second;
+    if (s->type() != raftType) {
+      continue;
+    }
+    raft *r = (raft*)s->data();
+    string str = raftLogString(r->raftLog_);
+    EXPECT_EQ(str, logStr);
+  }
+}
+
+TEST(raftTests, TestProposal) {
+  struct tmp {
+    network *net;
+    bool success;
+
+    tmp(network *net, bool success)
+      : net(net), success(success) {
+    }
+  };
+
+  vector<tmp> tests;
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+
+    network *net = newNetwork(peers);
+    tests.push_back(tmp(net, true));
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+
+    network *net = newNetwork(peers);
+    tests.push_back(tmp(net, true));
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+    peers.push_back(nopStepper);
+
+    network *net = newNetwork(peers);
+    //tests.push_back(tmp(net, false));
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+    peers.push_back(nopStepper);
+    peers.push_back(NULL);
+
+    network *net = newNetwork(peers);
+    //tests.push_back(tmp(net, false));
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+    peers.push_back(nopStepper);
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+
+    network *net = newNetwork(peers);
+    tests.push_back(tmp(net, true));
+  }
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+    string data = "somedata";
+
+    // promote 0 the leader
+    {
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(1);
+      msg.set_type(MsgHup);
+      msgs.push_back(msg);
+      t.net->send(&msgs);
+    }
+    {
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(1);
+      msg.set_type(MsgProp);
+      Entry *entry = msg.add_entries();
+      entry->set_data(data);
+      msgs.push_back(msg);
+      t.net->send(&msgs);
+    }
+
+    string logStr = "";
+    if (t.success) {
+      MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+      EntryVec entries;
+
+      entries.push_back(Entry());
+      {
+        Entry entry;
+        entry.set_term(1);
+        entry.set_index(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_term(1);
+        entry.set_index(2);
+        entry.set_data(data);
+        entries.push_back(entry);
+      }
+      s->entries_.clear();
+      s->entries_.insert(s->entries_.end(), entries.begin(), entries.end());
+      raftLog *log = new raftLog(s, &kDefaultLogger);
+      log->committed_ = 2;
+      log->unstable_.offset_ = 3;
+      logStr = raftLogString(log);
+    }
+
+    map<uint64_t, stateMachine*>::iterator iter;
+    for (iter = t.net->peers.begin(); iter != t.net->peers.end(); ++iter) {
+      stateMachine *s = iter->second;
+      if (s->type() != raftType) {
+        continue;
+      }
+      raft *r = (raft*)s->data();
+      string str = raftLogString(r->raftLog_);
+      EXPECT_EQ(str, logStr);
+    }
+  }
+}
+
+TEST(raftTests, TestProposalByProxy) {
+  vector<network*> tests;
+
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+
+    network *net = newNetwork(peers);
+    tests.push_back(net);
+  }
+  {
+    vector<stateMachine*> peers;
+    peers.push_back(NULL);
+    peers.push_back(NULL);
+    peers.push_back(nopStepper);
+
+    network *net = newNetwork(peers);
+    tests.push_back(net);
+  }
+
+  int i;
+  string data = "somedata";
+  for (i = 0; i < tests.size(); ++i) {
+    network *net = tests[i];
+    // promote 0 the leader
+    {
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(1);
+      msg.set_type(MsgHup);
+      msgs.push_back(msg);
+      net->send(&msgs);
+    }
+    // propose via follower
+    {
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(2);
+      msg.set_to(2);
+      msg.set_type(MsgProp);
+      Entry *entry = msg.add_entries();
+      entry->set_data(data);
+      msgs.push_back(msg);
+      net->send(&msgs);
+    }
+
+    string logStr = "";
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+    EntryVec entries;
+
+    entries.push_back(Entry());
+    {
+      Entry entry;
+      entry.set_term(1);
+      entry.set_index(1);
+      entries.push_back(entry);
+    }
+    {
+      Entry entry;
+      entry.set_term(1);
+      entry.set_index(2);
+      entry.set_data(data);
+      entries.push_back(entry);
+    }
+    s->entries_.clear();
+    s->entries_.insert(s->entries_.end(), entries.begin(), entries.end());
+    raftLog *log = new raftLog(s, &kDefaultLogger);
+    log->committed_ = 2;
+    log->unstable_.offset_ = 3;
+    logStr = raftLogString(log);
+
+    map<uint64_t, stateMachine*>::iterator iter;
+    for (iter = net->peers.begin(); iter != net->peers.end(); ++iter) {
+      stateMachine *s = iter->second;
+      if (s->type() != raftType) {
+        continue;
+      }
+      raft *r = (raft*)s->data();
+      string str = raftLogString(r->raftLog_);
+      EXPECT_EQ(str, logStr);
+    }
+    EXPECT_EQ(((raft*)(net->peers[1]->data()))->term_, 1);
+  }
+}
+
+TEST(raftTests, TestCommit) {
+  struct tmp {
+    vector<uint64_t> matches;
+    vector<Entry> logs;
+    uint64_t term;
+    uint64_t w;
+
+    tmp(vector<uint64_t> matches, vector<Entry> entries, uint64_t term, uint64_t w)
+      : matches(matches), logs(entries), term(term), w(w) {
+    }
+  };
+
+  vector<tmp> tests;
+  // single
+  {
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(1);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 1, 1));
+    }
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(1);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 2, 0));
+    }
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(2);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_index(2);
+        entry.set_term(2);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 2, 2));
+    }
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(1);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(2);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 2, 1));
+    }
+  }
+  // odd
+  {
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(2);
+      matches.push_back(1);
+      matches.push_back(1);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_index(2);
+        entry.set_term(2);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 1, 1));
+    }
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(2);
+      matches.push_back(1);
+      matches.push_back(1);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_index(2);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 2, 0));
+    }
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(2);
+      matches.push_back(1);
+      matches.push_back(2);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_index(2);
+        entry.set_term(2);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 2, 2));
+    }
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(2);
+      matches.push_back(1);
+      matches.push_back(2);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_index(2);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 2, 0));
+    }
+  }
+  // even
+  {
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(2);
+      matches.push_back(1);
+      matches.push_back(1);
+      matches.push_back(1);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_index(2);
+        entry.set_term(2);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 1, 1));
+    }
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(2);
+      matches.push_back(1);
+      matches.push_back(1);
+      matches.push_back(1);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_index(2);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 2, 0));
+    }
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(2);
+      matches.push_back(1);
+      matches.push_back(1);
+      matches.push_back(2);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_index(2);
+        entry.set_term(2);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 1, 1));
+    }
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(2);
+      matches.push_back(1);
+      matches.push_back(1);
+      matches.push_back(2);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_index(2);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 2, 0));
+    }
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(2);
+      matches.push_back(1);
+      matches.push_back(2);
+      matches.push_back(2);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_index(2);
+        entry.set_term(2);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 2, 2));
+    }
+    {
+      vector<uint64_t> matches;
+      vector<Entry> entries;
+
+      matches.push_back(2);
+      matches.push_back(1);
+      matches.push_back(2);
+      matches.push_back(2);
+
+      {
+        Entry entry;
+        entry.set_index(1);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+      {
+        Entry entry;
+        entry.set_index(2);
+        entry.set_term(1);
+        entries.push_back(entry);
+      }
+
+      tests.push_back(tmp(matches, entries, 2, 0));
+    }
+  }
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    s->Append(&t.logs);
+    s->hardState_.set_term(t.term);
+
+    vector<uint64_t> peers;
+    raft *r = newTestRaft(1, peers, 5, 1, s);
+    int j;
+    for (j = 0; j < t.matches.size(); ++j) {
+      r->setProgress(j + 1, t.matches[j], t.matches[j] + 1);
+    }
+    r->maybeCommit();
+    EXPECT_EQ(r->raftLog_->committed_, t.w);
+  }
+}
