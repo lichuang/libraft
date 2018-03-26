@@ -2117,6 +2117,8 @@ TEST(raftTests, TestHandleMsgApp) {
 
   vector<tmp> tests;
   // Ensure 1
+
+  // previous log mismatch
   {
     Message msg;
     msg.set_type(MsgApp);
@@ -2127,6 +2129,7 @@ TEST(raftTests, TestHandleMsgApp) {
 
     tests.push_back(tmp(msg, 2, 0, true));
   }
+  // previous log non-exist
   {
     Message msg;
     msg.set_type(MsgApp);
@@ -2138,6 +2141,126 @@ TEST(raftTests, TestHandleMsgApp) {
     tests.push_back(tmp(msg, 2, 0, true));
   }
 
+  // Ensure 2
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(2);
+    msg.set_logterm(1);
+    msg.set_index(1);
+    msg.set_commit(1);
+
+    tests.push_back(tmp(msg, 2, 1, false));
+  }
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(2);
+    msg.set_logterm(0);
+    msg.set_index(0);
+    msg.set_commit(1);
+    
+    Entry *entry = msg.add_entries();
+    entry->set_index(1);
+    entry->set_term(2);
+
+    tests.push_back(tmp(msg, 1, 1, false));
+  }
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(2);
+    msg.set_logterm(2);
+    msg.set_index(2);
+    msg.set_commit(3);
+    
+    Entry *entry = msg.add_entries();
+    entry->set_index(3);
+    entry->set_term(2);
+
+    entry = msg.add_entries();
+    entry->set_index(4);
+    entry->set_term(2);
+
+    tests.push_back(tmp(msg, 4, 3, false));
+  }
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(2);
+    msg.set_logterm(2);
+    msg.set_index(2);
+    msg.set_commit(4);
+    
+    Entry *entry = msg.add_entries();
+    entry->set_index(3);
+    entry->set_term(2);
+
+    tests.push_back(tmp(msg, 3, 3, false));
+  }
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(2);
+    msg.set_logterm(1);
+    msg.set_index(1);
+    msg.set_commit(4);
+    
+    Entry *entry = msg.add_entries();
+    entry->set_index(2);
+    entry->set_term(2);
+
+    tests.push_back(tmp(msg, 2, 2, false));
+  }
+
+  // Ensure 3
+
+  // match entry 1, commit up to last new entry 1
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(1);
+    msg.set_logterm(1);
+    msg.set_index(1);
+    msg.set_commit(3);
+
+    tests.push_back(tmp(msg, 2, 1, false));
+  }
+  // match entry 1, commit up to last new entry 2
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(1);
+    msg.set_logterm(1);
+    msg.set_index(1);
+    msg.set_commit(3);
+
+    Entry *entry = msg.add_entries();
+    entry->set_index(2);
+    entry->set_term(2);
+    tests.push_back(tmp(msg, 2, 2, false));
+  }
+  // match entry 2, commit up to last new entry 2
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(2);
+    msg.set_logterm(2);
+    msg.set_index(2);
+    msg.set_commit(3);
+
+    tests.push_back(tmp(msg, 2, 2, false));
+  }
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(2);
+    msg.set_logterm(2);
+    msg.set_index(2);
+    msg.set_commit(4);
+
+    tests.push_back(tmp(msg, 2, 2, false));
+  }
   int i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
@@ -2164,7 +2287,7 @@ TEST(raftTests, TestHandleMsgApp) {
 
     r->handleAppendEntries(t.m);
   
-    EXPECT_EQ(r->raftLog_->lastIndex(), t.index);
+    EXPECT_EQ(r->raftLog_->lastIndex(), t.index) << "i: " << i;
     EXPECT_EQ(r->raftLog_->committed_, t.commit);
 
     vector<Message*> msgs;
