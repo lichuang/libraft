@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <math.h>
 #include "libraft.h"
 #include "util.h"
 #include "raft.h"
@@ -2042,6 +2043,7 @@ TEST(raftTests, TestCommit) {
     s->hardState_.set_term(t.term);
 
     vector<uint64_t> peers;
+    peers.push_back(1);
     raft *r = newTestRaft(1, peers, 5, 1, s);
     int j;
     for (j = 0; j < t.matches.size(); ++j) {
@@ -2049,5 +2051,125 @@ TEST(raftTests, TestCommit) {
     }
     r->maybeCommit();
     EXPECT_EQ(r->raftLog_->committed_, t.w);
+  }
+}
+
+TEST(raftTests, TestPastElectionTimeout) {
+  struct tmp {
+    int elapse;
+    float probability;
+    bool round;
+
+    tmp(int elapse, float probability, bool round)
+      : elapse(elapse), probability(probability), round(round) {
+    }
+  };
+  vector<tmp> tests;
+
+  tests.push_back(tmp(5, 0, false));
+  tests.push_back(tmp(10, 0.1, true));
+  tests.push_back(tmp(13, 0.4, true));
+  tests.push_back(tmp(15, 0.6, true));
+  tests.push_back(tmp(18, 0.9, true));
+  tests.push_back(tmp(20, 1, false));
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    raft *r = newTestRaft(1, peers, 10, 1, s);
+    r->electionElapsed_ = t.elapse;
+    int c = 0, j;
+    for (j = 0; j < 10000; ++j) {
+      r->resetRandomizedElectionTimeout();
+      if (r->pastElectionTimeout()) {
+        ++c;
+      }
+    }
+
+    float g = (float)c / 10000.0;
+    if (t.round) {
+      g = floor(g * 10 + 0.5) / 10.0;
+    }
+
+    EXPECT_EQ(g, t.probability);
+  }
+}
+
+// TestHandleMsgApp ensures:
+// 1. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm.
+// 2. If an existing entry conflicts with a new one (same index but different terms),
+//    delete the existing entry and all that follow it; append any new entries not already in the log.
+// 3. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry).
+TEST(raftTests, TestHandleMsgApp) {
+  struct tmp {
+    Message m;
+    uint64_t index;
+    uint64_t commit;
+    bool reject;
+
+    tmp(Message m, uint64_t index, uint64_t commit, bool reject)
+      : m(m), index(index), commit(commit), reject(reject) {}
+  };
+
+  vector<tmp> tests;
+  // Ensure 1
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(2);
+    msg.set_logterm(3);
+    msg.set_index(2);
+    msg.set_commit(3);
+
+    tests.push_back(tmp(msg, 2, 0, true));
+  }
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(2);
+    msg.set_logterm(3);
+    msg.set_index(3);
+    msg.set_commit(3);
+
+    tests.push_back(tmp(msg, 2, 0, true));
+  }
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<Entry> entries;
+    {
+      Entry entry;
+      entry.set_index(1);
+      entry.set_term(1);
+      entries.push_back(entry);
+    }
+    {
+      Entry entry;
+      entry.set_index(2);
+      entry.set_term(2);
+      entries.push_back(entry);
+    }
+    s->Append(&entries);
+
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    raft *r = newTestRaft(1, peers, 10, 1, s);
+
+    r->handleAppendEntries(t.m);
+  
+    EXPECT_EQ(r->raftLog_->lastIndex(), t.index);
+    EXPECT_EQ(r->raftLog_->committed_, t.commit);
+
+    vector<Message*> msgs;
+    r->readMessages(&msgs);
+    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ(msgs[0]->reject(), t.reject);
   }
 }
