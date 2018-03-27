@@ -2296,3 +2296,157 @@ TEST(raftTests, TestHandleMsgApp) {
     EXPECT_EQ(msgs[0]->reject(), t.reject);
   }
 }
+
+// TestHandleHeartbeat ensures that the follower commits to the commit in the message.
+TEST(raftTests, TestHandleHeartbeat) {
+  uint64_t commit = 2;
+  struct tmp {
+    Message m;
+    uint64_t commit;
+
+    tmp(Message m, uint64_t commit)
+      : m(m), commit(commit) {}
+  };
+
+  vector<tmp> tests;
+  {
+    Message m;
+    m.set_from(2);
+    m.set_to(1);
+    m.set_type(MsgHeartbeat);
+    m.set_term(2);
+    m.set_commit(commit + 1);
+    tests.push_back(tmp(m, commit + 1));
+  }
+  // do not decrease commit
+  {
+    Message m;
+    m.set_from(2);
+    m.set_to(1);
+    m.set_type(MsgHeartbeat);
+    m.set_term(2);
+    m.set_commit(commit - 1);
+    tests.push_back(tmp(m, commit));
+  }
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<Entry> entries;
+    {
+      Entry entry;
+      entry.set_index(1);
+      entry.set_term(1);
+      entries.push_back(entry);
+    }
+    {
+      Entry entry;
+      entry.set_index(2);
+      entry.set_term(2);
+      entries.push_back(entry);
+    }
+    {
+      Entry entry;
+      entry.set_index(3);
+      entry.set_term(3);
+      entries.push_back(entry);
+    }
+    s->Append(&entries);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    raft *r = newTestRaft(1, peers, 5, 1, s);
+
+    r->becomeFollower(2, 2);
+    r->raftLog_->commitTo(commit);
+    r->handleHeartbeat(t.m);
+
+    EXPECT_EQ(r->raftLog_->committed_, t.commit);
+    vector<Message *> msgs;
+    r->readMessages(&msgs);
+    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ(msgs[0]->type(), MsgHeartbeatResp);
+  }
+}
+
+// TestHandleHeartbeatResp ensures that we re-send log entries when we get a heartbeat response.
+TEST(raftTests, TestHandleHeartbeatResp) {
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<Entry> entries;
+  {
+    Entry entry;
+    entry.set_index(1);
+    entry.set_term(1);
+    entries.push_back(entry);
+  }
+  {
+    Entry entry;
+    entry.set_index(2);
+    entry.set_term(2);
+    entries.push_back(entry);
+  }
+  {
+    Entry entry;
+    entry.set_index(3);
+    entry.set_term(3);
+    entries.push_back(entry);
+  }
+  s->Append(&entries);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  raft *r = newTestRaft(1, peers, 5, 1, s);
+
+  r->becomeCandidate();
+  r->becomeLeader();
+
+  r->raftLog_->commitTo(r->raftLog_->lastIndex());
+
+  vector<Message*> msgs;
+  // A heartbeat response from a node that is behind; re-send MsgApp
+  {
+    Message m;
+    m.set_from(2);
+    m.set_type(MsgHeartbeatResp);
+    r->step(m);
+
+    r->readMessages(&msgs);
+    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ(msgs[0]->type(), MsgApp);
+  }
+
+  // A second heartbeat response generates another MsgApp re-send
+  {
+    Message m;
+    m.set_from(2);
+    m.set_type(MsgHeartbeatResp);
+    r->step(m);
+    msgs.clear();
+    r->readMessages(&msgs);
+    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ(msgs[0]->type(), MsgApp);
+  }
+  // Once we have an MsgAppResp, heartbeats no longer send MsgApp.
+  {
+    Message m;
+    m.set_from(2);
+    m.set_type(MsgAppResp);
+    m.set_index(msgs[0]->index() + uint64_t(msgs[0]->entries_size()));
+    r->step(m);
+    vector<Message*> msgs;
+    // Consume the message sent in response to MsgAppResp
+    r->readMessages(&msgs);
+  }
+
+  {
+    Message m;
+    m.set_from(2);
+    m.set_type(MsgHeartbeatResp);
+    r->step(m);
+    msgs.clear();
+    r->readMessages(&msgs);
+    EXPECT_EQ(msgs.size(), 0);
+  }
+}
