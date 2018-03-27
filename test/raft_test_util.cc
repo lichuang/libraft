@@ -211,6 +211,7 @@ Config* newTestConfig(uint64_t id, const vector<uint64_t>& peers, int election, 
   c->maxSizePerMsg = noLimit;
   c->maxInflightMsgs = 256;
   c->logger = &kDefaultLogger;
+  c->readOnlyOption = ReadOnlySafe;
   c->checkQuorum = false;
   return c;
 }

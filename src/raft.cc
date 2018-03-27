@@ -859,7 +859,7 @@ void raft::stepLeader(const Message& msg) {
       sendAppend(from);
     }
 
-    if (readOnly_->option_ != ReadOnlySafe || msg.context().size() == 0) {
+    if (readOnly_->option_ != ReadOnlySafe || msg.context().empty()) {
       return;
     }
 

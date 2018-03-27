@@ -55,6 +55,7 @@ void readOnly::advance(const Message& msg, vector<readIndexStatus*> *rss) {
   }
 
   if (found) {
+    ++i;
     readIndexQueue_.erase(readIndexQueue_.begin(), readIndexQueue_.begin() + i);
     for (i = 0; i < rss->size(); ++i) {
       pendingReadIndex_.erase((*rss)[i]->req_->entries(0).data());

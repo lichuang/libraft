@@ -7,6 +7,7 @@
 #include "default_logger.h"
 #include "progress.h"
 #include "raft_test_util.h"
+#include "read_only.h"
 
 stateMachine *nopStepper = new blackHole();
 
@@ -2448,5 +2449,57 @@ TEST(raftTests, TestHandleHeartbeatResp) {
     msgs.clear();
     r->readMessages(&msgs);
     EXPECT_EQ(msgs.size(), 0);
+  }
+}
+
+// TestRaftFreesReadOnlyMem ensures raft will free read request from
+// readOnly readIndexQueue and pendingReadIndex map.
+// related issue: https://github.com/coreos/etcd/issues/7571
+TEST(raftTests, TestRaftFreesReadOnlyMem) {
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  raft *r = newTestRaft(1, peers, 5, 1, s);
+
+  r->becomeCandidate();
+  r->becomeLeader();
+
+  r->raftLog_->commitTo(r->raftLog_->lastIndex());
+
+  string ctx = "ctx";
+  vector<Message*> msgs;
+
+  // leader starts linearizable read request.
+  // more info: raft dissertation 6.4, step 2.
+  {
+    Message m;
+    m.set_from(2);
+    m.set_type(MsgReadIndex);
+    Entry *entry = m.add_entries();
+    entry->set_data(ctx);
+    r->step(m);
+
+    r->readMessages(&msgs);
+    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ(msgs[0]->type(), MsgHeartbeat);
+    EXPECT_EQ(msgs[0]->context(), ctx);
+    EXPECT_EQ(r->readOnly_->readIndexQueue_.size(), 1);
+    EXPECT_EQ(r->readOnly_->pendingReadIndex_.size(), 1);
+    EXPECT_NE(r->readOnly_->pendingReadIndex_.find(ctx), r->readOnly_->pendingReadIndex_.end());
+  }
+  // heartbeat responses from majority of followers (1 in this case)
+  // acknowledge the authority of the leader.
+  // more info: raft dissertation 6.4, step 3.
+  {
+    Message m;
+    m.set_from(2);
+    m.set_type(MsgHeartbeatResp);
+    m.set_context(ctx);
+    r->step(m);
+
+    EXPECT_EQ(r->readOnly_->readIndexQueue_.size(), 0);
+    EXPECT_EQ(r->readOnly_->pendingReadIndex_.size(), 0);
+    EXPECT_EQ(r->readOnly_->pendingReadIndex_.find(ctx), r->readOnly_->pendingReadIndex_.end());
   }
 }
