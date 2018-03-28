@@ -2954,3 +2954,101 @@ TEST(raftTests, TestLeaderElectionWithCheckQuorum) {
   EXPECT_EQ(a->state_, StateFollower);
   EXPECT_EQ(c->state_, StateLeader);
 }
+
+// TestFreeStuckCandidateWithCheckQuorum ensures that a candidate with a higher term
+// can disrupt the leader even if the leader still "officially" holds the lease, The
+// leader is expected to step down and adopt the candidate's term
+TEST(raftTests, TestFreeStuckCandidateWithCheckQuorum) {
+  raft *a, *b, *c;
+  vector<stateMachine*> peers;
+
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    a = newTestRaft(1, peers, 10, 1, s);
+    a->checkQuorum_ = true;
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    b = newTestRaft(2, peers, 10, 1, s);
+    b->checkQuorum_ = true;
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    c = newTestRaft(3, peers, 10, 1, s);
+    c->checkQuorum_ = true;
+  }
+  peers.push_back(new raftStateMachine(a));
+  peers.push_back(new raftStateMachine(b));
+  peers.push_back(new raftStateMachine(c));
+  network *net = newNetwork(peers);
+
+  b->randomizedElectionTimeout_ = b->electionTimeout_ + 2;
+  int i;
+  for (i = 0; i < b->electionTimeout_; ++i) {
+    b->tick();
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }  
+
+  net->isolate(1);
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }  
+  EXPECT_EQ(b->state_, StateFollower);
+  EXPECT_EQ(c->state_, StateCandidate);
+  EXPECT_EQ(c->term_, b->term_ + 1);
+
+  // Vote again for safety
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }  
+  EXPECT_EQ(b->state_, StateFollower);
+  EXPECT_EQ(c->state_, StateCandidate);
+  EXPECT_EQ(c->term_, b->term_ + 2);
+
+  net->recover();
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(3);
+    msg.set_type(MsgHeartbeat);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }  
+  // Disrupt the leader so that the stuck peer is freed
+  EXPECT_EQ(a->state_, StateFollower);
+  EXPECT_EQ(a->term_, c->term_);
+}

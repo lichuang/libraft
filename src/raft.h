@@ -112,6 +112,7 @@ struct raft {
   void proxyMessage(const Message& msg);
   void readMessages(vector<Message*> *);
   Message* cloneMessage(const Message& msg);
+  bool checkQuorumActive();
 };
 extern raft* newRaft(Config *);
 string entryString(const Entry& entry);

@@ -145,6 +145,28 @@ Message* raft::cloneMessage(const Message& msg) {
   return new Message(msg);
 }
 
+// checkQuorumActive returns true if the quorum is active from
+// the view of the local raft state machine. Otherwise, it returns
+// false.
+// checkQuorumActive also resets all RecentActive to false.
+bool raft::checkQuorumActive() {
+  int act = 0;
+
+  map<uint64_t, Progress*>::const_iterator iter;
+  for (iter = prs_.begin(); iter != prs_.end(); ++iter) {
+    if (iter->first == id_) { // self is always active
+      act++;
+      continue;
+    }
+    if (iter->second->recentActive_) {
+      act++;
+    }
+    iter->second->recentActive_ = false;
+  }
+
+  return act >= quorum();
+}
+
 bool raft::hasLeader() {
   return leader_ != None;
 }
@@ -415,7 +437,7 @@ void raft::tickHeartbeat() {
   heartbeatElapsed_++;
   electionElapsed_++;
 
-  if (electionElapsed_ >- electionTimeout_) {
+  if (electionElapsed_ >= electionTimeout_) {
     electionElapsed_ = 0;
     if (checkQuorum_) {
       Message msg;
@@ -600,6 +622,7 @@ int raft::step(const Message& msg) {
   logger_->Debugf(__FILE__, __LINE__, "msg %s %llu -> %llu, term:%llu",
                   msgTypeString(msg.type()), msg.from(), msg.to(), term_);
   // Handle the message term, which may result in our stepping down to a follower.
+  Message *respMsg;
   uint64_t term = msg.term();
   int type = msg.type();
   uint64_t from = msg.from();
@@ -635,7 +658,23 @@ int raft::step(const Message& msg) {
     }
   } else if (term < term_) {
     if (checkQuorum_ && (type == MsgHeartbeat || type == MsgApp)) {
-      //TODO
+      // We have received messages from a leader at a lower term. It is possible
+      // that these messages were simply delayed in the network, but this could
+      // also mean that this node has advanced its term number during a network
+      // partition, and it is now unable to either win an election or to rejoin
+      // the majority on the old term. If checkQuorum is false, this will be
+      // handled by incrementing term numbers in response to MsgVote with a
+      // higher term, but if checkQuorum is true we may not advance the term on
+      // MsgVote and must generate other messages to advance the term. The net
+      // result of these two features is to minimize the disruption caused by
+      // nodes that have been removed from the cluster's configuration: a
+      // removed node will send MsgVotes (or MsgPreVotes) which will be ignored,
+      // but it will not receive MsgApp or MsgHeartbeat, so it will not create
+      // disruptive term increases
+      respMsg = new Message();
+      respMsg->set_to(from);
+      respMsg->set_type(MsgAppResp);
+      send(respMsg);
     } else {
       // ignore other cases
       logger_->Infof(__FILE__, __LINE__, "%x [term: %llu] ignored a %s message with lower term from %x [term: %llu]",
@@ -647,7 +686,6 @@ int raft::step(const Message& msg) {
   EntryVec entries;
   int err;
   int n;
-  Message *respMsg;
 
   switch (type) {
   case MsgHup:
@@ -733,7 +771,11 @@ void raft::stepLeader(const Message& msg) {
     return;
     break;
   case MsgCheckQuorum:
-    // TODO
+    if (!checkQuorumActive()) {
+      logger_->Warningf(__FILE__, __LINE__, "%x stepped down to follower since quorum is not active", id_);
+      becomeFollower(term_, None);
+    }
+    return;
     break;
   case MsgProp:
     if (msg.entries_size() == 0) {
