@@ -2743,3 +2743,50 @@ TEST(raftTests, TestAllServerStepdown) {
     }
   }
 }
+
+TEST(raftTests, TestLeaderStepdownWhenQuorumActive) {
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  peers.push_back(3);
+  raft *r = newTestRaft(1, peers, 5, 1, s);
+
+  r->checkQuorum_ = true;
+  
+  r->becomeCandidate();
+  r->becomeLeader();
+
+  int i;
+  for (i = 0; i < r->electionTimeout_ + 1; ++i) {
+    Message msg;
+    msg.set_from(2);
+    msg.set_type(MsgHeartbeatResp);
+    msg.set_term(r->term_);
+    r->step(msg);
+    r->tick();
+  }
+
+  EXPECT_EQ(r->state_, StateLeader);
+}
+
+TEST(raftTests, TestLeaderStepdownWhenQuorumLost) {
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  peers.push_back(3);
+  raft *r = newTestRaft(1, peers, 5, 1, s);
+
+  r->checkQuorum_ = true;
+  
+  r->becomeCandidate();
+  r->becomeLeader();
+
+  int i;
+  for (i = 0; i < r->electionTimeout_ + 1; ++i) {
+    r->tick();
+  }
+
+  EXPECT_EQ(r->state_, StateFollower);
+}
