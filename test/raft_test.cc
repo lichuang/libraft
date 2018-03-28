@@ -2503,3 +2503,243 @@ TEST(raftTests, TestRaftFreesReadOnlyMem) {
     EXPECT_EQ(r->readOnly_->pendingReadIndex_.find(ctx), r->readOnly_->pendingReadIndex_.end());
   }
 }
+
+// TestMsgAppRespWaitReset verifies the resume behavior of a leader
+// MsgAppResp.
+TEST(raftTests, TestMsgAppRespWaitReset) {
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  peers.push_back(3);
+  raft *r = newTestRaft(1, peers, 5, 1, s);
+
+  r->becomeCandidate();
+  r->becomeLeader();
+
+  vector<Message*> msgs;
+
+  // The new leader has just emitted a new Term 4 entry; consume those messages
+  // from the outgoing queue.
+  r->bcastAppend();
+  r->readMessages(&msgs);
+
+  // Node 2 acks the first entry, making it committed.
+  {
+    Message msg;
+    msg.set_from(2);
+    msg.set_type(MsgAppResp);
+    msg.set_index(1);
+    r->step(msg);
+  }
+  EXPECT_EQ(r->raftLog_->committed_, 1);
+
+  // Also consume the MsgApp messages that update Commit on the followers.
+  r->readMessages(&msgs);
+
+  // A new command is now proposed on node 1.
+  {
+    Message msg;
+    msg.set_from(1);
+    msg.set_type(MsgProp);
+    Entry *entry = msg.add_entries();
+    r->step(msg);
+  }
+
+  // The command is broadcast to all nodes not in the wait state.
+  // Node 2 left the wait state due to its MsgAppResp, but node 3 is still waiting.
+  msgs.clear();
+  r->readMessages(&msgs);
+  EXPECT_EQ(msgs.size(), 1);
+  Message *msg = msgs[0];
+  EXPECT_FALSE(msg->type() != MsgApp || msg->to() != 2);
+  EXPECT_FALSE(msg->entries_size() != 1 || msg->entries(0).index() != 2);
+
+  // Now Node 3 acks the first entry. This releases the wait and entry 2 is sent.
+  {
+    Message msg;
+    msg.set_from(3);
+    msg.set_type(MsgAppResp);
+    msg.set_index(1);
+    r->step(msg);
+  }
+  msgs.clear();
+  r->readMessages(&msgs);
+  EXPECT_EQ(msgs.size(), 1);
+  msg = msgs[0];
+  EXPECT_FALSE(msg->type() != MsgApp || msg->to() != 3);
+  EXPECT_FALSE(msg->entries_size() != 1 || msg->entries(0).index() != 2);
+}
+
+void testRecvMsgVote(MessageType type) {
+  struct tmp {
+    StateType state;
+    uint64_t i, term;
+    uint64_t voteFor;
+    bool reject;
+
+    tmp(StateType t, uint64_t i, uint64_t term, uint64_t vote, bool reject)
+      : state(t), i(i), term(term), voteFor(vote), reject(reject) {}
+  };
+
+  vector<tmp> tests;
+  
+  tests.push_back(tmp(StateFollower, 0, 0, None, true));
+  tests.push_back(tmp(StateFollower, 0, 1, None, true));
+  tests.push_back(tmp(StateFollower, 0, 2, None, true));
+  tests.push_back(tmp(StateFollower, 0, 3, None, false));
+
+  tests.push_back(tmp(StateFollower, 1, 0, None, true));
+  tests.push_back(tmp(StateFollower, 1, 1, None, true));
+  tests.push_back(tmp(StateFollower, 1, 2, None, true));
+  tests.push_back(tmp(StateFollower, 1, 3, None, false));
+
+  tests.push_back(tmp(StateFollower, 2, 0, None, true));
+  tests.push_back(tmp(StateFollower, 2, 1, None, true));
+  tests.push_back(tmp(StateFollower, 2, 2, None, false));
+  tests.push_back(tmp(StateFollower, 2, 3, None, false));
+
+  tests.push_back(tmp(StateFollower, 3, 0, None, true));
+  tests.push_back(tmp(StateFollower, 3, 1, None, true));
+  tests.push_back(tmp(StateFollower, 3, 2, None, false));
+  tests.push_back(tmp(StateFollower, 3, 3, None, false));
+
+  tests.push_back(tmp(StateFollower, 3, 2, 2, false));
+  tests.push_back(tmp(StateFollower, 3, 2, 1, true));
+
+  tests.push_back(tmp(StateLeader, 3, 3, 1, true));
+  tests.push_back(tmp(StatePreCandidate, 3, 3, 1, true));
+  tests.push_back(tmp(StateCandidate, 3, 3, 1, true));
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp &t = tests[i];
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    raft *r = newTestRaft(1, peers, 10, 1, s);
+
+    r->state_ = t.state;
+    r->vote_ = t.voteFor;  
+
+    s = new MemoryStorage(&kDefaultLogger); 
+    EntryVec entries;
+
+    entries.push_back(Entry());
+    {
+      Entry entry;
+      entry.set_term(2);
+      entry.set_index(1);
+      entries.push_back(entry);
+    }
+    {
+      Entry entry;
+      entry.set_term(2);
+      entry.set_index(2);
+      entries.push_back(entry);
+    }
+    s->entries_.clear();
+    s->entries_.insert(s->entries_.end(), entries.begin(), entries.end());
+    r->raftLog_ = new raftLog(s, &kDefaultLogger);
+    r->raftLog_->unstable_.offset_ = 3;
+
+    {
+      Message msg;
+      msg.set_type(type);
+      msg.set_from(2);
+      msg.set_index(t.i);
+      msg.set_logterm(t.term);
+      r->step(msg);
+    }
+
+    vector<Message*> msgs;
+    r->readMessages(&msgs);
+
+    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ(msgs[0]->type(), voteRespMsgType(type));
+    EXPECT_EQ(msgs[0]->reject(), t.reject) << "i: " << i;
+  }
+}
+
+TEST(raftTests, TestRecvMsgVote) {
+  testRecvMsgVote(MsgVote); 
+}
+
+// TODO
+TEST(raftTests, TestStateTransition) {
+  struct tmp {
+  };
+}
+
+TEST(raftTests, TestAllServerStepdown) {
+  struct tmp {
+    StateType state, wstate;
+    uint64_t term, index;
+    
+    tmp(StateType s, StateType ws, uint64_t t, uint64_t i)
+      : state(s), wstate(ws), term(t), index(i) {
+    }
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp(StateFollower, StateFollower, 3, 0));
+  tests.push_back(tmp(StatePreCandidate, StateFollower, 3, 0));
+  tests.push_back(tmp(StateCandidate, StateFollower, 3, 0));
+  tests.push_back(tmp(StateLeader, StateFollower, 3, 1));
+
+  vector<MessageType> types;
+  types.push_back(MsgVote);
+  types.push_back(MsgApp);
+  uint64_t term = 3;
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp &t = tests[i];
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    raft *r = newTestRaft(1, peers, 10, 1, s);
+
+    switch (t.state) {
+    case StateFollower:
+      r->becomeFollower(1, None);
+      break;
+    case StatePreCandidate:
+      r->becomePreCandidate();
+      break;
+    case StateCandidate:
+      r->becomeCandidate();
+      break;
+    case StateLeader:
+      r->becomeCandidate();
+      r->becomeLeader();
+      break;
+    }
+
+    int j;
+    for (j = 0; j < types.size(); ++j) {
+      MessageType type = types[j];
+      Message msg;
+      msg.set_from(2);
+      msg.set_type(type);
+      msg.set_term(term);
+      msg.set_logterm(term);
+      r->step(msg);
+      
+      EXPECT_EQ(r->state_, t.wstate);
+      EXPECT_EQ(r->term_, t.term);
+      EXPECT_EQ(r->raftLog_->lastIndex(), t.index);
+      EntryVec entries;
+      r->raftLog_->allEntries(&entries);
+      EXPECT_EQ(entries.size(), t.index);
+
+      uint64_t leader = 2;
+      if (type == MsgVote) {
+        leader = None;
+      }
+      EXPECT_EQ(r->leader_, leader);
+    }
+  }
+}
