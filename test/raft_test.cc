@@ -2790,3 +2790,167 @@ TEST(raftTests, TestLeaderStepdownWhenQuorumLost) {
 
   EXPECT_EQ(r->state_, StateFollower);
 }
+
+TEST(raftTests, TestLeaderSupersedingWithCheckQuorum) {
+  raft *a, *b, *c;
+  vector<stateMachine*> peers;
+
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    a = newTestRaft(1, peers, 10, 1, s);
+    a->checkQuorum_ = true;
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    b = newTestRaft(2, peers, 10, 1, s);
+    b->checkQuorum_ = true;
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    c = newTestRaft(3, peers, 10, 1, s);
+    c->checkQuorum_ = true;
+  }
+  peers.push_back(new raftStateMachine(a));
+  peers.push_back(new raftStateMachine(b));
+  peers.push_back(new raftStateMachine(c));
+  network *net = newNetwork(peers);
+  
+  b->randomizedElectionTimeout_ = b->electionTimeout_ + 1;
+
+  int i;
+  for (i = 0; i < b->electionTimeout_; ++i) {
+    b->tick();
+  }
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }  
+
+  EXPECT_EQ(a->state_, StateLeader);
+  EXPECT_EQ(c->state_, StateFollower);
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }  
+
+  // Peer b rejected c's vote since its electionElapsed had not reached to electionTimeout
+  EXPECT_EQ(c->state_, StateCandidate);
+
+  // Letting b's electionElapsed reach to electionTimeout
+  for (i = 0; i < b->electionTimeout_; ++i) {
+    b->tick();
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }  
+  EXPECT_EQ(c->state_, StateLeader);
+}
+
+TEST(raftTests, TestLeaderElectionWithCheckQuorum) {
+  raft *a, *b, *c;
+  vector<stateMachine*> peers;
+
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    a = newTestRaft(1, peers, 10, 1, s);
+    a->checkQuorum_ = true;
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    b = newTestRaft(2, peers, 10, 1, s);
+    b->checkQuorum_ = true;
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    c = newTestRaft(3, peers, 10, 1, s);
+    c->checkQuorum_ = true;
+  }
+  peers.push_back(new raftStateMachine(a));
+  peers.push_back(new raftStateMachine(b));
+  peers.push_back(new raftStateMachine(c));
+  network *net = newNetwork(peers);
+  
+  a->randomizedElectionTimeout_ = a->electionTimeout_ + 1;
+  b->randomizedElectionTimeout_ = b->electionTimeout_ + 2;
+
+  int i;
+  // Immediately after creation, votes are cast regardless of the
+  // election timeout.
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }  
+
+  EXPECT_EQ(a->state_, StateLeader);
+  EXPECT_EQ(c->state_, StateFollower);
+
+  // need to reset randomizedElectionTimeout larger than electionTimeout again,
+  // because the value might be reset to electionTimeout since the last state changes
+  a->randomizedElectionTimeout_ = a->electionTimeout_ + 1;
+  b->randomizedElectionTimeout_ = b->electionTimeout_ + 2;
+
+  for (i = 0; i < a->electionTimeout_; ++i) {
+    a->tick();
+  }
+  for (i = 0; i < b->electionTimeout_; ++i) {
+    b->tick();
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(3);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }  
+  EXPECT_EQ(a->state_, StateFollower);
+  EXPECT_EQ(c->state_, StateLeader);
+}

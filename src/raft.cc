@@ -613,7 +613,7 @@ int raft::step(const Message& msg) {
       if (!force && inLease) {
         // If a server receives a RequestVote request within the minimum election timeout
         // of hearing from a current leader, it does not update its term or grant its vote
-        logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] ignored %s from %x [logterm: %llu, index: %llu] at term %llu: lease is not expired (remaining ticks: %llu",
+        logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] ignored %s from %x [logterm: %llu, index: %llu] at term %llu: lease is not expired (remaining ticks: %d)",
           id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from,
           msg.logterm(), msg.index(), term, electionTimeout_ - electionElapsed_);
         return OK;
@@ -641,6 +641,7 @@ int raft::step(const Message& msg) {
       logger_->Infof(__FILE__, __LINE__, "%x [term: %llu] ignored a %s message with lower term from %x [term: %llu]",
         id_, term_, msgTypeString(type), from, term);
     }
+    return OK;
   }
 
   EntryVec entries;
