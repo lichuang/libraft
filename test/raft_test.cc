@@ -3052,3 +3052,336 @@ TEST(raftTests, TestFreeStuckCandidateWithCheckQuorum) {
   EXPECT_EQ(a->state_, StateFollower);
   EXPECT_EQ(a->term_, c->term_);
 }
+
+TEST(raftTests, TestNonPromotableVoterWithCheckQuorum) {
+  raft *a, *b;
+  vector<stateMachine*> peers;
+
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    a = newTestRaft(1, peers, 10, 1, s);
+    a->checkQuorum_ = true;
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    b = newTestRaft(2, peers, 10, 1, s);
+    b->checkQuorum_ = true;
+  }
+  peers.push_back(new raftStateMachine(a));
+  peers.push_back(new raftStateMachine(b));
+  network *net = newNetwork(peers);
+
+  b->randomizedElectionTimeout_ = b->electionTimeout_ + 1;
+  // Need to remove 2 again to make it a non-promotable node since newNetwork overwritten some internal states
+  b->delProgress(2);
+  EXPECT_FALSE(b->promotable());
+  int i;
+  for (i = 0; i < b->electionTimeout_; ++i) {
+    b->tick();
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }  
+
+  EXPECT_EQ(a->state_, StateLeader);
+  EXPECT_EQ(b->state_, StateFollower);
+  EXPECT_EQ(b->leader_, 1);
+}
+
+TEST(raftTests, TestReadOnlyOptionSafe) {
+  raft *a, *b, *c;
+  vector<stateMachine*> peers;
+
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    a = newTestRaft(1, peers, 10, 1, s);
+    a->checkQuorum_ = true;
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    b = newTestRaft(2, peers, 10, 1, s);
+    b->checkQuorum_ = true;
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    c = newTestRaft(3, peers, 10, 1, s);
+    c->checkQuorum_ = true;
+  }
+  peers.push_back(new raftStateMachine(a));
+  peers.push_back(new raftStateMachine(b));
+  peers.push_back(new raftStateMachine(c));
+  network *net = newNetwork(peers);
+
+  b->randomizedElectionTimeout_ = b->electionTimeout_ + 2;
+  int i;
+  for (i = 0; i < b->electionTimeout_; ++i) {
+    b->tick();
+  }
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }  
+
+  EXPECT_EQ(a->state_, StateLeader);
+  struct tmp {
+    raft *r;
+    int proposals;
+    uint64_t wri;
+    string ctx;
+
+    tmp(raft *r, int proposals, uint64_t wri, string ctx)
+      : r(r), proposals(proposals), wri(wri), ctx(ctx) {}
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp(a, 10, 11, "ctx1"));
+  tests.push_back(tmp(b, 10, 21, "ctx2"));
+  tests.push_back(tmp(c, 10, 31, "ctx3"));
+  tests.push_back(tmp(a, 10, 41, "ctx4"));
+  tests.push_back(tmp(b, 10, 51, "ctx5"));
+  tests.push_back(tmp(c, 10, 61, "ctx6"));
+
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+    int j;
+    for (j = 0; j < t.proposals; ++j) {
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(1);
+      msg.set_type(MsgProp);
+      msg.add_entries();
+      msgs.push_back(msg);
+      net->send(&msgs);
+    }
+    {
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(t.r->id_);
+      msg.set_to(t.r->id_);
+      msg.set_type(MsgReadIndex);
+      Entry *entry = msg.add_entries();
+      entry->set_data(t.ctx);
+      msgs.push_back(msg);
+      net->send(&msgs);
+    }
+
+    raft *r = t.r;
+    EXPECT_FALSE(r->readStates_.size() == 0);
+    ReadState* state = r->readStates_[0];
+    EXPECT_EQ(state->index_, t.wri);
+    EXPECT_EQ(state->requestCtx_, t.ctx);
+    r->readStates_.clear();
+  }
+}
+
+// TODO
+TEST(raftTests, TestReadOnlyOptionLease) {
+}
+TEST(raftTests, TestReadOnlyOptionLeaseWithoutCheckQuorum) {
+}
+
+// TestReadOnlyForNewLeader ensures that a leader only accepts MsgReadIndex message
+// when it commits at least one log entry at it term.
+// TODO
+TEST(raftTests, TestReadOnlyForNewLeader) {
+  vector<uint64_t> peers;
+  vector<stateMachine*> sts;
+  peers.push_back(1);
+  peers.push_back(2);
+  peers.push_back(3);
+
+  raft *a, *b, *c;
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+
+    vector<Entry> entries;
+    
+    entries.push_back(Entry());
+    
+    Entry entry;
+    entry.set_index(1);
+    entry.set_term(1);
+    entries.push_back(entry);
+
+    entry.set_index(2);
+    entry.set_term(1);
+    entries.push_back(entry);
+    s->entries_ = entries;
+
+    s->hardState_.set_commit(1);
+    s->hardState_.set_term(1);
+
+    Config *c = newTestConfig(1, peers, 10, 1, s);
+    c->applied = 1;
+    a = newRaft(c);
+    sts.push_back(new raftStateMachine(a));
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+
+    vector<Entry> entries;
+    
+    Entry entry;
+    entry.set_index(1);
+    entry.set_term(1);
+    entries.push_back(entry);
+
+    entry.set_index(2);
+    entry.set_term(1);
+    entries.push_back(entry);
+    s->entries_ = entries;
+
+    s->hardState_.set_commit(2);
+    s->hardState_.set_term(1);
+
+    Config *c = newTestConfig(2, peers, 10, 1, s);
+    c->applied = 2;
+    b = newRaft(c);
+    sts.push_back(new raftStateMachine(b));
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+
+    vector<Entry> entries;
+    
+    Entry entry;
+    entry.set_index(1);
+    entry.set_term(1);
+    entries.push_back(entry);
+
+    entry.set_index(2);
+    entry.set_term(1);
+    entries.push_back(entry);
+    s->entries_ = entries;
+
+    s->hardState_.set_commit(2);
+    s->hardState_.set_term(1);
+
+    Config *cf = newTestConfig(2, peers, 10, 1, s);
+    cf->applied = 2;
+    c = newRaft(cf);
+    sts.push_back(new raftStateMachine(c));
+  }
+  
+  network *net = newNetwork(sts);
+
+  // Drop MsgApp to forbid peer a to commit any log entry at its term after it becomes leader.
+  net->ignore(MsgApp);
+  // Force peer a to become leader.
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  EXPECT_EQ(a->state_, StateLeader);
+
+  // Ensure peer a drops read only request.
+  uint64_t index = 4;
+  string ctx = "ctx";
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgReadIndex);
+    Entry *entry = msg.add_entries();
+    entry->set_data(ctx);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(a->readStates_.size(), 0);
+
+  net->recover();
+
+  // Force peer a to commit a log entry at its term
+  int i;
+  for (i = 0; i < a->heartbeatTimeout_; ++i) {
+    a->tick();
+  }
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries();
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(a->raftLog_->committed_, 4);
+
+  uint64_t term;
+  int err = a->raftLog_->term(a->raftLog_->committed_, &term);
+  uint64_t lastLogTerm = a->raftLog_->zeroTermOnErrCompacted(term, err); 
+  EXPECT_EQ(lastLogTerm, a->term_);
+
+  // Ensure peer a accepts read only request after it commits a entry at its term.
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgReadIndex);
+    msg.add_entries()->set_data(ctx);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(a->readStates_.size(), 1);
+  ReadState *rs = a->readStates_[0];
+  EXPECT_EQ(rs->index_, index);
+  EXPECT_EQ(rs->requestCtx_, ctx);
+}
+
+TEST(raftTests, TestLeaderAppResp) {
+  // initial progress: match = 0; next = 3
+  struct tmp {
+    uint64_t index;
+    bool reject;
+    // progress
+    uint64_t match;
+    uint64_t next;
+    // message
+    int msgNum;
+    uint64_t windex;
+    uint64_t wcommit;
+    
+    tmp(uint64_t i, bool reject, uint64_t match, uint64_t next, int num, uint64_t index, uint64_t commit)
+      : index(i), reject(reject), match(match), next(next), msgNum(num), windex(index), 
+    }
+  };
+}
