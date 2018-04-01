@@ -3381,7 +3381,144 @@ TEST(raftTests, TestLeaderAppResp) {
     uint64_t wcommit;
     
     tmp(uint64_t i, bool reject, uint64_t match, uint64_t next, int num, uint64_t index, uint64_t commit)
-      : index(i), reject(reject), match(match), next(next), msgNum(num), windex(index), 
+      : index(i), reject(reject), match(match), next(next), msgNum(num), windex(index), wcommit(commit) {
     }
   };
+
+  vector<tmp> tests;
+  // stale resp; no replies
+  tests.push_back(tmp(3, true, 0, 3, 0, 0, 0));
+  // denied resp; leader does not commit; decrease next and send probing msg
+  tests.push_back(tmp(2, true, 0, 2, 1, 1, 0));
+  // accept resp; leader commits; broadcast with commit index
+  tests.push_back(tmp(2, false, 2, 4, 2, 2, 2));
+  // ignore heartbeat replies
+  tests.push_back(tmp(0, false, 0, 3, 0, 0, 0));
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+ 		// sm term is 1 after it becomes the leader.
+		// thus the last log term must be 1 to be committed.
+    tmp &t = tests[i];
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    raft* r = newTestRaft(1, peers, 10, 1, s);
+
+    {
+      MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+      EntryVec entries;
+      entries.push_back(Entry());
+
+      Entry entry;
+      entry.set_index(1);
+      entry.set_term(0);
+      entries.push_back(entry);
+
+      entry.set_index(2);
+      entry.set_term(1);
+      entries.push_back(entry);
+      s->entries_ = entries;
+      r->raftLog_ = newLog(s, &kDefaultLogger);
+      r->raftLog_->unstable_.offset_ = 3;
+    }
+
+    r->becomeCandidate();
+    r->becomeLeader();
+    vector<Message*> msgs;
+    r->readMessages(&msgs);
+
+    {
+      Message msg;
+      msg.set_from(2);
+      msg.set_type(MsgAppResp);
+      msg.set_index(t.index);
+      msg.set_term(r->term_);
+      msg.set_reject(t.reject);
+      msg.set_rejecthint(t.index);
+      r->step(msg);
+    }
+
+    Progress *p = r->prs_[2];
+    EXPECT_EQ(p->match_, t.match);
+    EXPECT_EQ(p->next_, t.next);
+
+    r->readMessages(&msgs);
+
+    EXPECT_EQ(msgs.size(), t.msgNum);
+    int j;
+    for (j = 0; j < msgs.size(); ++j) {
+      Message *msg = msgs[j];
+      EXPECT_EQ(msg->index(), t.windex);
+      EXPECT_EQ(msg->commit(), t.wcommit);
+    }
+  }
+}
+
+// When the leader receives a heartbeat tick, it should
+// send a MsgApp with m.Index = 0, m.LogTerm=0 and empty entries.
+TEST(raftTests, TestBcastBeat) {
+  uint64_t offset = 1000;
+  // make a state machine with log.offset = 1000
+  Snapshot ss;
+  ss.mutable_metadata()->set_index(offset);
+  ss.mutable_metadata()->set_term(1);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(1);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(2);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(3);
+  /*
+  ConfState cs;
+  cs.add_nodes()->add_nodes(1);
+  cs.add_nodes()->add_nodes(2);
+  cs.add_nodes()->add_nodes(3);
+  */
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  s->ApplySnapshot(ss);
+  raft *r = newTestRaft(1, peers, 10, 1, s);
+  r->term_ = 1;
+
+  r->becomeCandidate();
+  r->becomeLeader();
+
+  EntryVec entries;
+  int i;
+  for (i = 0; i < 10; ++i) {
+    Entry entry;
+    entry.set_index(i + 1);
+    entries.push_back(entry);
+  }
+  r->appendEntry(&entries);
+  // slow follower
+  r->prs_[2]->match_ = 5;
+  r->prs_[2]->next_ = 6;
+  // normal follower
+  r->prs_[3]->match_ = r->raftLog_->lastIndex();
+  r->prs_[3]->next_ = r->raftLog_->lastIndex() + 1;
+
+  {
+    Message msg;
+    msg.set_type(MsgBeat);
+    r->step(msg);
+  }
+
+  vector<Message*> msgs;
+  r->readMessages(&msgs);
+  
+  EXPECT_EQ(msgs.size(), 2);
+  map<uint64_t, uint64_t> wantCommitMap;
+  wantCommitMap[2] = min(r->raftLog_->committed_, r->prs_[2]->match_);
+  wantCommitMap[3] = min(r->raftLog_->committed_, r->prs_[3]->match_);
+
+  for (i = 0; i < msgs.size(); ++i) {
+    Message *msg = msgs[i];
+    EXPECT_EQ(msg->type(), MsgHeartbeat);
+    EXPECT_EQ(msg->index(), 0);
+    EXPECT_EQ(msg->logterm(), 0);
+    EXPECT_NE(wantCommitMap[msg->to()], 0);
+    EXPECT_EQ(msg->commit(), wantCommitMap[msg->to()]);
+    EXPECT_EQ(msg->entries_size(), 0);
+  }
 }

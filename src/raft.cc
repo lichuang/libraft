@@ -1204,6 +1204,6 @@ void raft::removeNode(uint64_t id) {
 }
 
 void raft::readMessages(vector<Message*> *msgs) {
-  msgs->insert(msgs->end(), msgs_.begin(), msgs_.end());
+  *msgs = msgs_;
   msgs_.clear();
 }
