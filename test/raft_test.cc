@@ -4092,3 +4092,41 @@ TEST(raftTests, TestStepIgnoreConfig) {
   EXPECT_TRUE(isDeepEqualEntries(wents, ents));
   EXPECT_EQ(r->pendingConf_, pendingConf);
 }
+
+// TestRecoverPendingConfig tests that new leader recovers its pendingConf flag
+// based on uncommitted entries.
+TEST(raftTests, TestRecoverPendingConfig) {
+  struct tmp {
+    EntryType type;
+    bool pending;
+  
+    tmp(EntryType t, bool pending)
+      : type(t), pending(pending) {}
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp(EntryNormal, false));
+  tests.push_back(tmp(EntryConfChange, true));
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp &t = tests[i];
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    raft *r = newTestRaft(1, peers, 10, 1, s);
+
+    EntryVec entries;
+    Entry entry;
+    entry.set_type(t.type);
+    entries.push_back(entry);
+    r->appendEntry(&entries);
+    r->becomeCandidate();
+    r->becomeLeader();
+    EXPECT_EQ(t.pending, r->pendingConf_);
+  }
+}
+
+TEST(raftTests, TestRecoverDoublePendingConfig) {
+}
+
