@@ -3468,12 +3468,6 @@ TEST(raftTests, TestBcastBeat) {
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(1);
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(2);
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(3);
-  /*
-  ConfState cs;
-  cs.add_nodes()->add_nodes(1);
-  cs.add_nodes()->add_nodes(2);
-  cs.add_nodes()->add_nodes(3);
-  */
   MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   vector<uint64_t> peers;
   s->ApplySnapshot(ss);
@@ -3521,4 +3515,122 @@ TEST(raftTests, TestBcastBeat) {
     EXPECT_EQ(msg->commit(), wantCommitMap[msg->to()]);
     EXPECT_EQ(msg->entries_size(), 0);
   }
+}
+
+// tests the output of the state machine when receiving MsgBeat
+TEST(raftTests, TestRecvMsgBeat) {
+  struct tmp {
+    StateType state;
+    int msg;
+
+    tmp(StateType s, int msg)
+      : state(s), msg(msg) {
+    }
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp(StateLeader, 2));
+  // candidate and follower should ignore MsgBeat
+  tests.push_back(tmp(StateCandidate, 0));
+  tests.push_back(tmp(StateFollower, 0));
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    raft *r = newTestRaft(1, peers, 10, 1, s);
+
+    EntryVec entries;
+    entries.push_back(Entry());
+
+    Entry entry;
+    entry.set_index(1);
+    entry.set_term(0);
+    entries.push_back(entry);
+
+    entry.set_index(2);
+    entry.set_term(1);
+    entries.push_back(entry);
+    s->entries_ = entries;
+    r->raftLog_ = newLog(s, &kDefaultLogger);
+    r->term_ = 1;
+    r->state_ = t.state;
+
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgBeat);
+    r->step(msg);
+
+    vector<Message*> msgs;
+    r->readMessages(&msgs);
+
+    EXPECT_EQ(msgs.size(), t.msg);
+
+    int j;
+    for (j = 0; j < msgs.size(); ++j) {
+      EXPECT_EQ(msgs[j]->type(), MsgHeartbeat);
+    }
+  }
+}
+
+TEST(raftTests, TestLeaderIncreaseNext) {
+  EntryVec prevEntries;
+  {
+    Entry entry;
+
+    entry.set_term(1);
+    entry.set_index(1);
+    prevEntries.push_back(entry);
+
+    entry.set_term(1);
+    entry.set_index(2);
+    prevEntries.push_back(entry);
+
+    entry.set_term(1);
+    entry.set_index(3);
+    prevEntries.push_back(entry);
+  }
+  struct tmp {
+    ProgressState state;
+    uint64_t next, wnext;
+    tmp(ProgressState s, uint64_t n, uint64_t wn)
+      : state(s), next(n), wnext(wn) {
+    }
+  };
+  vector<tmp> tests;
+	// state replicate, optimistically increase next
+	// previous entries + noop entry + propose + 1
+  tests.push_back(tmp(ProgressStateReplicate, 2, prevEntries.size() + 1 + 1 + 1));
+	// state probe, not optimistically increase next
+  tests.push_back(tmp(ProgressStateProbe, 2, 2));
+
+	int i;
+	for (i = 0; i < tests.size(); ++i) {
+		tmp& t = tests[i];
+
+		vector<uint64_t> peers;
+		peers.push_back(1);
+		peers.push_back(2);
+		Storage *s = new MemoryStorage(&kDefaultLogger);
+		raft *r = newTestRaft(1, peers, 10, 1, s);
+		r->raftLog_->append(prevEntries);
+		r->becomeCandidate();
+		r->becomeLeader();
+		r->prs_[2]->state_ = t.state;
+		r->prs_[2]->next_ = t.next;
+
+		Message msg;
+		msg.set_from(1);
+		msg.set_to(1);
+		msg.set_type(MsgProp);
+		msg.add_entries()->set_data("somedata");
+		r->step(msg);
+
+		EXPECT_EQ(r->prs_[2]->next_, t.wnext);
+	}
 }
