@@ -177,3 +177,29 @@ int MemoryStorage::Append(EntryVec* entries) {
     lastIndex(), (*entries)[0].index());
   return OK;
 }
+
+// CreateSnapshot makes a snapshot which can be retrieved with Snapshot() and
+// can be used to reconstruct the state at that point.
+// If any configuration changes have been made since the last compaction,
+// the result of the last ApplyConfChange must be passed in.
+int MemoryStorage::CreateSnapshot(uint64_t i, ConfState *cs, const string& data, Snapshot *ss) {
+  Mutex mutex(&locker_);
+
+  if (i <= snapShot_->metadata().index()) {
+    return ErrSnapOutOfDate;
+  }
+
+  uint64_t offset = entries_[0].index();
+  if (i > lastIndex()) {
+    logger_->Fatalf(__FILE__, __LINE__, "snapshot %d is out of bound lastindex(%llu)", i, lastIndex());
+  }
+
+  snapShot_->mutable_metadata()->set_index(i);  
+  snapShot_->mutable_metadata()->set_term(entries_[i - offset].term());  
+  if (cs) {
+    *(snapShot_->mutable_metadata()->mutable_conf_state()) = *cs;
+  }
+  snapShot_->set_data(data);
+
+  return OK;
+}

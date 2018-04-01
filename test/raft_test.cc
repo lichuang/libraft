@@ -3794,3 +3794,301 @@ TEST(raftTests, TestRecvMsgUnreachable) {
 	EXPECT_EQ(r->prs_[2]->state_, ProgressStateProbe);
 	EXPECT_EQ(r->prs_[2]->next_, r->prs_[2]->match_ + 1);
 }
+
+TEST(raftTests, TestRestore) {
+  Snapshot ss;
+  ss.mutable_metadata()->set_index(11);
+  ss.mutable_metadata()->set_term(11);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(1);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(2);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(3);
+
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  raft *r = newTestRaft(1, peers, 10, 1, s);
+
+  EXPECT_TRUE(r->restore(ss));
+
+  EXPECT_EQ(r->raftLog_->lastIndex(), ss.metadata().index());
+  uint64_t term;
+  r->raftLog_->term(ss.metadata().index(), &term);
+  EXPECT_EQ(term, ss.metadata().term());
+
+  EXPECT_FALSE(r->restore(ss));
+}
+
+TEST(raftTests, TestRestoreIgnoreSnapshot) {
+  EntryVec prevEntries;
+  {
+    Entry entry;
+
+    entry.set_term(1);
+    entry.set_index(1);
+    prevEntries.push_back(entry);
+
+    entry.set_term(1);
+    entry.set_index(2);
+    prevEntries.push_back(entry);
+
+    entry.set_term(1);
+    entry.set_index(3);
+    prevEntries.push_back(entry);
+  }
+	vector<uint64_t> peers;
+	peers.push_back(1);
+	peers.push_back(2);
+	Storage *s = new MemoryStorage(&kDefaultLogger);
+	raft *r = newTestRaft(1, peers, 10, 1, s);
+	r->raftLog_->append(prevEntries);
+  uint64_t commit = 1;
+  r->raftLog_->commitTo(commit);
+
+  Snapshot ss;
+  ss.mutable_metadata()->set_index(commit);
+  ss.mutable_metadata()->set_term(1);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(1);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(2);
+
+  // ignore snapshot
+  EXPECT_FALSE(r->restore(ss));
+
+  EXPECT_EQ(r->raftLog_->committed_, commit);
+
+  // ignore snapshot and fast forward commit
+  ss.mutable_metadata()->set_index(commit + 1);
+  EXPECT_FALSE(r->restore(ss));
+  EXPECT_EQ(r->raftLog_->committed_, commit + 1);
+}
+
+TEST(raftTests, TestProvideSnap) {
+  // restore the state machine from a snapshot so it has a compacted log and a snapshot
+  Snapshot ss;
+  ss.mutable_metadata()->set_index(11);
+  ss.mutable_metadata()->set_term(11);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(1);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(2);
+
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  raft *r = newTestRaft(1, peers, 10, 1, s);
+
+  r->restore(ss);
+
+  r->becomeCandidate();
+  r->becomeLeader();
+
+  // force set the next of node 2, so that node 2 needs a snapshot
+  r->prs_[2]->next_ = r->raftLog_->firstIndex();
+  {
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(2);
+    msg.set_type(MsgAppResp);
+    msg.set_index(r->prs_[2]->next_ - 1);
+    msg.set_reject(true);
+    r->step(msg);
+  }
+
+  vector<Message*> msgs;
+  r->readMessages(&msgs);
+  EXPECT_EQ(msgs.size(), 1);
+  EXPECT_EQ(msgs[0]->type(), MsgSnap);
+}
+
+TEST(raftTests, TestIgnoreProvidingSnap) {
+  // restore the state machine from a snapshot so it has a compacted log and a snapshot
+  Snapshot ss;
+  ss.mutable_metadata()->set_index(11);
+  ss.mutable_metadata()->set_term(11);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(1);
+  ss.mutable_metadata()->mutable_conf_state()->add_nodes(2);
+
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  raft *r = newTestRaft(1, peers, 10, 1, s);
+
+  r->restore(ss);
+
+  r->becomeCandidate();
+  r->becomeLeader();
+
+	// force set the next of node 2, so that node 2 needs a snapshot
+	// change node 2 to be inactive, expect node 1 ignore sending snapshot to 2
+  r->prs_[2]->next_ = r->raftLog_->firstIndex() - 1;
+  r->prs_[2]->recentActive_ = false;
+  {
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries()->set_data("somedata");
+    r->step(msg);
+  }
+
+  vector<Message*> msgs;
+  r->readMessages(&msgs);
+  EXPECT_EQ(msgs.size(), 0);
+}
+
+TEST(raftTests, TestRestoreFromSnapMsg) {
+}
+
+TEST(raftTests, TestSlowNodeRestore) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  net->isolate(3);
+  int i;
+  for (i = 0; i <= 100; ++i) {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries();
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  raft *leader = (raft*)net->peers[1]->data();
+  EntryVec entries;
+  nextEnts(leader, net->storage[1], &entries);
+  Snapshot ss;
+  ConfState cs;
+  vector<uint64_t> nodes;
+  leader->nodes(&nodes);
+  int j;
+  for (j = 0; j < nodes.size(); ++j) {
+    cs.add_nodes(nodes[j]);
+  }
+  net->storage[1]->CreateSnapshot(leader->raftLog_->applied_, &cs, "", &ss);
+  net->storage[1]->Compact(leader->raftLog_->applied_);
+
+  net->recover();
+	// send heartbeats so that the leader can learn everyone is active.
+	// node 3 will only be considered as active when node 1 receives a reply from it.
+  do {
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgBeat);
+    msg.add_entries();
+    vector<Message> msgs;
+    net->send(&msgs);
+  } while (leader->prs_[3]->recentActive_ == false);
+
+  // trigger a snapshot
+  {
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries();
+    vector<Message> msgs;
+    net->send(&msgs);
+  }  
+
+  raft *follower = (raft*)net->peers[3]->data();
+
+  // trigger a commit
+  {
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries();
+    vector<Message> msgs;
+    net->send(&msgs);
+  }  
+  EXPECT_EQ(follower->raftLog_->committed_, leader->raftLog_->committed_);
+}
+
+// TestStepConfig tests that when raft step msgProp in EntryConfChange type,
+// it appends the entry to log and sets pendingConf to be true.
+TEST(raftTests, TestStepConfig) {
+  // a raft that cannot make progress
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  raft *r = newTestRaft(1, peers, 10, 1, s);
+
+  r->becomeCandidate();
+  r->becomeLeader();
+
+  uint64_t index = r->raftLog_->lastIndex();
+  Message msg;
+  msg.set_from(1);
+  msg.set_to(1);
+  msg.set_type(MsgProp);
+  msg.add_entries()->set_type(EntryConfChange);
+  r->step(msg);
+
+  EXPECT_EQ(r->raftLog_->lastIndex(), index + 1);
+  EXPECT_TRUE(r->pendingConf_);
+}
+
+// TestStepIgnoreConfig tests that if raft step the second msgProp in
+// EntryConfChange type when the first one is uncommitted, the node will set
+// the proposal to noop and keep its original state.
+TEST(raftTests, TestStepIgnoreConfig) {
+  // a raft that cannot make progress
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  raft *r = newTestRaft(1, peers, 10, 1, s);
+
+  r->becomeCandidate();
+  r->becomeLeader();
+
+  {
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries()->set_type(EntryConfChange);
+    r->step(msg);
+  }
+  uint64_t index = r->raftLog_->lastIndex();
+  bool pendingConf = r->pendingConf_;
+
+  {
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries()->set_type(EntryConfChange);
+    r->step(msg);
+  }
+  EntryVec wents, ents;
+  {
+    Entry entry;
+    entry.set_type(EntryNormal);
+    entry.set_term(1);
+    entry.set_index(3);
+    wents.push_back(entry);
+  }
+  int err = r->raftLog_->entries(index + 1, noLimit, &ents);
+
+  EXPECT_EQ(err, OK);
+  EXPECT_TRUE(isDeepEqualEntries(wents, ents));
+  EXPECT_EQ(r->pendingConf_, pendingConf);
+}
