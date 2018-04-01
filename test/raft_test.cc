@@ -3634,3 +3634,163 @@ TEST(raftTests, TestLeaderIncreaseNext) {
 		EXPECT_EQ(r->prs_[2]->next_, t.wnext);
 	}
 }
+
+TEST(raftTests, TestSendAppendForProgressProbe) {
+	vector<uint64_t> peers;
+	peers.push_back(1);
+	peers.push_back(2);
+	Storage *s = new MemoryStorage(&kDefaultLogger);
+	raft *r = newTestRaft(1, peers, 10, 1, s);
+	r->becomeCandidate();
+	r->becomeLeader();
+
+	vector<Message*> msgs;
+	r->readMessages(&msgs);
+	r->prs_[2]->becomeProbe();
+
+	// each round is a heartbeat
+	int i;
+	for (i = 0; i < 3; ++i) {
+		if (i == 0) {
+			// we expect that raft will only send out one msgAPP on the first
+			// loop. After that, the follower is paused until a heartbeat response is
+			// received.
+			EntryVec entries;
+			Entry entry;
+			entry.set_data("somedata");
+			entries.push_back(entry);
+			r->appendEntry(&entries);
+			r->sendAppend(2);
+			r->readMessages(&msgs);
+			EXPECT_EQ(msgs.size(), 1);
+			EXPECT_EQ(msgs[0]->index(), 0);
+		}
+
+		EXPECT_TRUE(r->prs_[2]->paused_);
+
+		int j;
+		// do a heartbeat
+		for (j = 0; j < r->heartbeatTimeout_; ++j) {
+			Message msg;
+			msg.set_from(1);
+			msg.set_to(1);
+			msg.set_type(MsgBeat);
+			r->step(msg);
+		}
+		EXPECT_TRUE(r->prs_[2]->paused_);
+
+		// consume the heartbeat
+		vector<Message*> msgs;
+		r->readMessages(&msgs);
+		EXPECT_EQ(msgs.size(), 1);
+		EXPECT_EQ(msgs[0]->type(), MsgHeartbeat);
+
+		// a heartbeat response will allow another message to be sent
+		{
+			Message msg;
+			msg.set_from(2);
+			msg.set_to(1);
+			msg.set_type(MsgHeartbeatResp);
+			r->step(msg);
+		}
+		r->readMessages(&msgs);
+		EXPECT_EQ(msgs.size(), 1);
+		EXPECT_EQ(msgs[0]->index(), 0);
+		EXPECT_TRUE(r->prs_[2]->paused_);
+	}
+}
+
+TEST(raftTests, TestSendAppendForProgressReplicate) {
+	vector<uint64_t> peers;
+	peers.push_back(1);
+	peers.push_back(2);
+	Storage *s = new MemoryStorage(&kDefaultLogger);
+	raft *r = newTestRaft(1, peers, 10, 1, s);
+	r->becomeCandidate();
+	r->becomeLeader();
+
+	vector<Message*> msgs;
+	r->readMessages(&msgs);
+	r->prs_[2]->becomeReplicate();
+
+	int i;
+	for (i = 0; i < 10; ++i) {
+		EntryVec entries;
+		Entry entry;
+		entry.set_data("somedata");
+		entries.push_back(entry);
+		r->appendEntry(&entries);
+		r->sendAppend(2);
+		r->readMessages(&msgs);
+		EXPECT_EQ(msgs.size(), 1);
+	}
+}
+
+TEST(raftTests, TestSendAppendForProgressSnapshot) {
+	vector<uint64_t> peers;
+	peers.push_back(1);
+	peers.push_back(2);
+	Storage *s = new MemoryStorage(&kDefaultLogger);
+	raft *r = newTestRaft(1, peers, 10, 1, s);
+	r->becomeCandidate();
+	r->becomeLeader();
+
+	vector<Message*> msgs;
+	r->readMessages(&msgs);
+	r->prs_[2]->becomeSnapshot(10);
+
+	int i;
+	for (i = 0; i < 10; ++i) {
+		EntryVec entries;
+		Entry entry;
+		entry.set_data("somedata");
+		entries.push_back(entry);
+		r->appendEntry(&entries);
+		r->sendAppend(2);
+		r->readMessages(&msgs);
+		EXPECT_EQ(msgs.size(), 0);
+	}
+}
+
+TEST(raftTests, TestRecvMsgUnreachable) {
+  EntryVec prevEntries;
+  {
+    Entry entry;
+
+    entry.set_term(1);
+    entry.set_index(1);
+    prevEntries.push_back(entry);
+
+    entry.set_term(1);
+    entry.set_index(2);
+    prevEntries.push_back(entry);
+
+    entry.set_term(1);
+    entry.set_index(3);
+    prevEntries.push_back(entry);
+  }
+	vector<uint64_t> peers;
+	peers.push_back(1);
+	peers.push_back(2);
+	Storage *s = new MemoryStorage(&kDefaultLogger);
+	s->Append(&prevEntries);
+	raft *r = newTestRaft(1, peers, 10, 1, s);
+	r->becomeCandidate();
+	r->becomeLeader();
+
+	// set node 2 to state replicate
+	r->prs_[2]->match_ = 3;
+	r->prs_[2]->becomeReplicate();
+	r->prs_[2]->optimisticUpdate(5);
+
+	{
+		Message msg;
+		msg.set_from(2);
+		msg.set_to(1);
+		msg.set_type(MsgUnreachable);
+		r->step(msg);
+	}
+
+	EXPECT_EQ(r->prs_[2]->state_, ProgressStateProbe);
+	EXPECT_EQ(r->prs_[2]->next_, r->prs_[2]->match_ + 1);
+}

@@ -945,7 +945,13 @@ void raft::stepLeader(const Message& msg) {
     pr->pause();
     break;
   case MsgUnreachable:
-    //TODO
+		// During optimistic replication, if the remote becomes unreachable,
+		// there is huge probability that a MsgApp is lost.
+    if (pr->state_ == ProgressStateReplicate) {
+      pr->becomeProbe();
+    }
+    logger_->Debugf(__FILE__, __LINE__, "%x failed to send message to %x because it is unreachable [%s]",
+      id_, msg.from(), pr->string().c_str());
     break;
   case MsgTransferLeader:
     //TODO
