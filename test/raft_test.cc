@@ -3957,20 +3957,19 @@ TEST(raftTests, TestSlowNodeRestore) {
   net->isolate(3);
   int i;
   for (i = 0; i <= 100; ++i) {
-    vector<Message> msgs;
-    Message msg;
-    msg.set_from(1);
-    msg.set_to(1);
-    msg.set_type(MsgProp);
-    msg.add_entries();
-    msgs.push_back(msg);
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(1);
+      msg.set_type(MsgProp);
+      msg.add_entries();
+      msgs.push_back(msg);
     net->send(&msgs);
   }
 
   raft *leader = (raft*)net->peers[1]->data();
   EntryVec entries;
   nextEnts(leader, net->storage[1], &entries);
-  Snapshot ss;
   ConfState cs;
   vector<uint64_t> nodes;
   leader->nodes(&nodes);
@@ -3978,7 +3977,7 @@ TEST(raftTests, TestSlowNodeRestore) {
   for (j = 0; j < nodes.size(); ++j) {
     cs.add_nodes(nodes[j]);
   }
-  net->storage[1]->CreateSnapshot(leader->raftLog_->applied_, &cs, "", &ss);
+  net->storage[1]->CreateSnapshot(leader->raftLog_->applied_, &cs, "", NULL);
   net->storage[1]->Compact(leader->raftLog_->applied_);
 
   net->recover();
@@ -3989,8 +3988,8 @@ TEST(raftTests, TestSlowNodeRestore) {
     msg.set_from(1);
     msg.set_to(1);
     msg.set_type(MsgBeat);
-    msg.add_entries();
     vector<Message> msgs;
+    msgs.push_back(msg);
     net->send(&msgs);
   } while (leader->prs_[3]->recentActive_ == false);
 
@@ -4130,3 +4129,964 @@ TEST(raftTests, TestRecoverPendingConfig) {
 TEST(raftTests, TestRecoverDoublePendingConfig) {
 }
 
+// TestAddNode tests that addNode could update pendingConf and nodes correctly.
+TEST(raftTests, TestAddNode) {
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  raft *r = newTestRaft(1, peers, 10, 1, s);
+
+  r->addNode(2);
+  EXPECT_FALSE(r->pendingConf_);
+  vector<uint64_t> nodes, wnodes;
+  r->nodes(&nodes);
+
+  wnodes.push_back(1);
+  wnodes.push_back(2);
+  EXPECT_TRUE(isDeepEqualNodes(nodes, wnodes));
+}
+
+// TestRemoveNode tests that removeNode could update pendingConf, nodes and
+// and removed list correctly.
+TEST(raftTests, TestRemoveNode) {
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  raft *r = newTestRaft(1, peers, 10, 1, s);
+
+  r->removeNode(2);
+  EXPECT_FALSE(r->pendingConf_);
+  vector<uint64_t> nodes, wnodes;
+  r->nodes(&nodes);
+
+  wnodes.push_back(1);
+  EXPECT_TRUE(isDeepEqualNodes(nodes, wnodes));
+
+  r->removeNode(1);
+  wnodes.clear();
+  r->nodes(&nodes);
+  EXPECT_TRUE(isDeepEqualNodes(nodes, wnodes));
+}
+
+TEST(raftTests, TestPromotable) {
+  struct tmp {
+    vector<uint64_t> peers;
+    bool wp;
+
+    tmp(vector<uint64_t> p, bool wp)
+      : peers(p), wp(wp) {}
+  };
+  vector<tmp> tests;
+  {
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    tests.push_back(tmp(peers, true));
+  }
+  {
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    tests.push_back(tmp(peers, true));
+  }
+  {
+    vector<uint64_t> peers;
+    tests.push_back(tmp(peers, false));
+  }
+  {
+    vector<uint64_t> peers;
+    peers.push_back(2);
+    peers.push_back(3);
+    tests.push_back(tmp(peers, false));
+  }
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp &t = tests[i];
+
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    raft *r = newTestRaft(1, t.peers, 5, 1, s);
+    EXPECT_EQ(r->promotable(), t.wp);
+  }
+}
+
+TEST(raftTests, TestRaftNodes) {
+  struct tmp {
+    vector<uint64_t> ids, wids;
+
+    tmp(vector<uint64_t> p, vector<uint64_t> wp)
+      : ids(p), wids(wp) {}
+  };
+  vector<tmp> tests;
+  {
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    tests.push_back(tmp(peers, peers));
+  }
+  {
+    vector<uint64_t> peers, wps;
+    peers.push_back(3);
+    peers.push_back(2);
+    peers.push_back(1);
+    wps.push_back(1);
+    wps.push_back(2);
+    wps.push_back(3);
+    tests.push_back(tmp(peers, wps));
+  }
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp &t = tests[i];
+
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    raft *r = newTestRaft(1, t.ids, 10, 1, s);
+    vector<uint64_t> nodes;
+    r->nodes(&nodes);
+    EXPECT_TRUE(isDeepEqualNodes(nodes, t.wids));
+  }
+}
+
+void testCampaignWhileLeader(bool prevote) {
+  vector<uint64_t> peers;
+  Storage *s = new MemoryStorage(&kDefaultLogger);
+  peers.push_back(1);
+  Config *c = newTestConfig(1, peers, 5, 1, s);
+  c->preVote = prevote;
+  
+  raft *r = newRaft(c);
+  EXPECT_EQ(r->state_, StateFollower);
+
+	// We don't call campaign() directly because it comes after the check
+	// for our current state.
+  {
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    r->step(msg);
+  }
+  EXPECT_EQ(r->state_, StateLeader);
+
+  uint64_t term = r->term_;
+  {
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    r->step(msg);
+  }
+  EXPECT_EQ(r->state_, StateLeader);
+  EXPECT_EQ(r->term_, term);
+}
+
+TEST(raftTests, TestCampaignWhileLeader) {
+  testCampaignWhileLeader(false);
+}
+
+TEST(raftTests, TestPreCampaignWhileLeader) {
+  testCampaignWhileLeader(true);
+}
+
+// TestCommitAfterRemoveNode verifies that pending commands can become
+// committed when a config change reduces the quorum requirements.
+TEST(raftTests, TestCommitAfterRemoveNode) {
+  // Create a cluster with two nodes.
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  raft *r = newTestRaft(1, peers, 5, 1, s);
+
+  r->becomeCandidate();
+  r->becomeLeader();
+
+  // Begin to remove the second node.
+  ConfChange cc;
+  cc.set_type(ConfChangeRemoveNode);
+  cc.set_nodeid(2);
+  string ccdata;
+  cc.SerializeToString(&ccdata);
+
+  {
+    Message msg;
+    msg.set_type(MsgProp);
+    Entry *ent = msg.add_entries();
+    ent->set_type(EntryConfChange);
+    ent->set_data(ccdata);
+    r->step(msg);
+  }
+
+  EntryVec entries;
+  nextEnts(r, s, &entries);
+  EXPECT_EQ(entries.size(), 0);
+
+  uint64_t ccIndex = r->raftLog_->lastIndex();
+
+  // While the config change is pending, make another proposal.
+  {
+    Message msg;
+    msg.set_type(MsgProp);
+    Entry *ent = msg.add_entries();
+    ent->set_type(EntryNormal);
+    ent->set_data("hello");
+    r->step(msg);
+  }
+
+  // Node 2 acknowledges the config change, committing it.
+  {
+    Message msg;
+    msg.set_type(MsgAppResp);
+    msg.set_from(2);
+    msg.set_index(ccIndex);
+    r->step(msg);
+  }
+
+  nextEnts(r, s, &entries);
+  EXPECT_EQ(entries.size(), 2);
+  EXPECT_FALSE(entries[0].type() != EntryNormal || entries[0].has_data());
+  EXPECT_FALSE(entries[1].type() != EntryConfChange);
+
+	// Apply the config change. This reduces quorum requirements so the
+	// pending command can now commit.
+  r->removeNode(2);
+  nextEnts(r, s, &entries);
+  EXPECT_FALSE(entries.size() != 1 || entries[0].type() != EntryNormal || entries[0].data() != "hello");
+}
+
+void checkLeaderTransferState(raft *r, StateType state, uint64_t leader) {
+  EXPECT_FALSE(r->state_ != state || r->leader_ != leader);
+  EXPECT_EQ(r->leadTransferee_, None);
+}
+
+// TestLeaderTransferToUpToDateNode verifies transferring should succeed
+// if the transferee has the most up-to-date log entries when transfer starts.
+TEST(raftTests, TestLeaderTransferToUpToDateNode) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  raft *leader = (raft*)net->peers[1]->data();
+  EXPECT_EQ(leader->leader_, 1);
+
+  // Transfer leadership to 2.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(2);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  checkLeaderTransferState(leader, StateFollower, 2);
+  // After some log replication, transfer leadership back to 1.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries();
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(2);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  checkLeaderTransferState(leader, StateLeader, 1);
+}
+
+// TestLeaderTransferToUpToDateNodeFromFollower verifies transferring should succeed
+// if the transferee has the most up-to-date log entries when transfer starts.
+// Not like TestLeaderTransferToUpToDateNode, where the leader transfer message
+// is sent to the leader, in this test case every leader transfer message is sent
+// to the follower.
+TEST(raftTests, TestLeaderTransferToUpToDateNodeFromFollower) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  raft *leader = (raft*)net->peers[1]->data();
+  EXPECT_EQ(leader->leader_, 1);
+
+  // Transfer leadership to 2.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(2);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  checkLeaderTransferState(leader, StateFollower, 2);
+  // After some log replication, transfer leadership back to 1.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries();
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  checkLeaderTransferState(leader, StateLeader, 1);
+}
+
+// TestLeaderTransferWithCheckQuorum ensures transferring leader still works
+// even the current leader is still under its leader lease
+TEST(raftTests, TestLeaderTransferWithCheckQuorum) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+  int i;
+  for (i = 1; i < 4; ++i) {
+    raft *r = (raft*)net->peers[i]->data();
+    r->checkQuorum_ = true;
+    r->randomizedElectionTimeout_ = r->electionTimeout_ + i;
+  }
+  
+  raft *r = (raft*)net->peers[2]->data();
+  for (i = 0; i < r->electionTimeout_; ++i) {
+    r->tick();
+  }
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  raft *leader = (raft*)net->peers[1]->data();
+  EXPECT_EQ(leader->leader_, 1);
+
+  // Transfer leadership to 2.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(2);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  checkLeaderTransferState(leader, StateFollower, 2);
+  // After some log replication, transfer leadership back to 1.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries();
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(2);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  checkLeaderTransferState(leader, StateLeader, 1);
+}
+
+TEST(raftTests, TestLeaderTransferToSlowFollower) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  net->isolate(3);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries();
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  net->recover();
+  raft *leader = (raft*)net->peers[1]->data();
+  EXPECT_EQ(leader->prs_[3]->match_, 1);
+
+  // Transfer leadership to 3 when node 3 is lack of log.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  checkLeaderTransferState(leader, StateFollower, 3);
+}
+
+TEST(raftTests, TestLeaderTransferAfterSnapshot) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  net->isolate(3);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries();
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  raft *leader = (raft*)net->peers[1]->data();
+  EntryVec entries;
+  nextEnts(leader, net->storage[1], &entries);
+  ConfState cs;
+  vector<uint64_t> nodes;
+  leader->nodes(&nodes);
+  int j;
+  for (j = 0; j < nodes.size(); ++j) {
+    cs.add_nodes(nodes[j]);
+  }
+  net->storage[1]->CreateSnapshot(leader->raftLog_->applied_, &cs, "", NULL);
+  net->storage[1]->Compact(leader->raftLog_->applied_);
+
+  net->recover();
+  EXPECT_EQ(leader->prs_[3]->match_, 1);
+
+  // Transfer leadership to 3 when node 3 is lack of log.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  // Send pb.MsgHeartbeatResp to leader to trigger a snapshot for node 3.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgHeartbeatResp);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  checkLeaderTransferState(leader, StateFollower, 3);
+}
+
+TEST(raftTests, TestLeaderTransferToSelf) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  raft *leader = (raft*)net->peers[1]->data();
+
+  // Transfer leadership to self, there will be noop.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  checkLeaderTransferState(leader, StateLeader, 1);
+}
+
+TEST(raftTests, TestLeaderTransferToNonExistingNode) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  raft *leader = (raft*)net->peers[1]->data();
+
+  // Transfer leadership to non-existing node, there will be noop.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(4);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  checkLeaderTransferState(leader, StateLeader, 1);
+}
+
+TEST(raftTests, TestLeaderTransferTimeout) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  net->isolate(3);
+  raft *leader = (raft*)net->peers[1]->data();
+
+  // Transfer leadership to isolated node, wait for timeout.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(leader->leadTransferee_, 3);
+  int i;
+  for (i = 0; i < leader->heartbeatTimeout_; ++i) {
+    leader->tick();
+  }
+  EXPECT_EQ(leader->leadTransferee_, 3);
+  for (i = 0; i < leader->electionTimeout_ - leader->heartbeatTimeout_; ++i) {
+    leader->tick();
+  }
+  checkLeaderTransferState(leader, StateLeader, 1);
+}
+
+TEST(raftTests, TestLeaderTransferIgnoreProposal) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  net->isolate(3);
+  raft *leader = (raft*)net->peers[1]->data();
+
+  // Transfer leadership to isolated node to let transfer pending, then send proposal.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(leader->leadTransferee_, 3);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgProp);
+    msg.add_entries();
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(leader->prs_[1]->match_, 1);
+}
+
+TEST(raftTests, TestLeaderTransferReceiveHigherTermVote) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  net->isolate(3);
+  raft *leader = (raft*)net->peers[1]->data();
+
+  // Transfer leadership to isolated node to let transfer pending.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(leader->leadTransferee_, 3);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(2);
+    msg.set_to(2);
+    msg.set_type(MsgHup);
+    msg.set_index(1);
+    msg.set_term(2);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  checkLeaderTransferState(leader, StateFollower, 2);
+}
+
+TEST(raftTests, TestLeaderTransferRemoveNode) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  net->ignore(MsgTimeoutNow);
+  raft *leader = (raft*)net->peers[1]->data();
+
+  // The leadTransferee is removed when leadship transferring.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(leader->leadTransferee_, 3);
+
+  leader->removeNode(3);
+  checkLeaderTransferState(leader, StateLeader, 1);
+}
+
+// TestLeaderTransferBack verifies leadership can transfer back to self when last transfer is pending.
+TEST(raftTests, TestLeaderTransferBack) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  net->isolate(3);
+  raft *leader = (raft*)net->peers[1]->data();
+
+  // The leadTransferee is removed when leadship transferring.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(leader->leadTransferee_, 3);
+
+  // Transfer leadership back to self.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  checkLeaderTransferState(leader, StateLeader, 1);
+}
+
+// TestLeaderTransferSecondTransferToAnotherNode verifies leader can transfer to another node
+// when last transfer is pending.
+TEST(raftTests, TestLeaderTransferSecondTransferToAnotherNode) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  net->isolate(3);
+  raft *leader = (raft*)net->peers[1]->data();
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(leader->leadTransferee_, 3);
+
+  // Transfer leadership to another node.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(2);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  checkLeaderTransferState(leader, StateFollower, 2);
+}
+
+// TestLeaderTransferSecondTransferToSameNode verifies second transfer leader request
+// to the same node should not extend the timeout while the first one is pending.
+TEST(raftTests, TestLeaderTransferSecondTransferToSameNode) {
+  vector<stateMachine*> peers;
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+  peers.push_back(NULL);
+
+  network *net = newNetwork(peers);
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  net->isolate(3);
+  raft *leader = (raft*)net->peers[1]->data();
+
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(leader->leadTransferee_, 3);
+
+  int i;
+  for (i = 0; i < leader->heartbeatTimeout_; ++i) {
+    leader->tick();
+  }
+
+  // Second transfer leadership request to the same node.
+  {
+    Message msg;
+    vector<Message> msgs;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgTransferLeader);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  for (i = 0; i < leader->electionTimeout_ - leader->heartbeatTimeout_; ++i) {
+    leader->tick();
+  }
+  checkLeaderTransferState(leader, StateLeader, 1);
+}
+
+// TestTransferNonMember verifies that when a MsgTimeoutNow arrives at
+// a node that has been removed from the group, nothing happens.
+// (previously, if the node also got votes, it would panic as it
+// transitioned to StateLeader)
+TEST(raftTests, TestTransferNonMember) {
+  vector<uint64_t> peers;
+  peers.push_back(2);
+  peers.push_back(3);
+  peers.push_back(4);
+  Storage *s = new MemoryStorage(&kDefaultLogger);
+  raft *r = newTestRaft(1, peers, 5, 1, s);
+
+  {
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(1);
+    msg.set_type(MsgTimeoutNow);
+    r->step(msg);
+  }
+
+  {
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(1);
+    msg.set_type(MsgVoteResp);
+    r->step(msg);
+  }
+  {
+    Message msg;
+    msg.set_from(3);
+    msg.set_to(1);
+    msg.set_type(MsgVoteResp);
+    r->step(msg);
+  }
+
+  EXPECT_EQ(r->state_, StateFollower);
+}

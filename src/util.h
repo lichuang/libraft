@@ -5,6 +5,7 @@
 
 void limitSize(uint64_t maxSize, EntryVec *entries);
 
+bool isDeepEqualNodes(const vector<uint64_t>& ns1, const vector<uint64_t>& ns2);
 bool isDeepEqualSnapshot(const Snapshot *s1, const Snapshot *s2);
 bool isDeepEqualEntries(const EntryVec& ents1, const EntryVec& ents2);
 bool isHardStateEqual(const HardState& h1, const HardState& h2);

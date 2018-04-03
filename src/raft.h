@@ -113,6 +113,7 @@ struct raft {
   void readMessages(vector<Message*> *);
   Message* cloneMessage(const Message& msg);
   bool checkQuorumActive();
+  void sendTimeoutNow(uint64_t to);
 };
 extern raft* newRaft(Config *);
 string entryString(const Entry& entry);

@@ -183,6 +183,7 @@ void raft::hardState(HardState *hs) {
 }
 
 void raft::nodes(vector<uint64_t> *nodes) {
+  nodes->clear();
   map<uint64_t, Progress*>::const_iterator iter = prs_.begin();
   while (iter != prs_.end()) {
     nodes->push_back(iter->first);
@@ -210,7 +211,6 @@ void raft::send(Message *msg) {
   msg->set_from(id_);
   int type = msg->type();
 
-  // TODO: MsgPreVote
   if (type == MsgVote || type == MsgPreVote) {
     if (msg->term() == 0) {
       // PreVote RPCs are sent at a term other than our actual term, so the code
@@ -237,6 +237,7 @@ void raft::send(Message *msg) {
 void raft::sendAppend(uint64_t to) {
   Progress *pr = prs_[to];
   if (pr == NULL || pr->isPaused()) {
+    logger_->Infof(__FILE__, __LINE__, "node %x paused", to);
     return;
   }
 
@@ -584,9 +585,9 @@ void raft::campaign(CampaignType t) {
     }
     logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu] sent %s request to %x at term %llu",
       id_, raftLog_->lastTerm(), raftLog_->lastIndex(), getCampaignString(t), id, term_);
-    string ctx;
+    string ctx = "";
     if (t == campaignTransfer) {
-      ctx = getCampaignString(t);
+      ctx = kCampaignTransfer;
     }
     Message *msg = new Message();
     msg->set_term(term);
@@ -631,8 +632,8 @@ int raft::step(const Message& msg) {
   } else if (term > term_) {
     uint64_t leader = from;
     if (type == MsgVote || type == MsgPreVote) {
-      bool force = msg.context() == kCampaignTransfer;
-      bool inLease = checkQuorum_ && leader_ != None && electionElapsed_ < electionTimeout_;
+      bool force = (msg.context() == kCampaignTransfer);
+      bool inLease = (checkQuorum_ && leader_ != None && electionElapsed_ < electionTimeout_);
       if (!force && inLease) {
         // If a server receives a RequestVote request within the minimum election timeout
         // of hearing from a current leader, it does not update its term or grant its vote
@@ -762,6 +763,7 @@ void raft::stepLeader(const Message& msg) {
   size_t i;
   uint64_t term;
   int err;
+  uint64_t lastLeadTransferee, leadTransferee;
   EntryVec entries;
   Message *n;
 
@@ -787,10 +789,13 @@ void raft::stepLeader(const Message& msg) {
       // drop any new proposals.
       return;
     }
-    n = cloneMessage(msg);
     if (leadTransferee_ != None) {
-      // TODO
+      logger_->Debugf(__FILE__, __LINE__,
+        "%x [term %d] transfer leadership to %x is in progress; dropping proposal",
+        id_, term_, leadTransferee_);
+      return;
     }
+    n = cloneMessage(msg);
     for (i = 0; i < n->entries_size(); ++i) {
       Entry *entry = n->mutable_entries(i);
       if (entry->type() != EntryConfChange) {
@@ -886,7 +891,11 @@ void raft::stepLeader(const Message& msg) {
           sendAppend(from);
         }
         // Transfer leadership is in progress.
-        // TODO
+        if (msg.from() == leadTransferee_ && pr->match_ == raftLog_->lastIndex()) {
+          logger_->Infof(__FILE__, __LINE__,
+            "%x sent MsgTimeoutNow to %x after received MsgAppResp", id_, msg.from());
+          sendTimeoutNow(msg.from());
+        }
       }
     }
     break;
@@ -954,7 +963,41 @@ void raft::stepLeader(const Message& msg) {
       id_, msg.from(), pr->string().c_str());
     break;
   case MsgTransferLeader:
-    //TODO
+    leadTransferee = msg.from();
+    lastLeadTransferee = leadTransferee_;
+    if (lastLeadTransferee != None) {
+      if (lastLeadTransferee == leadTransferee) {
+        logger_->Infof(__FILE__, __LINE__,
+          "%x [term %llu] transfer leadership to %x is in progress, ignores request to same node %x",
+          id_, term_, leadTransferee, leadTransferee);
+        return;
+      }
+      abortLeaderTransfer();
+      logger_->Infof(__FILE__, __LINE__,
+        "%x [term %d] abort previous transferring leadership to %x",
+        id_, term_, leadTransferee);
+    }
+    if (leadTransferee == id_) {
+      logger_->Debugf(__FILE__, __LINE__,
+        "%x is already leader. Ignored transferring leadership to self",
+        id_);
+      return;
+    }
+    // Transfer leadership to third party.
+    logger_->Infof(__FILE__, __LINE__,
+      "%x [term %llu] starts to transfer leadership to %x",
+      id_, term_, leadTransferee);
+    // Transfer leadership should be finished in one electionTimeout, so reset r.electionElapsed.
+    electionElapsed_ = 0;
+    leadTransferee_ = leadTransferee;
+    if (pr->match_ == raftLog_->lastIndex()) {
+      sendTimeoutNow(leadTransferee);
+      logger_->Infof(__FILE__, __LINE__,
+        "%x sends MsgTimeoutNow to %x immediately as %x already has up-to-date log",
+        id_, leadTransferee, leadTransferee);
+    } else {
+      sendAppend(leadTransferee);
+    }
     break;
   }
 }
@@ -1005,7 +1048,8 @@ void raft::stepCandidate(const Message& msg) {
     handleHeartbeat(msg);
     break;
   case MsgTimeoutNow:
-    // TODO
+    logger_->Debugf(__FILE__, __LINE__, "%x [term %llu state candidate] ignored MsgTimeoutNow from %x",
+      id_, term_, msg.from());
     break;
   }
 }
@@ -1040,10 +1084,30 @@ void raft::stepFollower(const Message& msg) {
     handleSnapshot(msg);
     break;
   case MsgTransferLeader:
-    // TODO
+    if (leader_ == None) {
+      logger_->Infof(__FILE__, __LINE__,
+        "%x no leader at term %llu; dropping leader transfer msg",
+        id_, term_);
+      return;
+    }
+    n = cloneMessage(msg);
+    n->set_to(leader_);
+    send(n);
     break;
   case MsgTimeoutNow:
-    // TODO
+    if (promotable()) {
+      logger_->Infof(__FILE__, __LINE__,
+        "%x [term %llu] received MsgTimeoutNow from %x and starts an election to get leadership.",
+        id_, term_, msg.from());
+ 			// Leadership transfers never use pre-vote even if r.preVote is true; we
+			// know we are not recovering from a partition so there is no need for the
+			// extra round trip.
+      campaign(campaignTransfer);
+    } else {
+      logger_->Infof(__FILE__, __LINE__,
+        "%x received MsgTimeoutNow from %x but is not promotable",
+        id_, msg.from());
+    }
     break;
   case MsgReadIndex:
     if (leader_ == None) {
@@ -1212,4 +1276,11 @@ void raft::removeNode(uint64_t id) {
 void raft::readMessages(vector<Message*> *msgs) {
   *msgs = msgs_;
   msgs_.clear();
+}
+
+void raft::sendTimeoutNow(uint64_t to) {
+  Message *msg = new Message();
+  msg->set_to(to);
+  msg->set_type(MsgTimeoutNow);
+  send(msg);
 }

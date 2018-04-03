@@ -7,6 +7,7 @@
 
 // nextEnts returns the appliable entries and updates the applied index
 void nextEnts(raft *r, Storage *s, EntryVec *entries) {
+  entries->clear();
   // Transfer all unstable entries to "stable" storage.
   EntryVec tmp;
   r->raftLog_->unstableEntries(&tmp); 

@@ -196,10 +196,13 @@ int MemoryStorage::CreateSnapshot(uint64_t i, ConfState *cs, const string& data,
 
   snapShot_->mutable_metadata()->set_index(i);  
   snapShot_->mutable_metadata()->set_term(entries_[i - offset].term());  
-  if (cs) {
+  if (cs != NULL) {
     *(snapShot_->mutable_metadata()->mutable_conf_state()) = *cs;
   }
   snapShot_->set_data(data);
+  if (ss != NULL) {
+    *ss = *snapShot_;
+  }
 
   return OK;
 }
