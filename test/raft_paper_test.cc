@@ -51,6 +51,9 @@ bool isDeepEqualMsgs(const vector<Message*>& msgs1, const vector<Message*>& msgs
 		if (m1->type() != m2->type()) {
 			return false;
 		}
+		if (m1->reject() != m2->reject()) {
+			return false;
+		}
 	}
 	return true;
 }
@@ -367,4 +370,66 @@ TEST(raftPaperTests, TestLeaderElectionInOneRoundRPC) {
 		EXPECT_EQ(r->state_, t.state) << "i: " << i;
 		EXPECT_EQ(r->term_, 1);
 	}
+}
+
+// TestFollowerVote tests that each follower will vote for at most one
+// candidate in a given term, on a first-come-first-served basis.
+// Reference: section 5.2
+TEST(raftPaperTests, TestFollowerVote) {
+	struct tmp {
+    uint64_t vote;
+    uint64_t nvote;
+    bool wreject;
+    tmp(uint64_t vote, uint64_t nvote, bool reject)
+      : vote(vote), nvote(nvote), wreject(reject) {
+    }
+	};
+
+	vector<tmp> tests;
+  tests.push_back(tmp(None, 1, false));
+  tests.push_back(tmp(None, 2, false));
+  tests.push_back(tmp(1, 1, false));
+  tests.push_back(tmp(2, 2, false));
+  tests.push_back(tmp(1, 2, true));
+  tests.push_back(tmp(2, 1, true));
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp &t = tests[i];
+    
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    Storage *s = new MemoryStorage(&kDefaultLogger);
+    raft *r = newTestRaft(1, peers, 10, 1, s);
+
+    HardState hs;
+    hs.set_term(1);
+    hs.set_vote(t.vote);
+    r->loadState(hs);
+
+		{
+			Message msg;
+			msg.set_from(t.nvote);
+			msg.set_to(1);
+			msg.set_type(MsgVote);
+			r->step(msg);
+		}
+
+    vector<Message*> msgs;
+    r->readMessages(&msgs);
+
+    vector<Message*> wmsgs;
+    {
+      Message *msg = new Message();
+      msg->set_from(1);
+      msg->set_to(t.nvote);
+      msg->set_term(1);
+      msg->set_type(MsgVoteResp);
+      msg->set_reject(t.wreject);
+      wmsgs.push_back(msg);
+    }
+	  EXPECT_TRUE(isDeepEqualMsgs(msgs, wmsgs));
+  }
 }
