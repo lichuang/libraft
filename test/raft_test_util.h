@@ -84,5 +84,6 @@ extern network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*>&
 extern network* newNetwork(const vector<stateMachine*>& peers);
 extern void nextEnts(raft *r, Storage *s, EntryVec *entries);
 extern string raftLogString(raftLog *log);
+extern void idsBySize(int size, vector<uint64_t>* ids);
 
 #endif  // __RAFT_TEST_UTIL_H__

@@ -761,7 +761,7 @@ void raft::proxyMessage(const Message& msg) {
 void raft::stepLeader(const Message& msg) {
   int type = msg.type();
   size_t i;
-  uint64_t term;
+  uint64_t term, ri;
   int err;
   uint64_t lastLeadTransferee, leadTransferee;
   EntryVec entries;
@@ -833,7 +833,19 @@ void raft::stepLeader(const Message& msg) {
         bcastHeartbeatWithCtx(n->entries(0).data());
         return;
       } else if (readOnly_->option_ == ReadOnlyLeaseBased) {
-        // TODO
+        ri = 0;
+        if (checkQuorum_) {
+          ri = raftLog_->committed_;
+        }
+        if (msg.from() == None || msg.from() == id_) { // from local member
+          readStates_.push_back(new ReadState(raftLog_->committed_, msg.entries(0).data())); 
+        } else {
+          n = cloneMessage(msg);
+          n->set_to(msg.from());
+          n->set_type(MsgReadIndexResp);
+          n->set_index(ri);
+          send(n);
+        }
       }
     } else {
       readStates_.push_back(new ReadState(raftLog_->committed_, msg.entries(0).data())); 

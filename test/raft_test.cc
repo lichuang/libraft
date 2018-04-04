@@ -3203,10 +3203,165 @@ TEST(raftTests, TestReadOnlyOptionSafe) {
   }
 }
 
-// TODO
 TEST(raftTests, TestReadOnlyOptionLease) {
+  vector<uint64_t> peers;
+  vector<stateMachine*> sts;
+  peers.push_back(1);
+  peers.push_back(2);
+  peers.push_back(3);
+
+  raft *a, *b, *c;
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+
+    a = newTestRaft(1, peers, 10, 1, s);
+    a->readOnly_->option_ = ReadOnlyLeaseBased;
+    a->checkQuorum_ = true;
+    sts.push_back(new raftStateMachine(a));
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+
+    b = newTestRaft(2, peers, 10, 1, s);
+    b->readOnly_->option_ = ReadOnlyLeaseBased;
+    b->checkQuorum_ = true;
+    sts.push_back(new raftStateMachine(b));
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+
+    c = newTestRaft(3, peers, 10, 1, s);
+    c->readOnly_->option_ = ReadOnlyLeaseBased;
+    c->checkQuorum_ = true;
+    sts.push_back(new raftStateMachine(c));
+  }
+  
+  network *net = newNetwork(sts);
+  b->randomizedElectionTimeout_ = b->electionTimeout_ + 1;
+  int i;
+  for (i = 0; i < b->electionTimeout_; ++i) {
+    b->tick();
+  }
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  EXPECT_EQ(a->state_, StateLeader);
+  
+  struct tmp {
+    raft *r;
+    int proposals;
+    uint64_t wri;
+    string wctx;
+
+    tmp(raft *r, int proposals, uint64_t wri, string ctx)
+      : r(r), proposals(proposals), wri(wri), wctx(ctx){
+    }
+  };
+
+  vector<tmp> tests;
+  tests.push_back(tmp(a, 10, 11, "ctx1"));
+  tests.push_back(tmp(b, 10, 21, "ctx2"));
+  tests.push_back(tmp(c, 10, 31, "ctx3"));
+  tests.push_back(tmp(a, 10, 41, "ctx4"));
+  tests.push_back(tmp(b, 10, 51, "ctx5"));
+  tests.push_back(tmp(c, 10, 61, "ctx6"));
+
+  for (i = 0; i < tests.size(); ++i) {
+    tmp &t = tests[i];
+    int j;
+    for (j = 0; j < t.proposals; ++j) {
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(1);
+      msg.set_type(MsgProp);
+      msg.add_entries();
+      msgs.push_back(msg);
+      net->send(&msgs);
+    }
+    {
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(t.r->id_);
+      msg.set_to(t.r->id_);
+      msg.set_type(MsgReadIndex);
+      msg.add_entries()->set_data(t.wctx);
+      msgs.push_back(msg);
+      net->send(&msgs);
+    }
+
+    raft *r = t.r;
+    ReadState *s = r->readStates_[0];
+    EXPECT_EQ(s->index_, t.wri);
+    EXPECT_EQ(s->requestCtx_, t.wctx);
+
+    r->readStates_.clear();
+  }
 }
+
 TEST(raftTests, TestReadOnlyOptionLeaseWithoutCheckQuorum) {
+  vector<uint64_t> peers;
+  vector<stateMachine*> sts;
+  peers.push_back(1);
+  peers.push_back(2);
+  peers.push_back(3);
+
+  raft *a, *b, *c;
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+
+    a = newTestRaft(1, peers, 10, 1, s);
+    a->readOnly_->option_ = ReadOnlyLeaseBased;
+    sts.push_back(new raftStateMachine(a));
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+
+    b = newTestRaft(2, peers, 10, 1, s);
+    b->readOnly_->option_ = ReadOnlyLeaseBased;
+    sts.push_back(new raftStateMachine(b));
+  }
+  {
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+
+    c = newTestRaft(3, peers, 10, 1, s);
+    c->readOnly_->option_ = ReadOnlyLeaseBased;
+    sts.push_back(new raftStateMachine(c));
+  }
+  
+  network *net = newNetwork(sts);
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(1);
+    msg.set_to(1);
+    msg.set_type(MsgHup);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+
+  string ctx = "ctx1";
+
+  {
+    vector<Message> msgs;
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(2);
+    msg.set_type(MsgReadIndex);
+    msg.add_entries()->set_data(ctx);
+    msgs.push_back(msg);
+    net->send(&msgs);
+  }
+  ReadState *s = b->readStates_[0];
+  EXPECT_EQ(s->index_, None);
+  EXPECT_EQ(s->requestCtx_, ctx);
 }
 
 // TestReadOnlyForNewLeader ensures that a leader only accepts MsgReadIndex message
