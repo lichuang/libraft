@@ -433,3 +433,162 @@ TEST(raftPaperTests, TestFollowerVote) {
 	  EXPECT_TRUE(isDeepEqualMsgs(msgs, wmsgs));
   }
 }
+
+// TestCandidateFallback tests that while waiting for votes,
+// if a candidate receives an AppendEntries RPC from another server claiming
+// to be leader whose term is at least as large as the candidate's current term,
+// it recognizes the leader as legitimate and returns to follower state.
+// Reference: section 5.2
+TEST(raftPaperTests, TestCandidateFallback) {
+  vector<Message> tests;
+
+  {
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(1);
+    msg.set_term(1);
+    msg.set_type(MsgApp);
+    tests.push_back(msg);
+  }
+  {
+    Message msg;
+    msg.set_from(2);
+    msg.set_to(1);
+    msg.set_term(2);
+    msg.set_type(MsgApp);
+    tests.push_back(msg);
+  }
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    Message& msg = tests[i];
+    
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    Storage *s = new MemoryStorage(&kDefaultLogger);
+    raft *r = newTestRaft(1, peers, 10, 1, s);
+		{
+			Message msg;
+			msg.set_from(1);
+			msg.set_to(1);
+			msg.set_type(MsgHup);
+			r->step(msg);
+		}
+    EXPECT_EQ(r->state_, StateCandidate);
+    r->step(msg);
+
+    EXPECT_EQ(r->state_, StateFollower);
+    EXPECT_EQ(r->term_, msg.term());
+  }
+}
+
+// testNonleaderElectionTimeoutRandomized tests that election timeout for
+// follower or candidate is randomized.
+// Reference: section 5.2
+void testNonleaderElectionTimeoutRandomized(StateType state) {
+  uint64_t et = 10;
+  
+  vector<uint64_t> peers;
+  peers.push_back(1);
+  peers.push_back(2);
+  peers.push_back(3);
+  Storage *s = new MemoryStorage(&kDefaultLogger);
+  raft *r = newTestRaft(1, peers, et, 1, s);
+  int i;
+  map<int, bool> timeouts;
+  for (i = 0; i < 50 * et; ++i) {
+    switch (state) {
+    case StateFollower:
+      r->becomeFollower(r->term_ + 1,2);
+      break;
+    case StateCandidate:
+      r->becomeCandidate();
+      break;
+    }
+
+    uint64_t time = 0;
+    vector<Message*> msgs;
+    r->readMessages(&msgs);
+    while (msgs.size() == 0) {
+      r->tick();
+      time++;
+      r->readMessages(&msgs);
+    }
+    timeouts[time] = true;
+  }
+
+  for (i = et + 1; i < 2 * et; ++i) {
+    EXPECT_TRUE(timeouts[i]);
+  }
+}
+
+TEST(raftPaperTests, TestFollowerElectionTimeoutRandomized) {
+  testNonleaderElectionTimeoutRandomized(StateFollower);
+}
+
+TEST(raftPaperTests, TestCandidateElectionTimeoutRandomized) {
+  testNonleaderElectionTimeoutRandomized(StateCandidate);
+}
+
+// testNonleadersElectionTimeoutNonconflict tests that in most cases only a
+// single server(follower or candidate) will time out, which reduces the
+// likelihood of split vote in the new election.
+// Reference: section 5.2
+void testNonleadersElectionTimeoutNonconflict(StateType state) {
+  uint64_t et = 10;
+  int size = 5;
+  vector<raft*> rs;
+  vector<uint64_t> peers;
+  idsBySize(size, &peers);
+  int i;
+  for (i = 0; i < peers.size(); ++i) {
+    Storage *s = new MemoryStorage(&kDefaultLogger);
+    raft *r = newTestRaft(peers[i], peers, et, 1, s);
+    rs.push_back(r);
+  }
+  int conflicts = 0;
+  for (i = 0; i < 1000; ++i) {
+    int j;
+    for (j = 0; j < rs.size(); ++j) {
+      raft *r = rs[j];
+      switch (state) {
+      case StateFollower:
+        r->becomeFollower(r->term_ + 1,None);
+        break;
+      case StateCandidate:
+        r->becomeCandidate();
+        break;
+      }
+    }
+
+    int timeoutNum = 0;
+    while (timeoutNum == 0) {
+      for (j = 0; j < rs.size(); ++j) {
+        raft *r = rs[j];
+        r->tick();
+        vector<Message*> msgs;
+        r->readMessages(&msgs);
+        if (msgs.size() > 0) {
+          ++timeoutNum;
+        }
+      }
+    }
+
+    // several rafts time out at the same tick
+    if (timeoutNum > 1) {
+      ++conflicts;
+    }
+  }
+
+  float g = float(conflicts) / 1000;
+  EXPECT_FALSE(g > 0.3);
+}
+
+TEST(raftPaperTests, TestFollowersElectioinTimeoutNonconflict) {
+  testNonleadersElectionTimeoutNonconflict(StateFollower);
+}
+
+TEST(raftPaperTests, TestCandidatesElectionTimeoutNonconflict) {
+  testNonleadersElectionTimeoutNonconflict(StateCandidate);
+}
