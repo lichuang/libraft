@@ -1,5 +1,6 @@
 #include <string>
 #include "util.h"
+#include "default_logger.h"
 
 using namespace std;
 
@@ -27,15 +28,19 @@ bool isDeepEqualSnapshot(const Snapshot *s1, const Snapshot *s2) {
 
 bool isDeepEqualEntry(const Entry& ent1, const Entry& ent2) {
   if (ent1.type() != ent2.type()) {
+    kDefaultLogger.Debugf(__FILE__, __LINE__, "type not equal");
     return false;
   }
   if (ent1.term() != ent2.term()) {
+    kDefaultLogger.Debugf(__FILE__, __LINE__, "type not equal");
     return false;
   }
   if (ent1.index() != ent2.index()) {
+    kDefaultLogger.Debugf(__FILE__, __LINE__, "type not equal");
     return false;
   }
   if (ent1.data() != ent2.data()) {
+    kDefaultLogger.Debugf(__FILE__, __LINE__, "type not equal");
     return false;
   }
   return true;
@@ -43,6 +48,7 @@ bool isDeepEqualEntry(const Entry& ent1, const Entry& ent2) {
 
 bool isDeepEqualEntries(const EntryVec& ents1, const EntryVec& ents2) {
   if (ents1.size() != ents2.size()) {
+    kDefaultLogger.Debugf(__FILE__, __LINE__, "entry size %d not equal %d", ents1.size(), ents2.size());
     return false;
   }
   int i;
