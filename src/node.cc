@@ -193,13 +193,7 @@ int NodeImpl::stateMachine(const Message& msg, Ready **ready) {
 void NodeImpl::handleConfChange() {
   if (confChange_.nodeid() == None) {
     raft_->resetPendingConf();
-    vector<uint64_t> nodes;
-    raft_->nodes(&nodes);
-    int j;
-    for (j = 0; j < nodes.size(); ++j) {
-      confState_->add_nodes(nodes[j]);
-    }
-    return;
+    goto addnodes;
   }
 
   switch(confChange_.type()) {
@@ -219,6 +213,8 @@ void NodeImpl::handleConfChange() {
     logger_->Fatalf(__FILE__, __LINE__, "unexpected conf type");
     break;
   }
+
+addnodes:  
   vector<uint64_t> nodes;
   raft_->nodes(&nodes);
   int j;
