@@ -9,7 +9,6 @@ enum NodeMessageType {
   ConfChangeMessage = 2,
   TickMessage       = 3,
   ReadyMessage      = 4,
-  AdvanceMessage    = 5,
   NoneMessage       = 6
 };
 
@@ -22,11 +21,10 @@ public:
 
   virtual void Tick(Ready **ready);
   virtual int  Campaign(Ready **ready);
-  virtual void Stop();
   virtual int  Propose(const string& data, Ready **ready);
   virtual int  ProposeConfChange(const ConfChange& cc, Ready **ready);
   virtual int  Step(const Message& msg, Ready **ready);
-  virtual void Advance(Ready **ready);
+  virtual void Advance();
   virtual void ApplyConfChange(const ConfChange& cc, ConfState *cs, Ready **ready);
   virtual void TransferLeadership(uint64_t leader, uint64_t transferee, Ready **ready);
   virtual int  ReadIndex(const string &rctx, Ready **ready);
@@ -39,9 +37,9 @@ private:
   void handleConfChange();
   void handleAdvance();
   void reset();
+  bool readyContainUpdate();
 
 public:
-  bool stopped_;
   raft *raft_;
   Logger *logger_;
 

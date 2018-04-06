@@ -122,6 +122,9 @@ bool isSoftStateEqual(const SoftState& s1, const SoftState& s2) {
 }
 
 bool isEmptySnapshot(const Snapshot* snapshot) {
+  if (snapshot == NULL) {
+    return true;
+  }
   return snapshot->metadata().index() == 0;
 }
 

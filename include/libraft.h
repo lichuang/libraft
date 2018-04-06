@@ -84,7 +84,7 @@ struct Ready {
   EntryVec          entries;
 
   // Snapshot specifies the snapshot to be saved to stable storage.
-  Snapshot          snapshot;
+  Snapshot          *snapshot;
 
 	// CommittedEntries specifies entries to be committed to a
 	// store/state-machine. These have previously been committed to stable
@@ -244,7 +244,7 @@ public:
 	// commands. For example. when the last Ready contains a snapshot, the application might take
 	// a long time to apply the snapshot data. To continue receiving Ready without blocking raft
 	// progress, it can call Advance before finishing applying the last ready.
-  virtual void Advance(Ready **ready) = 0;
+  virtual void Advance() = 0;
 
 	// ApplyConfChange applies config change to the local node.
 	// Returns an opaque ConfState protobuf which must be recorded

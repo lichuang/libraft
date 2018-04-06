@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 const static HardState kEmptyHardState;
+const static SoftState kEmptySoftState;
 const static Snapshot  kEmptySnapshot;
 
 // IsEmptySnap returns true if the given Snapshot is empty.
@@ -11,11 +12,15 @@ static bool isEmptyHardState(const HardState& hs) {
   return isHardStateEqual(hs, kEmptyHardState);
 }
 
+static bool isEmptySoftState(const SoftState& ss) {
+  return isSoftStateEqual(ss, kEmptySoftState);
+}
+
 NodeImpl::NodeImpl(const Config *config)
-  : stopped_(false)
-  , raft_(NULL)
+  : raft_(NULL)
   , logger_(config->logger)
   , leader_(None)
+  , prevSoftState_(kEmptySoftState)
   , prevHardState_(kEmptyHardState)
   , waitAdvanced_(false)
   , canPropose_(true)
@@ -29,10 +34,6 @@ NodeImpl::NodeImpl(const Config *config)
 
 NodeImpl::~NodeImpl() {
   delete raft_;
-}
-
-void NodeImpl::Stop() {
-  stopped_ = true;
 }
 
 void NodeImpl::Tick(Ready **ready) {
@@ -81,9 +82,20 @@ int NodeImpl::Step(const Message& msg, Ready **ready) {
   return doStep(msg, ready);
 }
 
-void NodeImpl::Advance(Ready **ready) {
-  msgType_ = AdvanceMessage;
-  stateMachine(Message(), ready);
+void NodeImpl::Advance() {
+  if (prevHardState_.commit() != 0) {
+    raft_->raftLog_->appliedTo(prevHardState_.commit());
+  }
+  if (havePrevLastUnstableIndex_) {
+    raft_->raftLog_->stableTo(prevSnapshotIndex_, prevLastUnstableTerm_);
+    havePrevLastUnstableIndex_ = false;
+  }
+  raft_->raftLog_->stableSnapTo(prevSnapshotIndex_);
+  int i;
+  for (i = 0; i < ready_.messages.size(); ++i) {
+    delete ready_.messages[i];
+  }
+  waitAdvanced_ = false;
 }
 
 void NodeImpl::ApplyConfChange(const ConfChange& cc, ConfState *cs, Ready **ready) {
@@ -122,10 +134,15 @@ int NodeImpl::ReadIndex(const string &rctx, Ready **ready) {
 }
 
 int NodeImpl::stateMachine(const Message& msg, Ready **ready) {
-  if (!waitAdvanced_) {
-    *ready = newReady();
-  } else {
+  if (waitAdvanced_) {
     *ready = NULL;
+  } else {
+    *ready = newReady();
+    if (!readyContainUpdate()) {
+      *ready = NULL;
+    } else {
+      waitAdvanced_ = true;
+    }
   }
 
   if (leader_ != raft_->leader_) {
@@ -149,8 +166,9 @@ int NodeImpl::stateMachine(const Message& msg, Ready **ready) {
   int ret = OK;
   switch (msgType_) {
   case ProposeMessage:
-    msgType_ = NoneMessage;
-    raft_->step(msg);
+    if (canPropose_) {
+      raft_->step(msg);
+    }
     break;
   case RecvMessage:
     // filter out response message from unknown From.
@@ -163,9 +181,6 @@ int NodeImpl::stateMachine(const Message& msg, Ready **ready) {
     break;
   case ConfChangeMessage:
     handleConfChange();
-    break;
-  case AdvanceMessage:
-    handleAdvance();
     break;
   default:
     break;
@@ -212,17 +227,6 @@ void NodeImpl::handleConfChange() {
   }
 }
 
-void NodeImpl::handleAdvance() {
-  if (prevHardState_.commit() != 0) {
-    raft_->raftLog_->appliedTo(prevHardState_.commit());
-  }
-  if (havePrevLastUnstableIndex_) {
-    raft_->raftLog_->stableTo(prevSnapshotIndex_, prevLastUnstableTerm_);
-    havePrevLastUnstableIndex_ = false;
-  }
-  raft_->raftLog_->stableSnapTo(prevSnapshotIndex_);
-}
-
 void NodeImpl::reset() {
   msgType_ = NoneMessage;
   confState_ = NULL;
@@ -233,7 +237,16 @@ bool NodeImpl::isMessageFromClusterNode(const Message& msg) {
 }
 
 Ready* NodeImpl::newReady() {
-  // 1) return the new ready state data in ready
+  // 1) reset ready data
+  ready_.softState = kEmptySoftState;
+  ready_.hardState = kEmptyHardState;
+  ready_.snapshot  = NULL;
+  ready_.readStates.clear();
+  ready_.entries.clear();
+  ready_.committedEntries.clear();
+  ready_.messages.clear();
+  
+  // 2) return the new ready state data in ready
   raft_->raftLog_->unstableEntries(&ready_.entries);
   raft_->raftLog_->nextEntries(&ready_.committedEntries);
   ready_.messages = raft_->msgs_;
@@ -242,27 +255,23 @@ Ready* NodeImpl::newReady() {
   raft_->softState(&ss);
   if (!isSoftStateEqual(ss, prevSoftState_)) {
     ready_.softState = ss;
-  } else {
-    ready_.softState = prevSoftState_;
   }
 
   HardState hs;
   raft_->hardState(&hs);
   if (!isHardStateEqual(hs, prevHardState_)) {
     ready_.hardState = hs;
-  } else {
-    ready_.hardState = prevHardState_;
   }
 
   if (raft_->raftLog_->unstable_.snapshot_ != NULL) {
-    ready_.snapshot = *(raft_->raftLog_->unstable_.snapshot_);
-  } else {
-    ready_.snapshot = kEmptySnapshot;
+    ready_.snapshot = raft_->raftLog_->unstable_.snapshot_;
   }
 
-  ready_.readStates = raft_->readStates_;
+  if (!raft_->readStates_.empty()) {
+    ready_.readStates = raft_->readStates_;
+  }
 
-  // 2) save the data for the next reay
+  // 3) save the state data
   prevSoftState_ = ready_.softState;
   size_t entSize = ready_.entries.size();
   if (entSize > 0) {
@@ -273,14 +282,24 @@ Ready* NodeImpl::newReady() {
   if (!isEmptyHardState(ready_.hardState)) {
     prevHardState_ = ready_.hardState;
   }
-  if (!isEmptySnapshot(&ready_.snapshot)) {
-    prevSnapshotIndex_ = ready_.snapshot.metadata().index();
+  if (!isEmptySnapshot(ready_.snapshot)) {
+    prevSnapshotIndex_ = ready_.snapshot->metadata().index();
   }
 
   raft_->msgs_.clear();
   raft_->readStates_.clear();
 
   return &ready_;
+}
+
+bool NodeImpl::readyContainUpdate() {
+  return (!isEmptySoftState(ready_.softState) ||
+          !isEmptyHardState(ready_.hardState) ||
+          !isEmptySnapshot(ready_.snapshot)  ||
+          !ready_.entries.empty()             ||
+          !ready_.committedEntries.empty()    ||
+          !ready_.messages.empty()            ||
+          !ready_.readStates.empty());
 }
 
 // StartNode returns a new Node given configuration and a list of raft peers.
