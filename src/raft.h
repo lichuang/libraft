@@ -66,7 +66,7 @@ struct raft {
 
   Logger* logger_;
 
-  raft(Config *, raftLog *);
+  raft(const Config *, raftLog *);
   void tick();
   const char* getCampaignString(CampaignType t);
   void loadState(const HardState &hs);
@@ -114,8 +114,10 @@ struct raft {
   Message* cloneMessage(const Message& msg);
   bool checkQuorumActive();
   void sendTimeoutNow(uint64_t to);
+  void resetPendingConf();
 };
-extern raft* newRaft(Config *);
+
+extern raft* newRaft(const Config *);
 string entryString(const Entry& entry);
 
 #endif  // __RAFT_H__

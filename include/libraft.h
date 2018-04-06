@@ -18,7 +18,8 @@ enum ErrorCode {
   ErrCompacted                      = 1,
   ErrSnapOutOfDate                  = 2,
   ErrUnavailable                    = 3,
-  ErrSnapshotTemporarilyUnavailable = 4
+  ErrSnapshotTemporarilyUnavailable = 4,
+  ErrSeriaFail                      = 5
 };
 
 inline bool SUCCESS(int err) { return err == OK; }
@@ -34,6 +35,16 @@ enum StateType {
 struct SoftState {
   uint64_t leader;
   StateType state;
+
+  SoftState()
+    : leader(None)
+    , state(StateFollower) {}
+
+  inline SoftState& operator=(const SoftState& from) {
+    leader = from.leader;
+    state  = from.state;
+    return *this;
+  }
 };
 
 // ReadState provides state for read only query.
@@ -52,12 +63,39 @@ struct ReadState {
 typedef vector<Entry> EntryVec;
 
 struct Ready {
+ 	// The current volatile state of a Node.
+	// SoftState will be nil if there is no update.
+	// It is not required to consume or store SoftState.
   SoftState         softState;
+
+	// The current state of a Node to be saved to stable storage BEFORE
+	// Messages are sent.
+	// HardState will be equal to empty state if there is no update.
   HardState         hardState;
-  vector<ReadState> readStates;
-  vector<Entry>     entries;
-  vector<Entry>     committedEntries;
-  vector<Message>   messages;
+
+ 	// ReadStates can be used for node to serve linearizable read requests locally
+	// when its applied index is greater than the index in ReadState.
+	// Note that the readState will be returned when raft receives msgReadIndex.
+	// The returned is only valid for the request that requested to read.
+  vector<ReadState*> readStates;
+
+	// Entries specifies entries to be saved to stable storage BEFORE
+	// Messages are sent.
+  EntryVec          entries;
+
+  // Snapshot specifies the snapshot to be saved to stable storage.
+  Snapshot          snapshot;
+
+	// CommittedEntries specifies entries to be committed to a
+	// store/state-machine. These have previously been committed to stable
+	// store.
+  EntryVec          committedEntries;
+
+ 	// Messages specifies outbound messages to be sent AFTER Entries are
+	// committed to stable storage.
+	// If it contains a MsgSnap message, the application MUST report back to raft
+	// when the snapshot has been received or has failed by calling ReportSnapshot.
+  vector<Message*>  messages;
 };
 
 class Storage {
@@ -172,18 +210,60 @@ struct Config {
   ReadOnlyOption    readOnlyOption;
 };
 
-class Node {
-public:
-  /*
-  virtual void Stop() = 0;
-  virtual int Campaign(string data) = 0;
-  virtual int Propose(string data) = 0;
-  */
-  virtual void Tick(Ready **ready) = 0;
+struct Peer {
+  uint64_t Id;
+  string   Context;
 };
 
-extern Node* StartNode(Config *config);
-extern Node* RestartNode(Config *config);
+class Node {
+public:
+	// Tick increments the internal logical clock for the Node by a single tick. Election
+	// timeouts and heartbeat timeouts are in units of ticks.
+  virtual void Tick(Ready **ready) = 0;
+
+  // Campaign causes the Node to transition to candidate state and start campaigning to become leader.
+  virtual int Campaign(Ready **ready) = 0;
+
+  // Propose proposes that data be appended to the log.
+  virtual int Propose(const string& data, Ready **ready) = 0;
+
+	// ProposeConfChange proposes config change.
+	// At most one ConfChange can be in the process of going through consensus.
+	// Application needs to call ApplyConfChange when applying EntryConfChange type entry.
+  virtual int ProposeConfChange(const ConfChange& cc, Ready **ready) = 0;
+
+  // Step advances the state machine using the given message. ctx.Err() will be returned, if any.
+  virtual int Step(const Message& msg, Ready **ready) = 0;
+
+ 	// Advance notifies the Node that the application has saved progress up to the last Ready.
+	// It prepares the node to return the next available Ready.
+	//
+	// The application should generally call Advance after it applies the entries in last Ready.
+	//
+	// However, as an optimization, the application may call Advance while it is applying the
+	// commands. For example. when the last Ready contains a snapshot, the application might take
+	// a long time to apply the snapshot data. To continue receiving Ready without blocking raft
+	// progress, it can call Advance before finishing applying the last ready.
+  virtual void Advance(Ready **ready) = 0;
+
+	// ApplyConfChange applies config change to the local node.
+	// Returns an opaque ConfState protobuf which must be recorded
+	// in snapshots. Will never return nil; it returns a pointer only
+	// to match MemoryStorage.Compact.
+  virtual void ApplyConfChange(const ConfChange& cc, ConfState *cs, Ready **ready) = 0;
+
+  // TransferLeadership attempts to transfer leadership to the given transferee.
+  virtual void TransferLeadership(uint64_t leader, uint64_t transferee, Ready **ready) = 0;
+
+	// ReadIndex request a read state. The read state will be set in the ready.
+	// Read state has a read index. Once the application advances further than the read
+	// index, any linearizable read requests issued before the read request can be
+	// processed safely. The read state will have the same rctx attached.
+  virtual int ReadIndex(const string &rctx, Ready **ready) = 0;
+};
+
+extern Node* StartNode(const Config *config, const vector<Peer>& peers);
+extern Node* RestartNode(const Config *config);
 extern const char* GetErrorString(int err);
 
 #endif  // __LIB_RAFT_H__

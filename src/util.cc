@@ -91,10 +91,34 @@ void limitSize(uint64_t maxSize, EntryVec *entries) {
   entries->erase(entries->begin() + limit, entries->end());
 }
 
+bool isLoaclMessage(const MessageType type) {
+  return (type == MsgHup          ||
+          type == MsgBeat         ||
+          type == MsgUnreachable  ||
+          type == MsgSnapStatus   ||
+          type == MsgCheckQuorum);
+}
+
+bool isResponseMessage(const MessageType type) {
+  return (type == MsgAppResp        ||
+          type == MsgVoteResp       ||
+          type == MsgHeartbeatResp  ||
+          type == MsgUnreachable    ||
+          type == MsgPreVoteResp);
+}
+
 bool isHardStateEqual(const HardState& h1, const HardState& h2) {
   return h1.term() == h2.term() &&
          h1.vote() == h2.vote() &&
          h1.commit() == h2.commit();
+}
+
+bool isSoftStateEqual(const SoftState& s1, const SoftState& s2) {
+  if (s1.leader != s2.leader) {
+    return false;
+  }
+
+  return s1.state == s2.state;
 }
 
 bool isEmptySnapshot(const Snapshot* snapshot) {

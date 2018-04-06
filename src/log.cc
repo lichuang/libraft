@@ -219,6 +219,7 @@ void raftLog::unstableEntries(EntryVec *entries) {
 // If applied is smaller than the index of snapshot, it returns all committed
 // entries after the index of snapshot.
 void raftLog::nextEntries(EntryVec* entries) {
+  entries->clear();
   uint64_t offset = max(applied_ + 1, firstIndex());
   if (committed_ + 1 > offset) {
     int err = slice(offset, committed_ + 1, noLimit, entries);  

@@ -49,7 +49,7 @@ void copyEntries(const Message& msg, EntryVec *entries) {
   }
 }
 
-raft::raft(Config *config, raftLog *log)
+raft::raft(const Config *config, raftLog *log)
   : id_(config->id),
     term_(0),
     vote_(0),
@@ -68,11 +68,11 @@ raft::raft(Config *config, raftLog *log)
 }
 
 //TODO:
-void validateConfig(Config *config) {
+void validateConfig(const Config *config) {
 
 }
 
-raft* newRaft(Config *config) {
+raft* newRaft(const Config *config) {
   validateConfig(config);
 
   raftLog *rl = newLog(config->storage, config->logger);
@@ -1295,4 +1295,8 @@ void raft::sendTimeoutNow(uint64_t to) {
   msg->set_to(to);
   msg->set_type(MsgTimeoutNow);
   send(msg);
+}
+
+void raft::resetPendingConf() {
+  pendingConf_ = false;
 }
