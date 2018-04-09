@@ -95,6 +95,9 @@ void NodeImpl::Advance() {
   for (i = 0; i < ready_.messages.size(); ++i) {
     delete ready_.messages[i];
   }
+  for (i = 0; i < ready_.readStates.size(); ++i) {
+    delete ready_.readStates[i];
+  }
   waitAdvanced_ = false;
 }
 
@@ -134,17 +137,6 @@ int NodeImpl::ReadIndex(const string &rctx, Ready **ready) {
 }
 
 int NodeImpl::stateMachine(const Message& msg, Ready **ready) {
-  if (waitAdvanced_) {
-    *ready = NULL;
-  } else {
-    *ready = newReady();
-    if (!readyContainUpdate()) {
-      *ready = NULL;
-    } else {
-      waitAdvanced_ = true;
-    }
-  }
-
   if (leader_ != raft_->leader_) {
     if (raft_->hasLeader()) {
       if (leader_ == None) {
@@ -184,6 +176,17 @@ int NodeImpl::stateMachine(const Message& msg, Ready **ready) {
     break;
   default:
     break;
+  }
+
+  if (waitAdvanced_) {
+    *ready = NULL;
+  } else {
+    *ready = newReady();
+    if (!readyContainUpdate()) {
+      *ready = NULL;
+    } else {
+      waitAdvanced_ = true;
+    }
   }
 
   reset();

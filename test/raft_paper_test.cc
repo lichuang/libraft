@@ -9,6 +9,8 @@
 #include "raft_test_util.h"
 #include "read_only.h"
 
+extern stateMachine *nopStepper;
+
 /*
 This file contains tests which verify that the scenarios described
 in the raft paper (https://ramcloud.stanford.edu/raft.pdf) are
@@ -1079,5 +1081,760 @@ TEST(raftPaperTests, TestFollowerCommitEntry) {
 // then it refuses the new entries. Otherwise it replies that it accepts the
 // append entries.
 // Reference: section 5.3
-TEST(raftPaperTests, TestFollowerCommitEntry) {
+TEST(raftPaperTests, TestFollowerCheckMsgApp) {
+  EntryVec entries;
+  {
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    entries.push_back(entry);
+  }
+  {
+    Entry entry;
+    entry.set_term(2);
+    entry.set_index(2);
+    entries.push_back(entry);
+  }
+
+  struct tmp {
+    uint64_t term;
+    uint64_t index;
+    uint64_t windex;
+    bool wreject;
+    uint64_t wrejectHint;
+
+    tmp(uint64_t t, uint64_t i, uint64_t wi, bool wr, uint64_t wrh)
+      : term(t), index(i), windex(wi), wreject(wr), wrejectHint(wrh) {}
+  };
+
+  vector<tmp> tests;
+
+  // match with committed entries
+  tests.push_back(tmp(0, 0, 1, false, 0));
+  tests.push_back(tmp(entries[0].term(), entries[0].index(), 1, false, 0));
+  // match with uncommitted entries
+  tests.push_back(tmp(entries[1].term(), entries[1].index(), 2, false, 0));
+
+  // unmatch with existing entry
+  tests.push_back(tmp(entries[0].term(), entries[1].index(), entries[1].index(), true, 2));
+  // unexisting entry
+  tests.push_back(tmp(entries[1].term() + 1, entries[1].index() + 1, entries[1].index() + 1, true, 2));
+  
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    Storage *s = new MemoryStorage(&kDefaultLogger);
+    EntryVec ents = entries;
+    s->Append(&ents);
+    raft *r = newTestRaft(1, peers, 10, 1, s);
+    HardState hs;
+    hs.set_commit(1);
+    r->loadState(hs);
+    r->becomeFollower(2, 2);
+    {
+      Message msg;
+      msg.set_type(MsgApp);
+      msg.set_from(2);
+      msg.set_to(1);
+      msg.set_term(2);
+      msg.set_term(2);
+      msg.set_logterm(t.term);
+      msg.set_index(t.index);
+
+      r->step(msg);
+    }
+
+    vector<Message *> msgs, wmsgs;
+    r->readMessages(&msgs);
+    {
+      Message *msg = new Message();
+      msg->set_from(1);
+      msg->set_to(2);
+      msg->set_type(MsgAppResp);
+      msg->set_term(2);
+      msg->set_index(t.windex);
+      msg->set_reject(t.wreject);
+      msg->set_rejecthint(t.wrejectHint);
+      wmsgs.push_back(msg);
+    }
+
+    EXPECT_TRUE(isDeepEqualMsgs(msgs, wmsgs)) << "i: " << i;
+  }
+}
+
+// TestFollowerAppendEntries tests that when AppendEntries RPC is valid,
+// the follower will delete the existing conflict entry and all that follow it,
+// and append any new entries not already in the log.
+// Also, it writes the new entry into stable storage.
+// Reference: section 5.3
+TEST(raftPaperTests, TestFollowerAppendEntries) {
+	struct tmp {
+		uint64_t index, term;
+		EntryVec ents, wents, wunstable;
+
+		tmp(uint64_t i, uint64_t t, EntryVec e, EntryVec we, EntryVec wu)
+			: index(i), term(t), ents(e), wents(we), wunstable(wu) {}
+	};
+
+	vector<tmp> tests;
+	{
+		EntryVec ents, wents, wunstable;
+		Entry entry;
+
+		entry.set_term(3);
+		entry.set_index(3);
+		ents.push_back(entry);
+		
+		entry.set_term(1);
+		entry.set_index(1);
+		wents.push_back(entry);
+		entry.set_term(2);
+		entry.set_index(2);
+		wents.push_back(entry);
+		entry.set_term(3);
+		entry.set_index(3);
+		wents.push_back(entry);
+	
+		wunstable.push_back(entry);
+
+		tests.push_back(tmp(2, 2, ents, wents, wunstable));
+	}
+	{
+		EntryVec ents, wents, wunstable;
+		Entry entry;
+
+		entry.set_term(3);
+		entry.set_index(2);
+		ents.push_back(entry);
+		entry.set_term(4);
+		entry.set_index(3);
+		ents.push_back(entry);
+		
+		entry.set_term(1);
+		entry.set_index(1);
+		wents.push_back(entry);
+		entry.set_term(3);
+		entry.set_index(2);
+		wents.push_back(entry);
+		wunstable.push_back(entry);
+
+		entry.set_term(4);
+		entry.set_index(3);
+		wents.push_back(entry);
+		wunstable.push_back(entry);
+
+		tests.push_back(tmp(1, 1, ents, wents, wunstable));
+	}
+	{
+		EntryVec ents, wents, wunstable;
+		Entry entry;
+
+		entry.set_term(1);
+		entry.set_index(1);
+		ents.push_back(entry);
+		
+		entry.set_term(1);
+		entry.set_index(1);
+		wents.push_back(entry);
+
+		entry.set_term(2);
+		entry.set_index(2);
+		wents.push_back(entry);
+
+		tests.push_back(tmp(0, 0, ents, wents, wunstable));
+	}
+	{
+		EntryVec ents, wents, wunstable;
+		Entry entry;
+
+		entry.set_term(3);
+		entry.set_index(1);
+		ents.push_back(entry);
+		wents.push_back(entry);
+		wunstable.push_back(entry);
+
+		tests.push_back(tmp(0, 0, ents, wents, wunstable));
+	}
+
+	int i;
+	for (i = 0; i < tests.size(); ++i) {
+		tmp& t = tests[i];
+		vector<uint64_t> peers;
+		peers.push_back(1);
+		peers.push_back(2);
+		peers.push_back(3);
+		Storage *s = new MemoryStorage(&kDefaultLogger);
+
+		EntryVec appEntries;
+		Entry entry;
+		entry.set_term(1);
+		entry.set_index(1);
+		appEntries.push_back(entry);
+		entry.set_term(2);
+		entry.set_index(2);
+		appEntries.push_back(entry);
+
+    s->Append(&appEntries);
+		raft *r = newTestRaft(1, peers, 10, 1, s);
+		r->becomeFollower(2, 2);
+    {
+      Message msg;
+      msg.set_type(MsgApp);
+      msg.set_from(2);
+      msg.set_to(1);
+      msg.set_term(2);
+      msg.set_logterm(t.term);
+      msg.set_index(t.index);
+			int j;
+			for (j = 0; j < t.ents.size(); ++j) {
+				*(msg.add_entries()) = t.ents[j];
+			}
+
+      r->step(msg);
+    }
+
+		EntryVec wents, wunstable;
+		r->raftLog_->allEntries(&wents);
+		EXPECT_TRUE(isDeepEqualEntries(wents, t.wents));
+
+		r->raftLog_->unstableEntries(&wunstable);
+		EXPECT_TRUE(isDeepEqualEntries(wunstable, t.wunstable));
+	}
+}
+
+// TestLeaderSyncFollowerLog tests that the leader could bring a follower's log
+// into consistency with its own.
+// Reference: section 5.3, figure 7
+TEST(raftPaperTests, TestLeaderSyncFollowerLog) {
+	EntryVec ents;
+	{
+		Entry entry;
+		
+		ents.push_back(entry);
+
+		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); ents.push_back(entry);
+		entry.set_term(1); entry.set_index(3); ents.push_back(entry);
+
+		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(5); ents.push_back(entry);
+
+		entry.set_term(5); entry.set_index(6); ents.push_back(entry);
+		entry.set_term(5); entry.set_index(7); ents.push_back(entry);
+
+		entry.set_term(6); entry.set_index(8); ents.push_back(entry);
+		entry.set_term(6); entry.set_index(9); ents.push_back(entry);
+		entry.set_term(6); entry.set_index(10); ents.push_back(entry);
+	}
+
+	uint64_t term = 8;
+	vector<EntryVec> tests;
+	{
+		Entry entry;
+		EntryVec ents;
+		
+		ents.push_back(entry);
+
+		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+
+		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(5); ents.push_back(entry);
+
+		entry.set_term(5); entry.set_index(6); ents.push_back(entry);
+		entry.set_term(5); entry.set_index(7); ents.push_back(entry);
+
+		entry.set_term(6); entry.set_index(8); ents.push_back(entry);
+		entry.set_term(6); entry.set_index(9); ents.push_back(entry);
+
+		tests.push_back(ents);
+	}
+	{
+		Entry entry;
+		EntryVec ents;
+		
+		ents.push_back(entry);
+
+		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+
+		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
+
+		tests.push_back(ents);
+	}
+	{
+		Entry entry;
+		EntryVec ents;
+		
+		ents.push_back(entry);
+
+		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+
+		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(5); ents.push_back(entry);
+
+		entry.set_term(5); entry.set_index(6); ents.push_back(entry);
+		entry.set_term(5); entry.set_index(7); ents.push_back(entry);
+
+		entry.set_term(6); entry.set_index(8); ents.push_back(entry);
+		entry.set_term(6); entry.set_index(9); ents.push_back(entry);
+		entry.set_term(6); entry.set_index(10); ents.push_back(entry);
+		entry.set_term(6); entry.set_index(11); ents.push_back(entry);
+
+		tests.push_back(ents);
+	}
+	{
+		Entry entry;
+		EntryVec ents;
+		
+		ents.push_back(entry);
+
+		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+
+		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(5); ents.push_back(entry);
+
+		entry.set_term(5); entry.set_index(6); ents.push_back(entry);
+		entry.set_term(5); entry.set_index(7); ents.push_back(entry);
+
+		entry.set_term(6); entry.set_index(8); ents.push_back(entry);
+		entry.set_term(6); entry.set_index(9); ents.push_back(entry);
+		entry.set_term(6); entry.set_index(10); ents.push_back(entry);
+
+		entry.set_term(7); entry.set_index(11); ents.push_back(entry);
+		entry.set_term(7); entry.set_index(12); ents.push_back(entry);
+
+		tests.push_back(ents);
+	}
+	{
+		Entry entry;
+		EntryVec ents;
+		
+		ents.push_back(entry);
+
+		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+
+		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(5); ents.push_back(entry);
+
+		entry.set_term(4); entry.set_index(6); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(7); ents.push_back(entry);
+
+		tests.push_back(ents);
+	}
+	{
+		Entry entry;
+		EntryVec ents;
+		
+		ents.push_back(entry);
+
+		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+
+		entry.set_term(2); entry.set_index(4); ents.push_back(entry);
+		entry.set_term(2); entry.set_index(5); ents.push_back(entry);
+		entry.set_term(2); entry.set_index(6); ents.push_back(entry);
+
+		entry.set_term(3); entry.set_index(7); ents.push_back(entry);
+		entry.set_term(3); entry.set_index(8); ents.push_back(entry);
+		entry.set_term(3); entry.set_index(9); ents.push_back(entry);
+		entry.set_term(3); entry.set_index(10); ents.push_back(entry);
+		entry.set_term(3); entry.set_index(11); ents.push_back(entry);
+
+		tests.push_back(ents);
+	}
+	int i;
+	for (i = 0; i < tests.size(); ++i) {
+		EntryVec& t = tests[i];
+
+		vector<uint64_t> peers;
+		peers.push_back(1);
+		peers.push_back(2);
+		peers.push_back(3);
+
+		Storage *leaderStorage = new MemoryStorage(&kDefaultLogger);
+		EntryVec appEntries = ents;
+    leaderStorage->Append(&appEntries);
+		raft *leader = newTestRaft(1, peers, 10, 1, leaderStorage);
+
+    {
+      HardState hs;
+      hs.set_commit(leader->raftLog_->lastIndex());
+      hs.set_term(term);
+      leader->loadState(hs);
+    }
+
+		Storage *followerStorage = new MemoryStorage(&kDefaultLogger);
+    followerStorage->Append(&t);
+		raft *follower = newTestRaft(2, peers, 10, 1, followerStorage);
+
+    {
+      HardState hs;
+      hs.set_term(term - 1);
+      follower->loadState(hs);
+    }
+		// It is necessary to have a three-node cluster.
+		// The second may have more up-to-date log than the first one, so the
+		// first node needs the vote from the third node to become the leader.
+		vector<stateMachine*> sts;
+		sts.push_back(new raftStateMachine(leader));
+		sts.push_back(new raftStateMachine(follower));
+		sts.push_back(nopStepper);
+		
+  	network *net = newNetwork(sts);
+    {
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(1);
+      msg.set_type(MsgHup);
+      msgs.push_back(msg);
+      net->send(&msgs);
+    }
+		// The election occurs in the term after the one we loaded with
+		// lead.loadState above.
+    {
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(3);
+      msg.set_to(1);
+      msg.set_term(term + 1);
+      msg.set_type(MsgVoteResp);
+      msgs.push_back(msg);
+      net->send(&msgs);
+    }
+    {
+      vector<Message> msgs;
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(1);
+      msg.set_type(MsgProp);
+			msg.add_entries();
+      msgs.push_back(msg);
+      net->send(&msgs);
+    }
+
+		EXPECT_EQ(raftLogString(leader->raftLog_), raftLogString(follower->raftLog_)) << "i: " << i;
+	}
+}
+
+// TestVoteRequest tests that the vote request includes information about the candidate’s log
+// and are sent to all of the other nodes.
+// Reference: section 5.4.1
+TEST(raftPaperTests, TestVoteRequest) {
+  struct tmp {
+    EntryVec ents;
+    uint64_t wterm;
+
+    tmp(EntryVec ents, uint64_t t)
+      : ents(ents), wterm(t) {
+    }
+  };
+
+  vector<tmp> tests;
+  {
+    EntryVec entries;
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    entries.push_back(entry);
+
+    tests.push_back(tmp(entries, 2));
+  }
+  {
+    EntryVec entries;
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    entries.push_back(entry);
+
+    entry.set_term(2);
+    entry.set_index(2);
+    entries.push_back(entry);
+
+    tests.push_back(tmp(entries, 3));
+  }
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp & t = tests[i];
+  
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    peers.push_back(3);
+    Storage *s = new MemoryStorage(&kDefaultLogger);
+    raft *r = newTestRaft(1, peers, 10, 1, s);
+    {
+      Message msg;
+      msg.set_from(2);
+      msg.set_to(1);
+      msg.set_term(t.wterm - 1);
+      msg.set_type(MsgApp);
+      msg.set_logterm(0);
+      msg.set_index(0);
+      int j;
+      for (j = 0; j < t.ents.size(); ++j) {
+        *(msg.add_entries()) = t.ents[j];
+      }
+      r->step(msg);
+    }
+
+    vector<Message*> msgs;
+    r->readMessages(&msgs);
+    
+    int j;
+    for (j = 0; j < r->electionTimeout_ * 2; ++j) {
+      r->tickElection();
+    }
+    r->readMessages(&msgs);
+    EXPECT_EQ(msgs.size(), 2);
+    
+    for (j = 0; j < msgs.size(); ++j) {
+      Message *msg = msgs[j];
+      
+      EXPECT_EQ(msg->type(), MsgVote);
+      EXPECT_EQ(msg->to(), j + 2);
+      EXPECT_EQ(msg->term(), t.wterm);
+
+      uint64_t windex = t.ents[t.ents.size() - 1].index();
+      uint64_t wlogterm = t.ents[t.ents.size() - 1].term();
+
+      EXPECT_EQ(msg->index(), windex);
+      EXPECT_EQ(msg->logterm(), wlogterm);
+    }
+  }
+}
+
+// TestVoter tests the voter denies its vote if its own log is more up-to-date
+// than that of the candidate.
+// Reference: section 5.4.1
+TEST(raftPaperTests, TestVoter) {
+  struct tmp {
+    EntryVec ents;
+    uint64_t logterm;
+    uint64_t index;
+    bool wreject;
+
+    tmp(EntryVec ents, uint64_t lt, uint64_t i, bool wr)
+      : ents(ents), logterm(lt), index(i), wreject(wr) {}
+  };
+
+  vector<tmp> tests;
+  // same logterm
+  {
+    EntryVec ents;
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    ents.push_back(entry);
+    
+    tests.push_back(tmp(ents, 1, 1, false));
+  }
+  {
+    EntryVec ents;
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    ents.push_back(entry);
+    
+    tests.push_back(tmp(ents, 1, 2, false));
+  }
+  {
+    EntryVec ents;
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    ents.push_back(entry);
+    
+    entry.set_term(1);
+    entry.set_index(2);
+    ents.push_back(entry);
+    tests.push_back(tmp(ents, 1, 1, true));
+  }
+  // candidate higher logterm
+  {
+    EntryVec ents;
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    ents.push_back(entry);
+    
+    tests.push_back(tmp(ents, 2, 1, false));
+  }
+  {
+    EntryVec ents;
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    ents.push_back(entry);
+    
+    tests.push_back(tmp(ents, 2, 2, false));
+  }
+  {
+    EntryVec ents;
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    ents.push_back(entry);
+    
+    entry.set_term(1);
+    entry.set_index(2);
+    ents.push_back(entry);
+    tests.push_back(tmp(ents, 2, 1, false));
+  }
+  // voter higher logterm
+  {
+    EntryVec ents;
+    Entry entry;
+    entry.set_term(2);
+    entry.set_index(1);
+    ents.push_back(entry);
+    
+    tests.push_back(tmp(ents, 1, 1, true));
+  }
+  {
+    EntryVec ents;
+    Entry entry;
+    entry.set_term(2);
+    entry.set_index(1);
+    ents.push_back(entry);
+    
+    tests.push_back(tmp(ents, 1, 2, true));
+  }
+  {
+    EntryVec ents;
+    Entry entry;
+    entry.set_term(2);
+    entry.set_index(1);
+    ents.push_back(entry);
+    
+    entry.set_term(1);
+    entry.set_index(2);
+    ents.push_back(entry);
+    tests.push_back(tmp(ents, 1, 1, true));
+  }
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+    
+    vector<uint64_t> peers;
+    peers.push_back(1);
+    peers.push_back(2);
+    Storage *s = new MemoryStorage(&kDefaultLogger);
+    s->Append(&t.ents);
+    raft *r = newTestRaft(1, peers, 10, 1, s);
+
+		{
+			Message msg;
+			msg.set_from(2);
+			msg.set_to(1);
+			msg.set_term(3);
+			msg.set_logterm(t.logterm);
+			msg.set_index(t.index);
+			msg.set_type(MsgVote);
+			r->step(msg);
+		}
+
+    vector<Message*> msgs;
+    r->readMessages(&msgs);
+
+    EXPECT_EQ(msgs.size(), 1);
+    Message *msg = msgs[0];
+    
+    EXPECT_EQ(msg->type(), MsgVoteResp);
+    EXPECT_EQ(msg->reject(), t.wreject);
+  }
+}
+
+// TestLeaderOnlyCommitsLogFromCurrentTerm tests that only log entries from the leader’s
+// current term are committed by counting replicas.
+// Reference: section 5.4.2
+TEST(raftPaperTests, TestLeaderOnlyCommitsLogFromCurrentTerm) {
+  EntryVec entries; 
+  {
+    Entry entry;
+    entry.set_term(1);
+    entry.set_index(1);
+    entries.push_back(entry);
+  }
+  {
+    Entry entry;
+    entry.set_term(2);
+    entry.set_index(2);
+    entries.push_back(entry);
+  }
+  struct tmp {
+    uint64_t index, wcommit;
+    tmp(uint64_t i, uint64_t w) 
+      : index(i), wcommit(w){}
+  };
+
+  vector<tmp> tests;
+  // do not commit log entries in previous terms
+  tests.push_back(tmp(1, 0));
+  tests.push_back(tmp(2, 0));
+  // commit log in current term
+  tests.push_back(tmp(3, 3));
+
+  int i;
+  for (i = 0; i < tests.size(); ++i) {
+    tmp& t = tests[i];
+    EntryVec ents = entries;
+
+		Storage *s = new MemoryStorage(&kDefaultLogger);
+    s->Append(&ents);
+		vector<uint64_t> peers;
+		peers.push_back(1);
+		peers.push_back(2);
+		raft *r = newTestRaft(1, peers, 10, 1, s);
+
+    HardState hs;
+    hs.set_term(3);
+    r->loadState(hs);
+
+    // become leader at term 3
+    r->becomeCandidate();
+    r->becomeLeader();
+
+    vector<Message*> msgs;
+    r->readMessages(&msgs);
+
+    // propose a entry to current term
+    {
+      Entry entry;
+      Message msg;
+      msg.set_from(1);
+      msg.set_to(1);
+      msg.set_type(MsgProp);
+      msg.add_entries();
+      r->step(msg);
+    }
+    {
+      Entry entry;
+      Message msg;
+      msg.set_from(2);
+      msg.set_to(1);
+      msg.set_term(r->term_);
+      msg.set_index(t.index);
+      msg.set_type(MsgAppResp);
+      r->step(msg);
+    }
+
+    EXPECT_EQ(r->raftLog_->committed_, t.wcommit);
+  }
 }
