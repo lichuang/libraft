@@ -22,6 +22,10 @@ enum CampaignType {
   campaignTransfer = 3
 };
 
+struct raft;
+
+typedef void (*stepFun)(raft *, const Message&);
+
 struct raft {
   uint64_t id_;
   uint64_t term_;
@@ -66,6 +70,8 @@ struct raft {
 
   Logger* logger_;
 
+  stepFun stateStep;
+
   raft(const Config *, raftLog *);
   void tick();
   const char* getCampaignString(CampaignType t);
@@ -97,9 +103,6 @@ struct raft {
   void tickHeartbeat();
   int  poll(uint64_t id, MessageType t, bool v);
   int  step(const Message& msg);
-  void stepFollower(const Message& msg);
-  void stepCandidate(const Message& msg);
-  void stepLeader(const Message& msg);
   bool promotable();
   bool restore(const Snapshot& snapshot);
   void delProgress(uint64_t id);
@@ -111,7 +114,6 @@ struct raft {
   void abortLeaderTransfer();
   void proxyMessage(const Message& msg);
   void readMessages(vector<Message*> *);
-  Message* cloneMessage(const Message& msg);
   bool checkQuorumActive();
   void sendTimeoutNow(uint64_t to);
   void resetPendingConf();
@@ -119,5 +121,9 @@ struct raft {
 
 extern raft* newRaft(const Config *);
 string entryString(const Entry& entry);
+
+void stepLeader(raft *r, const Message& msg);
+void stepCandidate(raft* r, const Message& msg);
+void stepFollower(raft* r, const Message& msg);
 
 #endif  // __RAFT_H__

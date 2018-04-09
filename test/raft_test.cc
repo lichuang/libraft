@@ -2620,6 +2620,17 @@ void testRecvMsgVote(MessageType type) {
     raft *r = newTestRaft(1, peers, 10, 1, s);
 
     r->state_ = t.state;
+    switch (t.state) {
+    case StateFollower:
+      r->stateStep = stepFollower;
+      break;
+    case StateCandidate:
+      r->stateStep = stepCandidate;
+      break;
+    case StateLeader:
+      r->stateStep = stepLeader;
+      break;
+    }
     r->vote_ = t.voteFor;  
 
     s = new MemoryStorage(&kDefaultLogger); 
@@ -3714,6 +3725,17 @@ TEST(raftTests, TestRecvMsgBeat) {
     r->raftLog_ = newLog(s, &kDefaultLogger);
     r->term_ = 1;
     r->state_ = t.state;
+    switch (t.state) {
+    case StateFollower:
+      r->stateStep = stepFollower;
+      break;
+    case StateCandidate:
+      r->stateStep = stepCandidate;
+      break;
+    case StateLeader:
+      r->stateStep = stepLeader;
+      break;
+    }
 
     Message msg;
     msg.set_from(1);
@@ -3724,7 +3746,7 @@ TEST(raftTests, TestRecvMsgBeat) {
     vector<Message*> msgs;
     r->readMessages(&msgs);
 
-    EXPECT_EQ(msgs.size(), t.msg);
+    EXPECT_EQ(msgs.size(), t.msg) << "i: " << i;
 
     int j;
     for (j = 0; j < msgs.size(); ++j) {
