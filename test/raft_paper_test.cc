@@ -102,7 +102,7 @@ void commitNoopEntry(raft *r, Storage *s) {
   r->readMessages(&msgs);
   EntryVec entries;
   r->raftLog_->unstableEntries(&entries);
-  s->Append(&entries);
+  s->Append(entries);
   r->raftLog_->appliedTo(r->raftLog_->committed_);
   r->raftLog_->stableTo(r->raftLog_->lastIndex(), r->raftLog_->lastTerm());
 }
@@ -921,7 +921,7 @@ TEST(raftPaperTests, TestLeaderCommitPrecedingEntries) {
     peers.push_back(3);
     Storage *s = new MemoryStorage(&kDefaultLogger);
     EntryVec appEntries = t;
-    s->Append(&appEntries);
+    s->Append(appEntries);
     raft *r = newTestRaft(1, peers, 10, 1, s);
     HardState hs;
     hs.set_term(2);
@@ -1130,7 +1130,7 @@ TEST(raftPaperTests, TestFollowerCheckMsgApp) {
     peers.push_back(3);
     Storage *s = new MemoryStorage(&kDefaultLogger);
     EntryVec ents = entries;
-    s->Append(&ents);
+    s->Append(ents);
     raft *r = newTestRaft(1, peers, 10, 1, s);
     HardState hs;
     hs.set_commit(1);
@@ -1279,7 +1279,7 @@ TEST(raftPaperTests, TestFollowerAppendEntries) {
 		entry.set_index(2);
 		appEntries.push_back(entry);
 
-    s->Append(&appEntries);
+    s->Append(appEntries);
 		raft *r = newTestRaft(1, peers, 10, 1, s);
 		r->becomeFollower(2, 2);
     {
@@ -1468,7 +1468,7 @@ TEST(raftPaperTests, TestLeaderSyncFollowerLog) {
 
 		Storage *leaderStorage = new MemoryStorage(&kDefaultLogger);
 		EntryVec appEntries = ents;
-    leaderStorage->Append(&appEntries);
+    leaderStorage->Append(appEntries);
 		raft *leader = newTestRaft(1, peers, 10, 1, leaderStorage);
 
     {
@@ -1479,7 +1479,7 @@ TEST(raftPaperTests, TestLeaderSyncFollowerLog) {
     }
 
 		Storage *followerStorage = new MemoryStorage(&kDefaultLogger);
-    followerStorage->Append(&t);
+    followerStorage->Append(t);
 		raft *follower = newTestRaft(2, peers, 10, 1, followerStorage);
 
     {
@@ -1736,7 +1736,7 @@ TEST(raftPaperTests, TestVoter) {
     peers.push_back(1);
     peers.push_back(2);
     Storage *s = new MemoryStorage(&kDefaultLogger);
-    s->Append(&t.ents);
+    s->Append(t.ents);
     raft *r = newTestRaft(1, peers, 10, 1, s);
 
 		{
@@ -1797,7 +1797,7 @@ TEST(raftPaperTests, TestLeaderOnlyCommitsLogFromCurrentTerm) {
     EntryVec ents = entries;
 
 		Storage *s = new MemoryStorage(&kDefaultLogger);
-    s->Append(&ents);
+    s->Append(ents);
 		vector<uint64_t> peers;
 		peers.push_back(1);
 		peers.push_back(2);

@@ -26,7 +26,7 @@ raftStateMachine* entsWithConfig(ConfigFun fun, const vector<uint64_t>& terms) {
     entry.set_term(terms[i]);
     entries.push_back(entry);
   }
-  s->Append(&entries);
+  s->Append(entries);
 
   vector<uint64_t> peers;
   Config *c = newTestConfig(1, peers, 5, 1, s);
@@ -1076,7 +1076,7 @@ TEST(raftTests, TestDuelingCandidates) {
     entry.set_index(1);
     entries.push_back(entry);
 
-    s->Append(&entries);
+    s->Append(entries);
   }
 
   raftLog *log = new raftLog(s, &kDefaultLogger);
@@ -1198,7 +1198,7 @@ TEST(raftTests, TestDuelingPreCandidates) {
     entry.set_index(1);
     entries.push_back(entry);
 
-    s->Append(&entries);
+    s->Append(entries);
   }
 
   raftLog *log = new raftLog(s, &kDefaultLogger);
@@ -2040,7 +2040,7 @@ TEST(raftTests, TestCommit) {
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    s->Append(&t.logs);
+    s->Append(t.logs);
     s->hardState_.set_term(t.term);
 
     vector<uint64_t> peers;
@@ -2280,7 +2280,7 @@ TEST(raftTests, TestHandleMsgApp) {
       entry.set_term(2);
       entries.push_back(entry);
     }
-    s->Append(&entries);
+    s->Append(entries);
 
     vector<uint64_t> peers;
     peers.push_back(1);
@@ -2354,7 +2354,7 @@ TEST(raftTests, TestHandleHeartbeat) {
       entry.set_term(3);
       entries.push_back(entry);
     }
-    s->Append(&entries);
+    s->Append(entries);
     vector<uint64_t> peers;
     peers.push_back(1);
     peers.push_back(2);
@@ -2394,7 +2394,7 @@ TEST(raftTests, TestHandleHeartbeatResp) {
     entry.set_term(3);
     entries.push_back(entry);
   }
-  s->Append(&entries);
+  s->Append(entries);
   vector<uint64_t> peers;
   peers.push_back(1);
   peers.push_back(2);
@@ -3950,7 +3950,7 @@ TEST(raftTests, TestRecvMsgUnreachable) {
 	peers.push_back(1);
 	peers.push_back(2);
 	Storage *s = new MemoryStorage(&kDefaultLogger);
-	s->Append(&prevEntries);
+	s->Append(prevEntries);
 	raft *r = newTestRaft(1, peers, 10, 1, s);
 	r->becomeCandidate();
 	r->becomeLeader();

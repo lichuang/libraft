@@ -262,7 +262,7 @@ TEST(memoryStorageTests, TestStorageLastIndex) {
     entry.set_index(6);
     entry.set_term(5);
     entries.push_back(entry);
-    s.Append(&entries);
+    s.Append(entries);
   }
 
   err = s.LastIndex(&last);

@@ -16,9 +16,10 @@ static bool isEmptySoftState(const SoftState& ss) {
   return isSoftStateEqual(ss, kEmptySoftState);
 }
 
-NodeImpl::NodeImpl(const Config *config)
-  : raft_(NULL)
-  , logger_(config->logger)
+NodeImpl::NodeImpl()
+  : stopped_(false)
+  , raft_(NULL)
+  , logger_(NULL)
   , leader_(None)
   , prevSoftState_(kEmptySoftState)
   , prevHardState_(kEmptyHardState)
@@ -87,7 +88,7 @@ void NodeImpl::Advance() {
     raft_->raftLog_->appliedTo(prevHardState_.commit());
   }
   if (havePrevLastUnstableIndex_) {
-    raft_->raftLog_->stableTo(prevSnapshotIndex_, prevLastUnstableTerm_);
+    raft_->raftLog_->stableTo(prevLastUnstableIndex_, prevLastUnstableTerm_);
     havePrevLastUnstableIndex_ = false;
   }
   raft_->raftLog_->stableSnapTo(prevSnapshotIndex_);
@@ -102,10 +103,14 @@ void NodeImpl::Advance() {
 }
 
 void NodeImpl::ApplyConfChange(const ConfChange& cc, ConfState *cs, Ready **ready) {
-  msgType_ = ConfChangeMessage;
   confChange_ = cc;
   confState_ = cs;
+  /*
+  msgType_ = ConfChangeMessage;
   stateMachine(Message(), ready);
+  */
+  *ready = NULL;
+  handleConfChange();
 }
 
 int NodeImpl::doStep(const Message& msg, Ready **ready) {
@@ -137,6 +142,9 @@ int NodeImpl::ReadIndex(const string &rctx, Ready **ready) {
 }
 
 int NodeImpl::stateMachine(const Message& msg, Ready **ready) {
+  if (stopped_) {
+    return OK;
+  }
   if (leader_ != raft_->leader_) {
     if (raft_->hasLeader()) {
       if (leader_ == None) {
@@ -212,6 +220,7 @@ void NodeImpl::handleConfChange() {
     break;
   case ConfChangeUpdateNode:
     raft_->resetPendingConf();
+    break;
   default:
     logger_->Fatalf(__FILE__, __LINE__, "unexpected conf type");
     break;
@@ -291,6 +300,10 @@ Ready* NodeImpl::newReady() {
   return &ready_;
 }
 
+void NodeImpl::Stop() {
+  stopped_ = true;
+}
+
 bool NodeImpl::readyContainUpdate() {
   return (!isEmptySoftState(ready_.softState) ||
           !isEmptyHardState(ready_.hardState) ||
@@ -304,7 +317,8 @@ bool NodeImpl::readyContainUpdate() {
 // StartNode returns a new Node given configuration and a list of raft peers.
 // It appends a ConfChangeAddNode entry for each given peer to the initial log.
 Node* StartNode(const Config* config, const vector<Peer>& peers) {
-  NodeImpl* node = new NodeImpl(config);
+  NodeImpl* node = new NodeImpl();
+  node->logger_ = config->logger;
   raft *r = newRaft(config);
   
 	// become the follower at term 1 and apply initial configuration
@@ -362,7 +376,8 @@ Node* StartNode(const Config* config, const vector<Peer>& peers) {
 // has been applied to it; otherwise use zero.
 Node* RestartNode(const Config *config) {
   raft *r = newRaft(config);
-  NodeImpl *node = new NodeImpl(config);
+  NodeImpl* node = new NodeImpl();
+  node->logger_ = config->logger;
   node->raft_ = r;
   r->softState(&node->prevSoftState_);
 

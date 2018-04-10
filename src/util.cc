@@ -28,19 +28,15 @@ bool isDeepEqualSnapshot(const Snapshot *s1, const Snapshot *s2) {
 
 bool isDeepEqualEntry(const Entry& ent1, const Entry& ent2) {
   if (ent1.type() != ent2.type()) {
-    kDefaultLogger.Debugf(__FILE__, __LINE__, "type not equal");
     return false;
   }
   if (ent1.term() != ent2.term()) {
-    kDefaultLogger.Debugf(__FILE__, __LINE__, "type not equal");
     return false;
   }
   if (ent1.index() != ent2.index()) {
-    kDefaultLogger.Debugf(__FILE__, __LINE__, "type not equal");
     return false;
   }
   if (ent1.data() != ent2.data()) {
-    kDefaultLogger.Debugf(__FILE__, __LINE__, "type not equal");
     return false;
   }
   return true;
@@ -48,7 +44,6 @@ bool isDeepEqualEntry(const Entry& ent1, const Entry& ent2) {
 
 bool isDeepEqualEntries(const EntryVec& ents1, const EntryVec& ents2) {
   if (ents1.size() != ents2.size()) {
-    kDefaultLogger.Debugf(__FILE__, __LINE__, "entry size %d not equal %d", ents1.size(), ents2.size());
     return false;
   }
   int i;
@@ -126,6 +121,49 @@ bool isEmptySnapshot(const Snapshot* snapshot) {
     return true;
   }
   return snapshot->metadata().index() == 0;
+}
+
+bool isDeepEqualReadStates(const vector<ReadState*>& rs1, const vector<ReadState*>& rs2) {
+  if (rs1.size() != rs2.size()) {
+    return false;
+  }
+  int i;
+  for (i = 0; i < rs1.size(); ++i) {
+    ReadState* r1 = rs1[i];
+    ReadState* r2 = rs2[i];
+    if (r1->index_ != r2->index_) {
+      return false;
+    }
+    if (r1->requestCtx_ != r2->requestCtx_) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool isDeepEqualMessage(const Message& msg1, const Message& msg2) {
+  if (msg1.from() != msg2.from()) {
+    return false;
+  }
+  if (msg1.to() != msg2.to()) {
+    return false;
+  }
+  if (msg1.type() != msg2.type()) {
+    return false;
+  }
+
+  if (msg1.entries_size() != msg2.entries_size()) {
+    return false;
+  }
+  
+  int i;
+  for (i = 0; i < msg1.entries_size(); ++i) {
+    if (!isDeepEqualEntry(msg1.entries(i), msg2.entries(i))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 int numOfPendingConf(const EntryVec& entries) {

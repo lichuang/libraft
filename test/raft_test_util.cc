@@ -11,7 +11,7 @@ void nextEnts(raft *r, Storage *s, EntryVec *entries) {
   // Transfer all unstable entries to "stable" storage.
   EntryVec tmp;
   r->raftLog_->unstableEntries(&tmp); 
-  s->Append(&tmp);
+  s->Append(tmp);
   r->raftLog_->stableTo(r->raftLog_->lastIndex(), r->raftLog_->lastTerm());
 
   r->raftLog_->nextEntries(entries);

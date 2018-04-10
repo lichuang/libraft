@@ -135,46 +135,47 @@ int MemoryStorage::ApplySnapshot(const Snapshot& snapshot) {
 
 // Append the new entries to storage.
 // entries[0].Index > ms.entries[0].Index
-int MemoryStorage::Append(EntryVec* entries) {
-  if (entries->empty()) {
+int MemoryStorage::Append(const EntryVec& entries) {
+  if (entries.empty()) {
     return OK;
   }
 
   Mutex mutex(&locker_);
+  EntryVec appendEntries = entries;
 
   uint64_t first = firstIndex();
-  uint64_t last  = (*entries)[0].index() + entries->size() - 1;
+  uint64_t last  = appendEntries[0].index() + appendEntries.size() - 1;
 
   if (last < first) {
     return OK;
   }
 
   // truncate compacted entries
-  if (first > (*entries)[0].index()) {
-    uint64_t index = first - (*entries)[0].index();
-    entries->erase(entries->begin(), entries->begin() + index);
+  if (first > appendEntries[0].index()) {
+    uint64_t index = first - appendEntries[0].index();
+    appendEntries.erase(appendEntries.begin(), appendEntries.begin() + index);
   }
 
-  uint64_t offset = (*entries)[0].index() - entries_[0].index();
+  uint64_t offset = appendEntries[0].index() - entries_[0].index();
   if (entries_.size() > offset) {
     entries_.erase(entries_.begin(), entries_.begin() + offset);
     int i;
-    for (i = 0; i < entries->size(); ++i) {
-      entries_.push_back((*entries)[i]);
+    for (i = 0; i < appendEntries.size(); ++i) {
+      entries_.push_back(appendEntries[i]);
     }
     return OK;
   }
 
   if (entries_.size() == offset) {
     int i;
-    for (i = 0; i < entries->size(); ++i) {
-      entries_.push_back((*entries)[i]);
+    for (i = 0; i < appendEntries.size(); ++i) {
+      entries_.push_back(appendEntries[i]);
     }
     return OK;
   }
 
   logger_->Fatalf(__FILE__, __LINE__, "missing log entry [last: %llu, append at: %llu]",
-    lastIndex(), (*entries)[0].index());
+    lastIndex(), appendEntries[0].index());
   return OK;
 }
 

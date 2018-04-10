@@ -109,7 +109,7 @@ public:
   virtual int Entries(uint64_t lo, uint64_t hi, uint64_t maxSize, vector<Entry> *entries) = 0;
   virtual int GetSnapshot(Snapshot **snapshot) = 0;
   virtual int SetHardState(const HardState& ) = 0;
-  virtual int Append(EntryVec* entries) = 0;
+  virtual int Append(const EntryVec& entries) = 0;
   virtual int CreateSnapshot(uint64_t i, ConfState *cs, const string& data, Snapshot *ss) = 0;
 };
 
@@ -260,6 +260,9 @@ public:
 	// index, any linearizable read requests issued before the read request can be
 	// processed safely. The read state will have the same rctx attached.
   virtual int ReadIndex(const string &rctx, Ready **ready) = 0;
+
+	// Stop performs any necessary termination of the Node.
+  virtual void Stop() = 0;
 };
 
 extern Node* StartNode(const Config *config, const vector<Peer>& peers);

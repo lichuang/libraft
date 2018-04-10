@@ -386,7 +386,7 @@ TEST(logTests, TestAppend) {
   for (i = 0; i < tests.size(); ++i) {
     const tmp &test = tests[i];
     MemoryStorage s(&kDefaultLogger);
-    s.Append(&entries);
+    s.Append(entries);
     raftLog *log = newLog(&s, &kDefaultLogger);
     
     uint64_t index = log->append(test.entries);
@@ -628,7 +628,7 @@ TEST(logTests, TestCompactionSideEffects) {
     entry.set_term(i);
     entries.push_back(entry);
 
-    s.Append(&entries);
+    s.Append(entries);
   }
 
   raftLog *log = newLog(&s, &kDefaultLogger);
@@ -855,7 +855,7 @@ TEST(logTests, TestUnstableEnts) {
     {
       EntryVec ents;
       ents.insert(ents.end(), entries.begin(),  entries.begin() + t.unstable - 1);
-      s.Append(&ents);
+      s.Append(ents);
     }
 
     // append unstable entries to raftlog
@@ -1122,7 +1122,7 @@ TEST(logTests, TestCompaction) {
       entry.set_index(j);
       entries.push_back(entry);
     }
-    s.Append(&entries);
+    s.Append(entries);
 
     raftLog *log = newLog(&s, &kDefaultLogger);
     log->maybeCommit(t.lastIndex, 0);

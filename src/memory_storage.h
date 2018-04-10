@@ -17,7 +17,7 @@ public:
   int GetSnapshot(Snapshot **snapshot);
   int SetHardState(const HardState& );
 
-  int Append(EntryVec* entries);
+  int Append(const EntryVec& entries);
   int Compact(uint64_t compactIndex);
   int ApplySnapshot(const Snapshot& snapshot);
   int CreateSnapshot(uint64_t i, ConfState *cs, const string& data, Snapshot *ss);

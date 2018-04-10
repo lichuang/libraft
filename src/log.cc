@@ -161,7 +161,7 @@ void raftLog::restore(const Snapshot& snapshot) {
 // append entries to unstable storage and return last index
 // fatal if the first index of entries < committed_
 uint64_t raftLog::append(const EntryVec& entries) {
-  if (entries.size() == 0) {
+  if (entries.empty()) {
     return lastIndex();
   }
 

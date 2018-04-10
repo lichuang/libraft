@@ -16,7 +16,7 @@ struct raft;
 
 class NodeImpl : public Node {
 public:
-  NodeImpl(const Config *config);
+  NodeImpl();
   ~NodeImpl();
 
   virtual void Tick(Ready **ready);
@@ -28,6 +28,7 @@ public:
   virtual void ApplyConfChange(const ConfChange& cc, ConfState *cs, Ready **ready);
   virtual void TransferLeadership(uint64_t leader, uint64_t transferee, Ready **ready);
   virtual int  ReadIndex(const string &rctx, Ready **ready);
+  virtual void Stop();
 
 private:
   int stateMachine(const Message& msg, Ready **ready);
@@ -40,6 +41,7 @@ private:
   bool readyContainUpdate();
 
 public:
+  bool stopped_;
   raft *raft_;
   Logger *logger_;
 
