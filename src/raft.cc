@@ -410,6 +410,7 @@ void raft::reset(uint64_t term) {
 
 void raft::appendEntry(EntryVec* entries) {
   uint64_t li = raftLog_->lastIndex();
+  logger_->Debugf(__FILE__, __LINE__, "lastIndex:%llu", li);
   size_t i;
   for (i = 0; i < entries->size(); ++i) {
     (*entries)[i].set_term(term_);
