@@ -70,7 +70,7 @@ void unstableLog::stableTo(uint64_t i, uint64_t t) {
   if (gt == t && i >= offset_) {
     entries_.erase(entries_.begin(), entries_.begin() + i + 1 - offset_);
     offset_ = i + 1;
-    logger_->Debugf(__FILE__, __LINE__, "stable to %llu, entries size:%d, offset:%llu", i, entries_.size(), offset_);
+    //logger_->Debugf(__FILE__, __LINE__, "stable to %llu, entries size:%d, offset:%llu", i, entries_.size(), offset_);
   }
 }
 

@@ -259,8 +259,7 @@ TEST(nodeTests, TestNodeProposeAddDuplicateNode) {
   Ready *ready;
   EntryVec readyEntries;
   n->Campaign(&ready);
-  //applyReadyEntries(ready, &readyEntries, s, n);
-  n->Advance();
+  applyReadyEntries(ready, &readyEntries, s, n);
 
   ConfChange cc1, cc2;
   string ccdata1, ccdata2;
