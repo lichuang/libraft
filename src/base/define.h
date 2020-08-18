@@ -1,9 +1,8 @@
 /*
- * Copyright (C) codedump
+ * Copyright (C) lichuang
  */
 
-#ifndef __LIBRAFT_BASE_DEFINE_H__
-#define __LIBRAFT_BASE_DEFINE_H__
+#pragma once
 
 #define BEGIN_NAMESPACE namespace libraft {
 #define END_NAMESPACE   };
@@ -13,5 +12,3 @@
 #define DISALLOW_COPY_AND_ASSIGN(TypeName) \
   TypeName(const TypeName&);               \
   void operator=(const TypeName&)
-  
-#endif // __LIBRAFT_BASE_DEFINE_H__

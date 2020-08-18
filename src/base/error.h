@@ -1,9 +1,8 @@
 /*
- * Copyright (C) codedump
+ * Copyright (C) lichuang
  */
 
-#ifndef __LIBRAFT_BASE_ERROR_H__
-#define __LIBRAFT_BASE_ERROR_H__
+#pragma once
 
 #include <string>
 
@@ -12,7 +11,7 @@ using namespace std;
 BEGIN_NAMESPACE
 
 enum {
-  EOK = 0;
+  kOK = 0;
 };
 
 class Error {
@@ -31,5 +30,3 @@ private:
 };
 
 END_NAMESPACE
-
-#endif // __LIBRAFT_BASE_ERROR_H__

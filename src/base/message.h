@@ -1,9 +1,8 @@
 /*
- * Copyright (C) codedump
+ * Copyright (C) lichuang
  */
 
-#ifndef __LIBRAFT_BASE_MESSAGE_H__
-#define __LIBRAFT_BASE_MESSAGE_H__
+#pragma once
 
 #include "base/define.h"
 #include "base/error.h"
@@ -36,5 +35,3 @@ public:
 };
 
 END_NAMESPACE
-
-#endif // __LIBRAFT_BASE_MESSAGE_H__

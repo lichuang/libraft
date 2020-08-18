@@ -1,9 +1,8 @@
 /*
- * Copyright (C) codedump
+ * Copyright (C) lichuang
  */
 
-#ifndef __LIBRAFT_BASE_ENTITY_H__
-#define __LIBRAFT_BASE_ENTITY_H__
+#pragma once
 
 #include "base/define.h"
 #include "base/typedef.h"
@@ -11,6 +10,12 @@
 BEGIN_NAMESPACE
 
 class Message;
+class Mailbox;
+
+struct EntityRef {
+  class Mailbox;
+  EntityId id_;
+};
 
 class Entity {
 public:
@@ -29,9 +34,7 @@ public:
   virtual void Handle(Message* msg) = 0;
 
 protected:
-  EntityId id_;
+  EntityRef ref_;
 };
 
 END_NAMESPACE
-
-#endif  // __LIBRAFT_BASE_ENTITY_H__

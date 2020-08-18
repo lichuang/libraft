@@ -1,5 +1,5 @@
 /*
- * Copyright (C) codedump
+ * Copyright (C) lichuang
  */
 
 #include "base/buffer.h"
@@ -10,8 +10,7 @@
 #include "core/application.h"
 #include "core/session.h"
 #include "core/socket.h"
-#include "core/worker.h"
-#include "rpc/rpc_channel.h"
+#include "base/worker.h"
 
 BEGIN_NAMESPACE
 

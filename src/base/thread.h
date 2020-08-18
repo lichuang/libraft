@@ -1,8 +1,8 @@
 /*
- * Copyright (C) codedump
+ * Copyright (C) lichuang
  */
-#ifndef __LIBRAFT_BASE_THREAD_H__
-#define __LIBRAFT_BASE_THREAD_H__
+
+#pragma once
 
 #include <functional>
 #include <string>
@@ -69,5 +69,3 @@ private:
 extern const string& CurrentThreadName();
 
 END_NAMESPACE
-
-#endif  // __LIBRAFT_BASE_THREAD_H__

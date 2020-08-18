@@ -1,5 +1,5 @@
 /*
- * Copyright (C) codedump
+ * Copyright (C) lichuang
  */
 
 #include <sys/prctl.h>

@@ -1,8 +1,8 @@
 /*
- * Copyright (C) codedump
+ * Copyright (C) lichuang
  */
-#ifndef __LIBRAFT_BASE_WORKER_H__
-#define __LIBRAFT_BASE_WORKER_H__
+
+#pragma once
 
 #include <string>
 #include "base/define.h"
@@ -15,19 +15,10 @@ BEGIN_NAMESPACE
 // inside the worker there is a mailbox,
 // other threads can communicate to the thread using message though mailbox
 class Worker 
-  : public Thread,
-    public Event,
-    public MessageHandler {
+  : public Thread {
 public:
   Worker(const string& name);
   virtual ~Worker();
-
-  // Event vitual methods
-  virtual void In();
-
-  virtual void Out();
-
-  virtual void Timeout();
 
   // process message handler
   virtual void Process(Message*);
@@ -43,9 +34,9 @@ protected:
   virtual void Run();
 
 protected:
+  Mailbox mailbox_;
+
   DISALLOW_COPY_AND_ASSIGN(Worker);
 };
 
 END_NAMESPACE
-
-#endif  // __LIBRAFT_BASE_WORKER_H__
