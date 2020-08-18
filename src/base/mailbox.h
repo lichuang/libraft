@@ -10,7 +10,7 @@
 #include "base/mutex.h"
 #include "base/signaler.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 class Message;
 
@@ -47,4 +47,4 @@ private:
   DISALLOW_COPY_AND_ASSIGN(Mailbox);
 };
 
-END_NAMESPACE
+};

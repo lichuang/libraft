@@ -8,7 +8,7 @@
 #include <errno.h>
 #include "base/define.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 class Condition;
 
@@ -58,4 +58,4 @@ private:
   Mutex* const mutex_;
 };
 
-END_NAMESPACE
+};

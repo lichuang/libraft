@@ -12,7 +12,7 @@
 
 using namespace std;
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 typedef pthread_t tid_t;
 
@@ -68,4 +68,4 @@ private:
 
 extern const string& CurrentThreadName();
 
-END_NAMESPACE
+};

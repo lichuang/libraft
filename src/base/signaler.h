@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include "base/macros.h"
+#include "base/define.h"
 #include "base/typedef.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 class Signaler {
 public:
@@ -29,4 +29,4 @@ private:
   DISALLOW_COPY_AND_ASSIGN(Signaler);
 };
 
-END_NAMESPACE
+};

@@ -2,11 +2,11 @@
  * Copyright (C) lichuang
  */
 
-#include "base/errcode.h"
+#include "base/error.h"
 #include "base/mailbox.h"
 #include "base/message.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 Mailbox::Mailbox()
   : active_(false) {
@@ -58,4 +58,4 @@ Mailbox::Recv(Message** msg, int timeout) {
   return kOK;
 }
 
-END_NAMESPACE
+};

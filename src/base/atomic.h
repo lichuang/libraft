@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include "base/define.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 //  This class encapsulates several atomic operations on pointers.
 template <typename T>
@@ -79,4 +79,4 @@ private:
   DISALLOW_COPY_AND_ASSIGN(AtomicCounter);
 } __attribute__ ((aligned (sizeof (void *))));
 
-END_NAMESPACE
+};

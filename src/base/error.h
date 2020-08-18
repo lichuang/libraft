@@ -8,25 +8,26 @@
 
 using namespace std;
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 enum {
-  kOK = 0;
+  kOK = 0,
+  kError = -1,
 };
 
 class Error {
 public:
-  Error(int code=EOK, const std::string& msg="")
+  Error(int code=kOK, const std::string& msg="")
     : errCode_(code), errMsg_(msg) {
   }
 
-  const int Code() const { return errCode_; }
+  int Code() const { return errCode_; }
 
   const std::string& Message() const { return errMsg_; }
 
 private:
   int errCode_;
-  string msg_;
+  string errMsg_;
 };
 
-END_NAMESPACE
+};

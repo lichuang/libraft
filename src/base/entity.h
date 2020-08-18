@@ -7,7 +7,7 @@
 #include "base/define.h"
 #include "base/typedef.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 class Message;
 class Mailbox;
@@ -37,4 +37,4 @@ protected:
   EntityRef ref_;
 };
 
-END_NAMESPACE
+};

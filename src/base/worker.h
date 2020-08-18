@@ -9,7 +9,7 @@
 
 using namespace std;
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 // worker thread
 // inside the worker there is a mailbox,
@@ -39,4 +39,4 @@ protected:
   DISALLOW_COPY_AND_ASSIGN(Worker);
 };
 
-END_NAMESPACE
+};

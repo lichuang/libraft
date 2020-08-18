@@ -4,8 +4,9 @@
 
 #include <sys/prctl.h>
 #include "base/thread.h"
+#include "base/spin_lock.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 // per thread info
 struct perThreadInfo {
@@ -100,4 +101,4 @@ CurrentThreadName() {
   return gPerThreadInfo.name;
 }
 
-END_NAMESPACE
+};

@@ -5,11 +5,25 @@
 #include <errno.h>
 #include <poll.h>
 #include <unistd.h>
+#include <sys/eventfd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include "base/error.h"
 #include "base/signaler.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
+
+static int
+MakeFdPair(int *w, int *r) {
+  int fd = eventfd(0, EFD_NONBLOCK);
+  if (fd == -1) {
+    *w = *r = -1;
+    return kError;
+  }
+
+  *w = *r = fd;
+  return kOK;
+}
 
 Signaler::Signaler()
   : wfd_(-1),
@@ -58,4 +72,4 @@ Signaler::RecvFailable() {
   return ::read(rfd_, &dummy, sizeof(dummy));
 }
 
-END_NAMESPACE
+};

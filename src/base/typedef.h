@@ -6,8 +6,17 @@
 
 #include <stdint.h>
 
-typedef MessageId uint64_t;
+namespace libraft {
 
-typedef MessageType uint32_t;
+typedef uint64_t MessageId;
 
-typedef EntityId uint64_t;
+typedef uint32_t MessageType;
+
+typedef uint64_t EntityId;
+
+typedef int fd_t;
+
+// invalid fd const
+static const fd_t kInvalidFd     = -1;
+
+};

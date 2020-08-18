@@ -8,7 +8,7 @@
 #include "base/error.h"
 #include "base/typedef.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 class MessageHandler;
 
@@ -17,7 +17,7 @@ class Message {
 public:
   virtual ~Message() {}
 
-  const MessageType Type() const { return type_; }
+  MessageType Type() const { return type_; }
   
 protected:
   MessageId id_;
@@ -34,4 +34,4 @@ public:
   virtual ~MessageHandler() {}
 };
 
-END_NAMESPACE
+};

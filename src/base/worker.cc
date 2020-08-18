@@ -2,17 +2,9 @@
  * Copyright (C) lichuang
  */
 
-#include "base/buffer.h"
-#include "base/errcode.h"
-#include "base/object_pool.h"
-#include "core/accept_message.h"
-#include "core/epoll.h"
-#include "core/application.h"
-#include "core/session.h"
-#include "core/socket.h"
 #include "base/worker.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 Worker::Worker(const string &name)
   : Thread(name),
@@ -71,4 +63,4 @@ Worker::Run() {
   }
 }
 
-END_NAMESPACE
+};

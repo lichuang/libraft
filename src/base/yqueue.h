@@ -10,7 +10,7 @@
 #include "base/atomic.h"
 #include "base/define.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 //  yqueue is an efficient queue implementation. The main goal is
 //  to minimise number of allocations/deallocations needed. Thus yqueue
@@ -179,4 +179,4 @@ template <typename T, int N> class YQueue
     DISALLOW_COPY_AND_ASSIGN(YQueue);
 };
 
-END_NAMESPACE
+};

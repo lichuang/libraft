@@ -8,7 +8,7 @@
 #include "base/atomic.h"
 #include "base/yqueue.h"
 
-BEGIN_NAMESPACE
+namespace libraft {
 
 //  Lock-free queue implementation.
 //  Only a single thread can read from the pipe at any specific moment.
@@ -162,4 +162,4 @@ protected:
   DISALLOW_COPY_AND_ASSIGN(YPipe);
 };
 
-END_NAMESPACE
+};
