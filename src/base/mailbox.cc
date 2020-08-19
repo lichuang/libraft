@@ -9,53 +9,61 @@
 namespace libraft {
 
 Mailbox::Mailbox()
-  : active_(false) {
-  pipe_.CheckRead();
+  : has_unread_data_(ATOMIC_FLAG_INIT) {
+  writer_index_.store(0, memory_order_relaxed);
+  writing_.store(false, memory_order_relaxed);
 }
 
 Mailbox::~Mailbox() {
 }
 
-void Mailbox::Send(IMessage *msg) {
-  // multi write single read mode
-  sync_.Lock();
-  pipe_.Write(msg, false);
-  bool ok = pipe_.Flush();
-  sync_.UnLock();
+bool 
+Mailbox::Send(IMessage *msg) {
+  writing_.store(true, memory_order_acquire);
+
+  short idx = writer_index_.load(memory_order_acquire);
+  bool ok = queue_[idx].Push(msg);
+  writing_.store(false, memory_order_relaxed);
+
   if (!ok) {
-    // Flush return false means the reader thread is sleeping,
-    // so send a signal to wake up the reader
+    return false;
+  }
+  // if reader thread is sleeping, send a signal to wake up the reader
+  if (!has_unread_data_.test_and_set(std::memory_order_acquire)) {
     signaler_.Send();
   }
+
+  return true;
 }
 
-int
-Mailbox::Recv(IMessage** msg, int timeout) {
-  // Try to get the command straight away.
-  if (active_) {
-    if (pipe_.Read(msg)) {
-      // if read success, return
-      return kOK;
-    }
-    // If there are no more commands available, switch into passive state.
-    active_ = false;
-  }
-  //  Wait for signal from the command sender.
-  int rc = signaler_.Wait(timeout);
-  if (rc == -1) {
-    return kError;
+void
+Mailbox::Recv(IMessage** msg) {
+  // switch the reader and writer queue
+  short writer_idx = writer_index_.load(memory_order_acquire);
+  writer_index_.store(1 - writer_idx, memory_order_acquire);  
+
+  // clear the has_unread_data_ flag, so if there is new written data, 
+  // writer thread will wake up reader thread
+  has_unread_data_.clear();
+
+  // wait for writer thread end operation
+  while (writing_.load(memory_order_acquire)) {
   }
 
-  //  Receive the signal.
-  rc = static_cast<int>(signaler_.RecvFailable());
-  if (rc == -1) {
-    return kError;
-  }
+  IMessage *ret, *next;
 
-  //  Switch into active state.
-  active_ = true;
-  pipe_.Read(msg);
-  return kOK;
+  // old writer queue now is the reader queue
+  LockFreeQueue<IMessage*> *queue = &(queue_[writer_idx]);
+
+  // cause there is only one read thread,so no need thread-safe pop operation
+  queue->UnsafePop(ret);
+  // save message queue head
+  *msg = ret;
+
+  while (queue->UnsafePop(next)) {
+    ret->Next(next);
+    ret = next;
+  }
 }
 
 };

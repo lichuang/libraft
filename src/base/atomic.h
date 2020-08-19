@@ -40,8 +40,9 @@ public:
     return cmp;
   }
 
+  inline T* ptr() { return ptr_; }
 private:
-  std::atomic<T *> ptr_;
+  std::atomic<T*> ptr_;
 
   DISALLOW_COPY_AND_ASSIGN(AtomicPointer);
 };

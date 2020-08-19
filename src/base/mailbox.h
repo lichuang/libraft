@@ -4,10 +4,10 @@
 
 #pragma once
 
+#include <atomic>
 #include "base/define.h"
+#include "base/lockfree_queue.h"
 #include "base/typedef.h"
-#include "base/ypipe.h"
-#include "base/mutex.h"
 #include "base/signaler.h"
 
 namespace libraft {
@@ -23,26 +23,24 @@ public:
   fd_t Fd() const {
     return signaler_.Fd();
   }
-  void Send(IMessage *);
-  int  Recv(IMessage **, int timeout);
+  bool  Send(IMessage *);
+  void  Recv(IMessage **);
 
 private:
-  // The pipe to store actual commands.
-  typedef YPipe<IMessage*, 16> cpipe_t;
-  cpipe_t pipe_;
-
   // Signaler to pass signals from writer thread to reader thread.
   Signaler signaler_;
 
-  //  There's only one thread receiving from the mailbox, but there
-  //  is arbitrary number of threads sending. Given that ypipe requires
-  //  synchronised access on both of its endpoints, we have to synchronise
-  //  the sending side.
-  Mutex sync_;
+  // True if there is unread data,is so, writer thread has to wakeup reader thread
+  std::atomic_flag has_unread_data_;
 
-  //  True if the underlying pipe is active, ie. when we are allowed to
-  //  read commands from it.
-  bool active_;
+  // True if there is thread writing data
+  std::atomic_bool writing_;
+
+  // one for multi writer threads,one for single reader thread
+  LockFreeQueue<IMessage*> queue_[2];
+
+  // current writer queue index
+  std::atomic_short writer_index_;
 
   DISALLOW_COPY_AND_ASSIGN(Mailbox);
 };

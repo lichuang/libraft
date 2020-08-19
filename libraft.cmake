@@ -6,6 +6,7 @@ set(libraft_files
   src/base/signaler.cc 
   src/base/spin_lock.cc   
   src/base/thread.cc  
+  src/base/worker.cc  
 )
 
 add_library(raft 

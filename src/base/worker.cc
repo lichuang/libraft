@@ -2,48 +2,47 @@
  * Copyright (C) lichuang
  */
 
+#include "base/event.h"
+#include "base/event_loop.h"
+#include "base/message.h"
+#include "base/mailbox.h"
 #include "base/worker.h"
 
 namespace libraft {
 
 Worker::Worker(const string &name)
   : Thread(name),
-    poller_(new Epoll()) {
-  int rc = poller_->Init(1024);
-  if (rc != kOK) {
-    return;
-  }
-
+    mailbox_(new Mailbox()),
+    ev_loop_(new EventLoop()),
+    event_(NULL) {  
   // add mailbox signal fd into poller
-  fd_t fd = mailbox_.Fd();
-  handle_ = poller_->Add(fd, this);
+  fd_t fd = mailbox_->Fd();
+
+  event_ = new Event(ev_loop_, fd, this);
+  event_->EnableRead();
 }
 
 Worker::~Worker() {
-  delete poller_;
+  delete mailbox_;
+  delete ev_loop_;
+  delete event_;
 }
 
 void
-Worker::In() {
-  IMessage* msg;
-  int rc = mailbox_.Recv(&msg, 0);
+Worker::handleRead(Event*) {
+  IMessage* msg, *next;
+  mailbox_->Recv(&msg);
 
-  while (rc == 0 || errno == EINTR) {
-    if (rc == 0)  {
-      msg->Process();
-      delete msg;
-    }
-    rc = mailbox_.Recv(&msg, 0);
+  while (msg) {
+    next = msg->Next();
+    //msg->Process();
+    delete msg;    
+    msg = next;
   }
 }
 
 void
-Worker::Out() {
-  // nothing to do
-}
-
-void
-Worker::Timeout() {
+Worker::handleWrite(Event*) {
   // nothing to do
 }
 
@@ -53,14 +52,12 @@ Worker::Process(IMessage *msg) {
 
 void
 Worker::Send(IMessage *msg) {
-  mailbox_.Send(msg);
+  mailbox_->Send(msg);
 }
 
 void
 Worker::Run() {
-  while (Running()) {
-    poller_->Dispatch();
-  }
+  ev_loop_->Run();
 }
 
 };

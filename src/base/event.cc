@@ -9,7 +9,7 @@
 
 namespace libraft {
 
-IEvent::IEvent(EventLoop* loop, fd_t fd, IEventHandler *handler)
+Event::Event(EventLoop* loop, fd_t fd, IEventHandler *handler)
   : loop_(loop),
     fd_(fd),
     handler_(handler),
@@ -19,12 +19,12 @@ IEvent::IEvent(EventLoop* loop, fd_t fd, IEventHandler *handler)
   memset(event_, 0, sizeof(struct event));  
 }
 
-IEvent::~IEvent() {
+Event::~Event() {
   Close();
 }
 
 void
-IEvent::Close() {
+Event::Close() {
   if (event_) {
     event_del(event_);
     delete event_;
@@ -33,27 +33,27 @@ IEvent::Close() {
 }
 
 void 
-IEvent::DetachFromLoop() {
+Event::DetachFromLoop() {
   if (event_del(event_) == 0) {
     attached_ = false;
   }
 }
 
 void 
-IEvent::AttachToLoop() {
-    if (attached_) {
-      DetachFromLoop();
-    }
+Event::AttachToLoop() {
+  if (attached_) {
+    DetachFromLoop();
+  }
 
-    ::event_assign(event_, (struct event_base *)loop_->EventBase(), fd_, 
-                flags_ | EV_PERSIST, &IEvent::Handle, this);
-    if (::event_add(event_, NULL) == 0) {
-        attached_ = true;
-    }
+  ::event_assign(event_, (struct event_base *)loop_->EventBase(), fd_, 
+                flags_ | EV_PERSIST, &Event::Handle, this);
+  if (::event_add(event_, NULL) == 0) {
+    attached_ = true;
+  }
 }
 
 void 
-IEvent::updateEventLoop() {
+Event::updateEventLoop() {
   if (IsNoneEvent()) {
     DetachFromLoop();
   } else {
@@ -62,7 +62,7 @@ IEvent::updateEventLoop() {
 }
 
 void 
-IEvent::EnableRead() {
+Event::EnableRead() {
   int flags = flags_;
   flags_ |= kReadable;
 
@@ -72,7 +72,7 @@ IEvent::EnableRead() {
 }
 
 void 
-IEvent::EnableWrite() {
+Event::EnableWrite() {
   int flags = flags_;
   flags_ |= kWritable;
 
@@ -82,7 +82,7 @@ IEvent::EnableWrite() {
 }
 
 void 
-IEvent::DisableRead() {
+Event::DisableRead() {
   int flags = flags_;
   flags_ &= (~kReadable);
 
@@ -92,7 +92,7 @@ IEvent::DisableRead() {
 }
 
 void 
-IEvent::DisableWrite() {
+Event::DisableWrite() {
   int flags = flags_;
   flags_ &= (~kWritable);
 
@@ -102,7 +102,7 @@ IEvent::DisableWrite() {
 }
 
 void 
-IEvent::DisableAllEvent() {
+Event::DisableAllEvent() {
   if (flags_ == kNone) {
     return;
   }
@@ -112,7 +112,7 @@ IEvent::DisableAllEvent() {
 }
 
 void 
-IEvent::Handle(fd_t fd, short which) {
+Event::Handle(fd_t fd, short which) {
   if ((which & kReadable) && event_) {
     handler_->handleRead(this);
   }
@@ -123,8 +123,8 @@ IEvent::Handle(fd_t fd, short which) {
 }
 
 void 
-IEvent::Handle(fd_t fd, short which, void* v) {
-  IEvent* ev = (IEvent*)v;
+Event::Handle(fd_t fd, short which, void* v) {
+  Event* ev = (Event*)v;
   ev->Handle(fd, which);
 }
 

@@ -6,24 +6,24 @@
 
 #include "base/typedef.h"
 
-class EventLoop;
 struct event;
 
 namespace libraft {
 
-class IEvent;
+class Event;
+class EventLoop;
 
 class IEventHandler {
 public:
   virtual ~IEventHandler() {}
 
-  virtual void handleRead(IEvent*) = 0;
+  virtual void handleRead(Event*) = 0;
 
-  virtual void handleWrite(IEvent*) = 0;
+  virtual void handleWrite(Event*) = 0;
 };
 
-// virtual class for notify events
-class IEvent {
+// base class for notify events
+class Event {
 public:
   enum EventFlag {
     kNone     = 0x00,
@@ -31,8 +31,8 @@ public:
     kWritable = 0x04,
   };
 
-  IEvent(EventLoop*, fd_t, IEventHandler*);
-  virtual ~IEvent();
+  Event(EventLoop*, fd_t, IEventHandler*);
+  virtual ~Event();
 
   void* EventData() { return event_; }
   
