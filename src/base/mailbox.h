@@ -12,7 +12,7 @@
 
 namespace libraft {
 
-class Message;
+class IMessage;
 
 // worker message mailbox
 class Mailbox {
@@ -23,12 +23,12 @@ public:
   fd_t Fd() const {
     return signaler_.Fd();
   }
-  void Send(Message *);
-  int  Recv(Message **, int timeout);
+  void Send(IMessage *);
+  int  Recv(IMessage **, int timeout);
 
 private:
   // The pipe to store actual commands.
-  typedef YPipe<Message*, 16> cpipe_t;
+  typedef YPipe<IMessage*, 16> cpipe_t;
   cpipe_t pipe_;
 
   // Signaler to pass signals from writer thread to reader thread.

@@ -9,7 +9,7 @@
 
 namespace libraft {
 
-class Event;
+class IEvent;
 
 class EventLoop {
 public:

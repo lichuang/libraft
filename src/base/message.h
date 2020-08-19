@@ -12,10 +12,10 @@ namespace libraft {
 
 class MessageHandler;
 
-class Message {
+class IMessage {
   friend class MessageHandler;
 public:
-  virtual ~Message() {}
+  virtual ~IMessage() {}
 
   MessageType Type() const { return type_; }
   

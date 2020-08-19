@@ -9,7 +9,7 @@
 
 namespace libraft {
 
-class Message;
+class IMessage;
 class Mailbox;
 
 struct EntityRef {
@@ -23,15 +23,15 @@ public:
     // register in worker
   }
 
-  void Send(Message* msg) {
+  void Send(IMessage* msg) {
 
   }
 
-  void Ask(Message* msg, int timeout, Message* response) { 
+  void Ask(IMessage* msg, int timeout, IMessage* response) { 
 
   }
 
-  virtual void Handle(Message* msg) = 0;
+  virtual void Handle(IMessage* msg) = 0;
 
 protected:
   EntityRef ref_;

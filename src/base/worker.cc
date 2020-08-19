@@ -25,7 +25,7 @@ Worker::~Worker() {
 
 void
 Worker::In() {
-  Message* msg;
+  IMessage* msg;
   int rc = mailbox_.Recv(&msg, 0);
 
   while (rc == 0 || errno == EINTR) {
@@ -48,11 +48,11 @@ Worker::Timeout() {
 }
 
 void
-Worker::Process(Message *msg) {
+Worker::Process(IMessage *msg) {
 }
 
 void
-Worker::Send(Message *msg) {
+Worker::Send(IMessage *msg) {
   mailbox_.Send(msg);
 }
 

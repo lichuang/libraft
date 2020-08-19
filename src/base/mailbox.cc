@@ -16,7 +16,7 @@ Mailbox::Mailbox()
 Mailbox::~Mailbox() {
 }
 
-void Mailbox::Send(Message *msg) {
+void Mailbox::Send(IMessage *msg) {
   // multi write single read mode
   sync_.Lock();
   pipe_.Write(msg, false);
@@ -30,7 +30,7 @@ void Mailbox::Send(Message *msg) {
 }
 
 int
-Mailbox::Recv(Message** msg, int timeout) {
+Mailbox::Recv(IMessage** msg, int timeout) {
   // Try to get the command straight away.
   if (active_) {
     if (pipe_.Read(msg)) {

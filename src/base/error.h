@@ -23,7 +23,7 @@ public:
 
   int Code() const { return errCode_; }
 
-  const std::string& Message() const { return errMsg_; }
+  const std::string& IMessage() const { return errMsg_; }
 
 private:
   int errCode_;

@@ -21,14 +21,14 @@ public:
   virtual ~Worker();
 
   // process message handler
-  virtual void Process(Message*);
+  virtual void Process(IMessage*);
 
   Poller* GetPoller() {
     return poller_;
   }
 
   // send message to the worker
-  void Send(Message *msg);
+  void Send(IMessage *msg);
   
 protected:  
   virtual void Run();

@@ -11,19 +11,19 @@ struct event;
 
 namespace libraft {
 
-class Event;
+class IEvent;
 
-class EventHandler {
+class IEventHandler {
 public:
-  virtual ~EventHandler() {}
+  virtual ~IEventHandler() {}
 
-  virtual void handleRead(Event*) = 0;
+  virtual void handleRead(IEvent*) = 0;
 
-  virtual void handleWrite(Event*) = 0;
+  virtual void handleWrite(IEvent*) = 0;
 };
 
 // virtual class for notify events
-class Event {
+class IEvent {
 public:
   enum EventFlag {
     kNone     = 0x00,
@@ -31,8 +31,8 @@ public:
     kWritable = 0x04,
   };
 
-  Event(EventLoop*, fd_t, EventHandler*);
-  virtual ~Event();
+  IEvent(EventLoop*, fd_t, IEventHandler*);
+  virtual ~IEvent();
 
   void* EventData() { return event_; }
   
@@ -70,7 +70,7 @@ protected:
   EventLoop* loop_;
   fd_t fd_;
 
-  EventHandler* handler_;
+  IEventHandler* handler_;
   // event flags
   int flags_;
 

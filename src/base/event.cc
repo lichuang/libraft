@@ -9,7 +9,7 @@
 
 namespace libraft {
 
-Event::Event(EventLoop* loop, fd_t fd, EventHandler *handler)
+IEvent::IEvent(EventLoop* loop, fd_t fd, IEventHandler *handler)
   : loop_(loop),
     fd_(fd),
     handler_(handler),
@@ -19,12 +19,12 @@ Event::Event(EventLoop* loop, fd_t fd, EventHandler *handler)
   memset(event_, 0, sizeof(struct event));  
 }
 
-Event::~Event() {
+IEvent::~IEvent() {
   Close();
 }
 
 void
-Event::Close() {
+IEvent::Close() {
   if (event_) {
     event_del(event_);
     delete event_;
@@ -33,27 +33,27 @@ Event::Close() {
 }
 
 void 
-Event::DetachFromLoop() {
+IEvent::DetachFromLoop() {
   if (event_del(event_) == 0) {
     attached_ = false;
   }
 }
 
 void 
-Event::AttachToLoop() {
+IEvent::AttachToLoop() {
     if (attached_) {
       DetachFromLoop();
     }
 
     ::event_assign(event_, (struct event_base *)loop_->EventBase(), fd_, 
-                flags_ | EV_PERSIST, &Event::Handle, this);
+                flags_ | EV_PERSIST, &IEvent::Handle, this);
     if (::event_add(event_, NULL) == 0) {
         attached_ = true;
     }
 }
 
 void 
-Event::updateEventLoop() {
+IEvent::updateEventLoop() {
   if (IsNoneEvent()) {
     DetachFromLoop();
   } else {
@@ -62,7 +62,7 @@ Event::updateEventLoop() {
 }
 
 void 
-Event::EnableRead() {
+IEvent::EnableRead() {
   int flags = flags_;
   flags_ |= kReadable;
 
@@ -72,7 +72,7 @@ Event::EnableRead() {
 }
 
 void 
-Event::EnableWrite() {
+IEvent::EnableWrite() {
   int flags = flags_;
   flags_ |= kWritable;
 
@@ -82,7 +82,7 @@ Event::EnableWrite() {
 }
 
 void 
-Event::DisableRead() {
+IEvent::DisableRead() {
   int flags = flags_;
   flags_ &= (~kReadable);
 
@@ -92,7 +92,7 @@ Event::DisableRead() {
 }
 
 void 
-Event::DisableWrite() {
+IEvent::DisableWrite() {
   int flags = flags_;
   flags_ &= (~kWritable);
 
@@ -102,7 +102,7 @@ Event::DisableWrite() {
 }
 
 void 
-Event::DisableAllEvent() {
+IEvent::DisableAllEvent() {
   if (flags_ == kNone) {
     return;
   }
@@ -112,7 +112,7 @@ Event::DisableAllEvent() {
 }
 
 void 
-Event::Handle(fd_t fd, short which) {
+IEvent::Handle(fd_t fd, short which) {
   if ((which & kReadable) && event_) {
     handler_->handleRead(this);
   }
@@ -123,8 +123,8 @@ Event::Handle(fd_t fd, short which) {
 }
 
 void 
-Event::Handle(fd_t fd, short which, void* v) {
-  Event* ev = (Event*)v;
+IEvent::Handle(fd_t fd, short which, void* v) {
+  IEvent* ev = (IEvent*)v;
   ev->Handle(fd, which);
 }
 

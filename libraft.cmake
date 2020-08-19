@@ -8,7 +8,7 @@ set(libraft_files
   src/base/thread.cc  
 )
 
-add_library(serverkit 
-  ${serverkit_SHARED_OR_STATIC}
+add_library(raft 
+  ${raft_SHARED_OR_STATIC}
   ${libraft_files}
 )
