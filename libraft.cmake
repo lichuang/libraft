@@ -1,5 +1,6 @@
 set(libraft_files
-  src/base/condition.cc    
+  src/base/condition.cc  
+  src/base/entity.cc    
   src/base/event_loop.cc 
   src/base/event.cc   
   src/base/mailbox.cc   

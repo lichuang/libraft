@@ -8,7 +8,6 @@
 #include "base/define.h"
 #include "base/lockfree_queue.h"
 #include "base/typedef.h"
-#include "base/signaler.h"
 
 namespace libraft {
 
@@ -21,16 +20,10 @@ public:
   Mailbox(Worker*);
   ~Mailbox();
 
-  fd_t Fd() const {
-    return signaler_.Fd();
-  }
   bool  Send(IMessage *);
   void  Recv();
 
 private:
-  // Signaler to pass signals from writer thread to reader thread.
-  Signaler signaler_;
-
   // True if there is unread data,is so, writer thread has to wakeup reader thread
   std::atomic_flag notified_;
 

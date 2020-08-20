@@ -21,4 +21,10 @@ void
 EventLoop::Run() {
   event_base_dispatch(ev_base_);
 }
+
+void 
+EventLoop::Stop() {
+  event_base_loopexit(ev_base_, NULL);
+}
+
 };

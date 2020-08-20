@@ -18,7 +18,8 @@ public:
   ~EventLoop();
 
   void Run();
-
+  void Stop();
+  
   void* EventBase() {
     return ev_base_;
   }

@@ -19,6 +19,7 @@ typedef pthread_t tid_t;
 enum ThreadState {
   kThreadNone,
   kThreadRunning,
+  kThreadStopping,
   kThreadStopped,
 };
 
@@ -59,7 +60,7 @@ protected:
     
   }
 
-private:
+protected:
   tid_t tid_;
   string name_;
   ThreadState state_;

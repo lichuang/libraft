@@ -5,37 +5,39 @@
 #pragma once
 
 #include "base/define.h"
+#include "base/entity.h"
 #include "base/error.h"
+#include "base/message_type.h"
 #include "base/typedef.h"
 
 namespace libraft {
 
 class MessageHandler;
 
-class IMessage {
-  friend class MessageHandler;
+struct IMessage {
 public:
-  IMessage() : next_(NULL) {}
+  IMessage(MessageType typ, bool isResponse = false) 
+    : type_(typ),
+      isResponse_(isResponse) {}
+
   virtual ~IMessage() {}
-
-  MessageType Type() const { return type_; }
   
-  void Next(IMessage* next) {
-    next_ = next;
+  void setDstEntiity(const EntityRef& ref) {
+    dstRef_ = ref;
   }
 
-  IMessage* Next() {
-    return next_;
+  void responseFor(IMessage *msg) {
+    isResponse_ = true;
+    srcRef_ = msg->dstRef_;
+    dstRef_ = msg->srcRef_;
   }
 
-protected:
   MessageId id_;
-  EntityId srcId_;
-  EntityId dstId_;
+  EntityRef srcRef_;
+  EntityRef dstRef_;
   Error error_;
   MessageType type_;
   bool isResponse_;
-  IMessage *next_;
 };
 
 class MessageHandler {

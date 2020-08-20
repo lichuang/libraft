@@ -32,7 +32,7 @@ Mailbox::Send(IMessage *msg) {
   }
   // if reader thread is sleeping, send a signal to wake up the reader
   if (!notified_.test_and_set(std::memory_order_acquire)) {
-    signaler_.Send();
+    worker_->notify();
   }
 
   return true;
@@ -40,8 +40,6 @@ Mailbox::Send(IMessage *msg) {
 
 void
 Mailbox::Recv() {
-  signaler_.Recv();
-
   // switch the reader and writer queue
   short writer_idx = writer_index_.load(memory_order_acquire);
   writer_index_.store(1 - writer_idx, memory_order_acquire);  
