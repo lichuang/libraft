@@ -20,8 +20,11 @@ EntityRef::Response(IMessage* msg, IMessage* srcMsg) {
 }
 
 void 
-IEntity::Ask(IMessage* msg, MessageResponseFn fn) {
+IEntity::Ask(const EntityRef& dstRef, IMessage* msg, MessageResponseFn fn) {
   resp_fn_map_[msg->type_] = fn;
+  msg->setDstEntiity(dstRef);
+  msg->setSrcEntiity(ref_);
+  dstRef.worker->Send(msg);  
 }
 
 void 

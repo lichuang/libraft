@@ -49,7 +49,7 @@ public:
 
   void Send(IMessage* msg);
   
-  void Ask(IMessage* msg, MessageResponseFn fn);
+  void Ask(const EntityRef& dstRef, IMessage* msg, MessageResponseFn fn);
 
   virtual void Handle(IMessage* msg) = 0;
   void HandleResponse(IMessage* msg);

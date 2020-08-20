@@ -26,6 +26,10 @@ public:
     dstRef_ = ref;
   }
 
+  void setSrcEntiity(const EntityRef& ref) {
+    srcRef_ = ref;
+  }
+
   void responseFor(IMessage *msg) {
     isResponse_ = true;
     srcRef_ = msg->dstRef_;

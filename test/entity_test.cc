@@ -13,6 +13,7 @@ using namespace libraft;
 using namespace std;
 
 TEST(EntityTest, send_msg) {
+  return;
   static int kTestEntityMsgType = 10100;
   struct TestEntityMsg1;
 
@@ -80,6 +81,7 @@ TEST(EntityTest, ask_msg) {
   class TestAskEntity : public IEntity {
   public:
     void Handle(IMessage* m) {
+
     }
   };
 
@@ -88,7 +90,7 @@ TEST(EntityTest, ask_msg) {
     void Handle(IMessage* m) {      
       TestAskEntityMsg* msg = (TestAskEntityMsg*)m;
       TestAskRespEntityMsg* resp = new TestAskRespEntityMsg(msg->str_);
-      msg->dstRef_.Response(resp, msg);      
+      msg->srcRef_.Response(resp, msg);            
     }
   };
 
@@ -106,7 +108,7 @@ TEST(EntityTest, ask_msg) {
   TestAskEntityMsg *msg = new TestAskEntityMsg("libraft");
   ASSERT_EQ(msg->str_, "libraft");
 
-  te1.Ask(msg, [](const IMessage* m) {
+  te1.Ask(te2.Ref(), msg, [](const IMessage* m) {
     TestAskRespEntityMsg* respmsg = (TestAskRespEntityMsg*)m;
     ASSERT_EQ(respmsg->str_, string("hello ") + "libraft");
     std::cout << "!!!\n";
