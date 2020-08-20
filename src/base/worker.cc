@@ -12,9 +12,10 @@ namespace libraft {
 
 Worker::Worker(const string &name)
   : Thread(name),
-    mailbox_(new Mailbox()),
+    mailbox_(NULL),
     ev_loop_(new EventLoop()),
     event_(NULL) {  
+  mailbox_ = new Mailbox(this);
   // add mailbox signal fd into poller
   fd_t fd = mailbox_->Fd();
 
@@ -30,15 +31,7 @@ Worker::~Worker() {
 
 void
 Worker::handleRead(Event*) {
-  IMessage* msg, *next;
-  mailbox_->Recv(&msg);
-
-  while (msg) {
-    next = msg->Next();
-    //msg->Process();
-    delete msg;    
-    msg = next;
-  }
+  mailbox_->Recv();
 }
 
 void
@@ -47,7 +40,7 @@ Worker::handleWrite(Event*) {
 }
 
 void
-Worker::Process(IMessage *msg) {
+Worker::process(IMessage *msg) {
 }
 
 void

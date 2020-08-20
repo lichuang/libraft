@@ -22,6 +22,9 @@ public:
   void* EventBase() {
     return ev_base_;
   }
+
+  void Add(Event*, int flags);
+  
 private:
   struct event_base *ev_base_;
 

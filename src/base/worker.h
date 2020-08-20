@@ -6,6 +6,7 @@
 
 #include <string>
 #include "base/define.h"
+#include "base/entity.h"
 #include "base/event.h"
 #include "base/thread.h"
 
@@ -15,17 +16,16 @@ namespace libraft {
 
 class Event;
 class EventLoop;
+class Mailbox;
 
 // worker thread
 // inside the worker there is a mailbox,
 // other threads can communicate to the thread using message though mailbox
 class Worker : public Thread, public IEventHandler {
+  friend class Mailbox;
 public:
   Worker(const string& name);
   virtual ~Worker();
-
-  // process message handler
-  virtual void Process(IMessage*);
 
   // send message to the worker
   void Send(IMessage *msg);
@@ -34,6 +34,9 @@ public:
 
   virtual void handleWrite(Event*);
     
+private:
+  void process(IMessage*);
+
 protected:  
   virtual void Run();
 

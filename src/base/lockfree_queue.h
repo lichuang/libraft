@@ -13,11 +13,11 @@ namespace libraft {
 
 template <typename T>
 class LockFreeQueue {
+private:
   typedef unsigned long tagged_node_t;
   static const int kLockFreeCacheLineBytes = 64;
   static const int kPaddingSize = kLockFreeCacheLineBytes - sizeof(tagged_node_t);
-
-private:
+	
 	struct node {
 		T data;
 		atomic_ulong next;
@@ -65,13 +65,15 @@ public:
 
   // pop without atomic operation
   bool UnsafePop(T &ret) {
-		node *next   = tag2nextNodePtr(head_);
+		node *next = tag2nextNodePtr(head_);
+		node *head = tag2nodePtr(head_);
 
     if (!next) {
       return false;
     }
 
     ret = next->data;
+		delete head;
     head_ = (tagged_node_t)next;
     return true;
   }

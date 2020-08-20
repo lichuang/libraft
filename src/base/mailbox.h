@@ -13,25 +13,26 @@
 namespace libraft {
 
 class IMessage;
+class Worker;
 
-// worker message mailbox
+// worker thread message mailbox
 class Mailbox {
 public:
-  Mailbox();
+  Mailbox(Worker*);
   ~Mailbox();
 
   fd_t Fd() const {
     return signaler_.Fd();
   }
   bool  Send(IMessage *);
-  void  Recv(IMessage **);
+  void  Recv();
 
 private:
   // Signaler to pass signals from writer thread to reader thread.
   Signaler signaler_;
 
   // True if there is unread data,is so, writer thread has to wakeup reader thread
-  std::atomic_flag has_unread_data_;
+  std::atomic_flag notified_;
 
   // True if there is thread writing data
   std::atomic_bool writing_;
@@ -42,6 +43,7 @@ private:
   // current writer queue index
   std::atomic_short writer_index_;
 
+  Worker *worker_;
   DISALLOW_COPY_AND_ASSIGN(Mailbox);
 };
 

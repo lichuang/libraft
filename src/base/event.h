@@ -22,15 +22,15 @@ public:
   virtual void handleWrite(Event*) = 0;
 };
 
+enum EventFlag {
+  kNone     = 0x00,
+  kReadable = 0x02,
+  kWritable = 0x04,
+};
+
 // base class for notify events
 class Event {
 public:
-  enum EventFlag {
-    kNone     = 0x00,
-    kReadable = 0x02,
-    kWritable = 0x04,
-  };
-
   Event(EventLoop*, fd_t, IEventHandler*);
   virtual ~Event();
 
