@@ -15,24 +15,49 @@ using namespace std;
 
 namespace libraft {
 
+class workerEntity : public IEntity {
+public:
+  workerEntity() {
+  }
+
+  virtual ~workerEntity() {
+  }
+
+  void Handle(IMessage* m) {
+  }
+
+};
+
+thread_local static Worker* gWorker;
+
 Worker::Worker(const string &name)
   : Thread(name),
-    mailbox_(NULL),
+    mailbox_(nullptr),
     ev_loop_(new EventLoop()),
-    event_(NULL),
-    current_(0) {  
+    event_(nullptr),
+    current_(0),
+    worker_entity_(nullptr),
+    current_msg_id_(0) {  
   mailbox_ = new Mailbox(this);
-  // add mailbox signal fd into poller
+  // add mailbox signal fd into event loop
   fd_t fd = signaler_.Fd();
 
   event_ = new Event(ev_loop_, fd, this);
   event_->EnableRead();
+
+  // worker entity is the id 1 entity in each worker
+  worker_entity_ = new workerEntity();
+  AddEntity(worker_entity_);
+
+  // save TLS worker pointer
+  gWorker = this;
 }
 
 Worker::~Worker() {
   delete mailbox_;
   delete ev_loop_;
   delete event_;
+  delete worker_entity_;
 }
 
 void 
@@ -62,6 +87,11 @@ Worker::handleRead(Event*) {
 void
 Worker::handleWrite(Event*) {
   // nothing to do
+}
+
+MessageId 
+Worker::newMsgId() {
+  return ++current_msg_id_;
 }
 
 void
@@ -110,6 +140,16 @@ Worker::Stop() {
   signaler_.Send();
   Join();
   mailbox_->Recv();
+}
+
+void 
+Sendto(IEntity* dst, IMessage* msg) {
+  gWorker->worker_entity_->Sendto(dst, msg);
+}
+
+MessageId 
+newMsgId() {
+  return gWorker->newMsgId();
 }
 
 };

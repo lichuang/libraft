@@ -14,42 +14,42 @@ using namespace std;
 
 TEST(EntityTest, send_msg) {
   return;
-  static int kTestEntityMsgType = 10100;
+  static int kTestSendEntityMsgType = 10100;
+  static int test_num = 10101;
   struct TestEntityMsg1;
 
-  struct TestEntityMsg1: public IMessage {
+  struct TestSendEntityMsg: public IMessage {
   public:
-    TestEntityMsg1(int *t)
-      : IMessage(kTestEntityMsgType),
+    TestSendEntityMsg(int *t)
+      : IMessage(kTestSendEntityMsgType),
         num_(t) {
     }
 
     int* num_;
   };
 
-  class TestEntity1 : public IEntity {
+  class TestEntity : public IEntity {
   public:
     void Handle(IMessage* m) {
-      TestEntityMsg1* msg = (TestEntityMsg1*)m;
-      *(msg->num_) = 101;
+      TestSendEntityMsg* msg = (TestSendEntityMsg*)m;
+      *(msg->num_) = test_num;
     }
   };
 
   int a = 10;
 
   Worker worker1("worker1");
-  //Worker worker2("worker1");
 
   worker1.Start();
-  TestEntity1 te1;
+  TestEntity te1;
   worker1.AddEntity(&te1);
 
-  IMessage *msg = new TestEntityMsg1(&a);
-  te1.Send(msg);
+  IMessage *msg = new TestSendEntityMsg(&a);
+  Sendto(&te1, msg);
 
   worker1.Stop();
 
-  ASSERT_EQ(a, 101);
+  ASSERT_EQ(a, test_num);
 }
 
 TEST(EntityTest, ask_msg) {

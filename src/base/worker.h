@@ -21,11 +21,18 @@ class EventLoop;
 class Mailbox;
 class IEntity;
 
+extern void Sendto(IEntity* dst, IMessage* msg);
+extern MessageId newMsgId();
+
 // worker thread
 // inside the worker there is a mailbox,
 // other threads can communicate to the thread using message though mailbox
 class Worker : public Thread, public IEventHandler {
   friend class Mailbox;
+
+  friend void Sendto(IEntity* dst, IMessage* msg);
+  friend MessageId newMsgId();
+
 public:
   Worker(const string& name);
   virtual ~Worker();
@@ -33,8 +40,8 @@ public:
   void AddEntity(IEntity*);
 
   // send message to the worker
-  void Send(IMessage *msg);
-    
+  void Send(IMessage *msg);    
+
   virtual void handleRead(Event*);
 
   virtual void handleWrite(Event*);
@@ -46,6 +53,8 @@ private:
   void processMsgInEntity(IMessage*);
   void notify();
   
+  MessageId newMsgId();
+
 protected:  
   virtual void Run();
 
@@ -64,8 +73,12 @@ protected:
   typedef map<EntityId, IEntity*> EntityMap;
   EntityMap entities_;
 
+  // default worker entity
+  IEntity *worker_entity_;
+
+  // message id
+  MessageId current_msg_id_;
   DISALLOW_COPY_AND_ASSIGN(Worker);
 };
 
-extern void     registerEntiry(EntityId id, IEntity*);
 };

@@ -8,7 +8,7 @@
 #include <sys/eventfd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include "base/error.h"
+#include "base/status.h"
 #include "base/signaler.h"
 
 namespace libraft {

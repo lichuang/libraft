@@ -16,6 +16,7 @@ class IMessage;
 class Worker;
 class IEntity;
 
+// entity reference composed by worker and entity id
 struct EntityRef {
   Worker *worker;
   EntityId id;
@@ -27,7 +28,7 @@ struct EntityRef {
   void Send(IMessage* msg);
   void Response(IMessage* msg, IMessage* srcMsg);
 
-  EntityRef& operator =(const EntityRef& ref) {
+  EntityRef& operator= (const EntityRef& ref) {
     worker = ref.worker;
     id = ref.id;
 
@@ -37,27 +38,33 @@ struct EntityRef {
 
 class IEntity {
   friend class Worker;
-
   typedef std::function<void(const IMessage*)> MessageResponseFn;
+
 public:
   IEntity() { 
+  }
+
+  virtual ~IEntity() {
   }
 
   const EntityRef& Ref() const {
     return ref_;
   }
 
-  void Send(IMessage* msg);
+  void Sendto(IEntity* dst, IMessage* msg);
   
   void Ask(const EntityRef& dstRef, IMessage* msg, MessageResponseFn fn);
 
-  virtual void Handle(IMessage* msg) = 0;
   void HandleResponse(IMessage* msg);
+
+  virtual void Handle(IMessage* msg) {}
 
 protected:
   EntityRef ref_;
-  typedef std::map<int, MessageResponseFn> MessageResponseMap;
+  typedef std::map<MessageId, MessageResponseFn> MessageResponseMap;
   MessageResponseMap resp_fn_map_;
 };
 
+// the global Sendto function, message src entity is the worker entity
+extern void Sendto(IEntity* dst, IMessage* msg);
 };

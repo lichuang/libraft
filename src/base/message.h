@@ -6,19 +6,25 @@
 
 #include "base/define.h"
 #include "base/entity.h"
-#include "base/error.h"
+#include "base/status.h"
 #include "base/message_type.h"
 #include "base/typedef.h"
 
 namespace libraft {
 
-class MessageHandler;
+extern MessageId newMsgId();
 
 struct IMessage {
 public:
   IMessage(MessageType typ, bool isResponse = false) 
-    : type_(typ),
-      isResponse_(isResponse) {}
+    : id_(0),
+      type_(typ),
+      isResponse_(isResponse) {
+    // response message id is the src message id
+    if (!isResponse) {
+      id_ = newMsgId();
+    }
+  }
 
   virtual ~IMessage() {}
   
@@ -34,20 +40,15 @@ public:
     isResponse_ = true;
     srcRef_ = msg->dstRef_;
     dstRef_ = msg->srcRef_;
+    id_ = msg->id_;
   }
 
   MessageId id_;
   EntityRef srcRef_;
   EntityRef dstRef_;
-  Error error_;
+  Status error_;
   MessageType type_;
   bool isResponse_;
-};
-
-class MessageHandler {
-public:
-
-  virtual ~MessageHandler() {}
 };
 
 };

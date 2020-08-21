@@ -2,7 +2,7 @@
  * Copyright (C) lichuang
  */
 
-#include "base/error.h"
+#include "base/status.h"
 #include "base/mailbox.h"
 #include "base/message.h"
 #include "base/worker.h"
