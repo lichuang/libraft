@@ -19,23 +19,23 @@ enum {
 class Status {
 public:
   Status(int code=kOK, const std::string& msg="")
-    : errCode_(code), errMsg_(msg) {
+    : code_(code), msg_(msg) {
   }
 
-  int Code() const { return errCode_; }
+  int Code() const { return code_; }
 
-  const std::string& Message() const { return errMsg_; }
+  const std::string& Message() const { return msg_; }
 
   Status& operator= (const Status& error) {
-    errCode_ = error.errCode_;
-    errMsg_ = error.errMsg_;
+    code_ = error.code_;
+    msg_ = error.msg_;
 
     return *this;
   }
 
 private:
-  int errCode_;
-  string errMsg_;
+  int code_;
+  string msg_;
 };
 
 };

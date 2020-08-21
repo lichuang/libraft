@@ -7,15 +7,16 @@
 #include <iostream>
 #include "base/entity.h"
 #include "base/message.h"
+#include "base/wait.h"
 #include "base/worker.h"
 
 using namespace libraft;
 using namespace std;
 
 TEST(EntityTest, send_msg) {
-  return;
   static int kTestSendEntityMsgType = 10100;
   static int test_num = 10101;
+  static WaitGroup wait;
   struct TestEntityMsg1;
 
   struct TestSendEntityMsg: public IMessage {
@@ -33,20 +34,22 @@ TEST(EntityTest, send_msg) {
     void Handle(IMessage* m) {
       TestSendEntityMsg* msg = (TestSendEntityMsg*)m;
       *(msg->num_) = test_num;
+      wait.Done();
     }
   };
 
   int a = 10;
+  wait.Add(1);
 
   Worker worker1("worker1");
 
-  worker1.Start();
   TestEntity te1;
   worker1.AddEntity(&te1);
 
   IMessage *msg = new TestSendEntityMsg(&a);
-  Sendto(&te1, msg);
+  Sendto(te1.Ref(), msg);
 
+  wait.Wait();
   worker1.Stop();
 
   ASSERT_EQ(a, test_num);
@@ -97,11 +100,9 @@ TEST(EntityTest, ask_msg) {
   Worker worker1("worker1");
   Worker worker2("worker2");
 
-  worker1.Start();
   TestAskEntity te1;
   worker1.AddEntity(&te1);
 
-  worker2.Start();
   TestRespEntity te2;
   worker2.AddEntity(&te2);
 

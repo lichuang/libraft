@@ -1,12 +1,9 @@
 set(libraft_files
-  src/base/condition.cc  
   src/base/entity.cc    
   src/base/event_loop.cc 
   src/base/event.cc   
   src/base/mailbox.cc   
   src/base/signaler.cc 
-  src/base/spin_lock.cc   
-  src/base/thread.cc  
   src/base/worker.cc  
 )
 

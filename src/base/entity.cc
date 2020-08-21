@@ -38,8 +38,7 @@ IEntity::HandleResponse(IMessage* msg) {
 }
 
 void 
-IEntity::Sendto(IEntity* dst, IMessage* msg) {
-  const EntityRef& dstRef = dst->Ref();
+IEntity::Sendto(const EntityRef& dstRef, IMessage* msg) {
   msg->setSrcEntiity(ref_);
   msg->setDstEntiity(dstRef);
   dstRef.worker->Send(msg);

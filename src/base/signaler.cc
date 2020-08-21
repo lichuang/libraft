@@ -53,7 +53,7 @@ Signaler::Send() {
 }
 
 int
-Signaler::Wait(int timeout) {
+Signaler::WaitGroup(int timeout) {
   struct pollfd pfd;
   pfd.fd = rfd_;
   pfd.events = POLLIN;

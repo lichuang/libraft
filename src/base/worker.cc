@@ -2,14 +2,16 @@
  * Copyright (C) lichuang
  */
 
+#include <map>
+#include <sys/prctl.h>
 #include "base/entity.h"
 #include "base/event.h"
 #include "base/event_loop.h"
 #include "base/message.h"
 #include "base/mailbox.h"
 #include "base/typedef.h"
+#include "base/wait.h"
 #include "base/worker.h"
-#include <map>
 
 using namespace std;
 
@@ -28,10 +30,13 @@ public:
 
 };
 
+// TLS worker pointer
 thread_local static Worker* gWorker;
 
 Worker::Worker(const string &name)
-  : Thread(name),
+  : state_(kThreadNone),
+    name_(name),
+    thread_(nullptr),
     mailbox_(nullptr),
     ev_loop_(new EventLoop()),
     event_(nullptr),
@@ -51,6 +56,12 @@ Worker::Worker(const string &name)
 
   // save TLS worker pointer
   gWorker = this;
+
+  // start worker thread
+  WaitGroup wg;
+  wg.Add(1);
+  thread_ = new std::thread(Worker::workerMain, this, &wg);
+  wg.Wait();
 }
 
 Worker::~Worker() {
@@ -58,6 +69,7 @@ Worker::~Worker() {
   delete ev_loop_;
   delete event_;
   delete worker_entity_;
+  delete thread_;
 }
 
 void 
@@ -79,6 +91,7 @@ void
 Worker::handleRead(Event*) {
   signaler_.Recv();
   mailbox_->Recv();
+
   if (!Running()) {
     ev_loop_->Stop();
   }
@@ -130,7 +143,14 @@ Worker::Send(IMessage *msg) {
 }
 
 void
+Worker::init() {
+  state_ = kThreadRunning;
+  ::prctl(PR_SET_NAME, name_.c_str());
+}
+
+void
 Worker::Run() {
+  init();
   ev_loop_->Run();
 }
 
@@ -138,13 +158,20 @@ void
 Worker::Stop() {
   state_ = kThreadStopping;
   signaler_.Send();
-  Join();
+  thread_->join();
   mailbox_->Recv();
+  state_ = kThreadStopped;
 }
 
 void 
-Sendto(IEntity* dst, IMessage* msg) {
-  gWorker->worker_entity_->Sendto(dst, msg);
+Worker::workerMain(Worker* worker, WaitGroup* wg) {
+  wg->Done();
+  worker->Run();
+}
+
+void 
+Sendto(const EntityRef& dstRef, IMessage* msg) {
+  gWorker->worker_entity_->Sendto(dstRef, msg);
 }
 
 MessageId 
@@ -152,4 +179,12 @@ newMsgId() {
   return gWorker->newMsgId();
 }
 
+const string& 
+CurrentThreadName() {
+  return gWorker->String();
+}
+
+ThreadId CurrentThreadId() {
+  return gWorker->Id();
+}
 };

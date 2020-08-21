@@ -18,7 +18,7 @@ public:
     return rfd_;
   }
   void Send();
-  int Wait(int timeout);
+  int WaitGroup(int timeout);
   ssize_t Recv();
 
   ssize_t RecvFailable();

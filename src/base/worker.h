@@ -7,10 +7,10 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <thread>
 #include "base/define.h"
 #include "base/event.h"
 #include "base/signaler.h"
-#include "base/thread.h"
 
 using namespace std;
 
@@ -20,17 +20,22 @@ class Event;
 class EventLoop;
 class Mailbox;
 class IEntity;
+class WaitGroup;
 
-extern void Sendto(IEntity* dst, IMessage* msg);
+typedef std::thread::id ThreadId;
+
+extern void Sendto(const EntityRef& dstRef, IMessage* msg);
 extern MessageId newMsgId();
+extern const string& CurrentThreadName();
+extern ThreadId CurrentThreadId();
 
 // worker thread
-// inside the worker there is a mailbox,
+// inside each worker there is a mailbox,
 // other threads can communicate to the thread using message though mailbox
-class Worker : public Thread, public IEventHandler {
+class Worker : public IEventHandler {
   friend class Mailbox;
 
-  friend void Sendto(IEntity* dst, IMessage* msg);
+  friend void Sendto(const EntityRef& dstRef, IMessage* msg);
   friend MessageId newMsgId();
 
 public:
@@ -48,17 +53,44 @@ public:
 
   void Stop();
 
+  ThreadId Id() {
+    return thread_->get_id();
+  }
+
+  const string& String() {
+    return name_;
+  }
+
+  bool Running() const { 
+    return state_ == kThreadRunning;
+  }
+
 private:
   void process(IMessage*);
   void processMsgInEntity(IMessage*);
   void notify();
-  
+
   MessageId newMsgId();
+
+  // after thread created, init thread info
+  void init();
 
 protected:  
   virtual void Run();
+  static void workerMain(Worker*, WaitGroup*);
+
+private:
+  enum ThreadState {
+    kThreadNone,
+    kThreadRunning,
+    kThreadStopping,
+    kThreadStopped,
+  };
 
 protected:
+  ThreadState state_;
+  std::string name_;
+  std::thread *thread_;
   Mailbox *mailbox_;
   EventLoop *ev_loop_;
   Event* event_;
