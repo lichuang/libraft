@@ -4,6 +4,7 @@ set(libraft_files
   src/base/event.cc   
   src/base/mailbox.cc   
   src/base/signaler.cc 
+  src/base/time.cc  
   src/base/worker.cc  
 
   src/core/log.cc  
