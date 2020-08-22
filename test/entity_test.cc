@@ -10,6 +10,7 @@
 #include "base/message.h"
 #include "base/wait.h"
 #include "base/worker.h"
+#include "core/log.h"
 
 using namespace libraft;
 using namespace std;
@@ -60,9 +61,12 @@ TEST(EntityTest, send_msg) {
 
 TEST(EntityTest, ask_msg) {
   static int kTestAskEntityMsgType = 10100;
+  static WaitGroup wg;
 
   struct TestAskEntityMsg;
   struct TestAskRespEntityMsg;
+
+  wg.Add(1);
 
   struct TestAskEntityMsg: public IMessage {
   public:
@@ -103,7 +107,8 @@ TEST(EntityTest, ask_msg) {
     void Handle(IMessage* m) {      
       TestAskEntityMsg* msg = (TestAskEntityMsg*)m;
       TestAskRespEntityMsg* resp = new TestAskRespEntityMsg(msg->str_);
-      msg->srcRef_.Response(resp, msg);            
+      msg->srcRef_.Response(resp, msg);   
+      Debug() << "send response";         
     }
   };
 
@@ -119,9 +124,11 @@ TEST(EntityTest, ask_msg) {
 
   te1.Ask(te2.Ref(), msg, [](const IMessage* m) {
     TestAskRespEntityMsg* respmsg = (TestAskRespEntityMsg*)m;
-    ASSERT_EQ(respmsg->str_, string("hello ") + "libraft");
-    std::cout << "!!!\n";
+    ASSERT_EQ(respmsg->str_, string("hello ") + "libraft"); 
+    wg.Done();   
   });
+
+  wg.Wait();
 
   worker1.Stop();
   worker2.Stop();

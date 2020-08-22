@@ -19,7 +19,7 @@ const int NUM_LOG_LEVELS = FATAL + 1;
 
 // An arbitrary limit on the length of a single log message.  This
 // is so that streaming can be done more efficiently.
-static const size_t kMaxLogMessageLen = 30000;
+static const size_t kMaxLogMessageLen = 4096;
 
 class LogStreamBuf : public std::streambuf {
 public:
@@ -86,9 +86,6 @@ public:
     return data_->stream_;
   }
 
-  static int logLevel();
-  static void setLogLevel(int level);
-
   typedef void (*OutputFunc)(const char* msg, int len);
   typedef void (*FlushFunc)();
   static void setOutput(OutputFunc);
@@ -104,19 +101,21 @@ private:
   int level_;
 };
 
-#define Debug if (libraft::LogMessage::logLevel() <= libraft::DEBUG) \
+extern int logLevel();
+
+#define Debug if (libraft::logLevel() <= libraft::DEBUG) \
   libraft::LogMessage(__FILE__, __LINE__, libraft::DEBUG, __func__).Stream
 
-#define Info if (libraft::LogMessage::logLevel() <= libraft::INFO) \
+#define Info if (libraft::logLevel() <= libraft::INFO) \
   libraft::LogMessage(__FILE__, __LINE__, libraft::INFO, __func__).Stream
 
-#define Warn if (libraft::LogMessage::logLevel() <= libraft::WARN) \
+#define Warn if (libraft::logLevel() <= libraft::WARN) \
   libraft::LogMessage(__FILE__, __LINE__, libraft::WARN, __func__).Stream
 
-#define Error if (libraft::LogMessage::logLevel() <= libraft::ERROR) \
+#define Error if (libraft::logLevel() <= libraft::ERROR) \
   libraft::LogMessage(__FILE__, __LINE__, libraft::ERROR, __func__).Stream
 
-#define Fatal if (libraft::LogMessage::logLevel() <= libraft::FATAL) \
+#define Fatal if (libraft::logLevel() <= libraft::FATAL) \
   libraft::LogMessage(__FILE__, __LINE__, libraft::FATAL, __func__).Stream
 
 // This class is used to explicitly ignore values in the conditional

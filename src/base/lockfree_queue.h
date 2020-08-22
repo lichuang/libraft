@@ -72,6 +72,7 @@ public:
 		node *next = tag2nextNodePtr(head_);
 		node *head = tag2nodePtr(head_);
 
+		// check is the queue is empty
     if (!next || next == head) {
       return false;
     }

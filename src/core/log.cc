@@ -69,13 +69,8 @@ LogMessage::finish() {
   data_->text_[data_->stream_.pcount()] = '\0';
 }
 
-void 
-LogMessage::setLogLevel(int level) {
-  FLAGS_loglevel = std::min(FATAL, level);
-}
-
-inline int 
-LogMessage::logLevel() {
+int 
+logLevel() {
   return FLAGS_loglevel;
 }
 

@@ -27,6 +27,7 @@ public:
   TimerEvent* event_;
 };
 
+// the default entity class bind to a worker
 class workerEntity : public IEntity {
 public:
   workerEntity(Worker* w)
@@ -54,9 +55,9 @@ workerEntity::Handle(IMessage *m) {
 }
 
 // TLS worker pointer
-thread_local static Worker* gWorker;
+thread_local static Worker* gWorker = nullptr;
 
-Worker::Worker(const string &name)
+Worker::Worker(const string &name, bool isMain)
   : state_(kThreadNone),
     name_(name),
     thread_(nullptr),
@@ -70,17 +71,18 @@ Worker::Worker(const string &name)
   mailbox_ = new Mailbox(this);
   // add mailbox signal fd into event loop
   fd_t fd = signaler_.Fd();
-
   event_ = new IOEvent(ev_loop_, fd, this);
   event_->EnableRead();
 
   // worker entity is the id 1 entity in each worker
   worker_entity_ = new workerEntity(this);
 
-  // save TLS worker pointer
-  gWorker = this;
-
   // start worker thread
+  if (isMain) {
+    // save TLS worker pointer
+    gWorker = this;    
+    return;
+  }
   WaitGroup wg;
   wg.Add(1);
   thread_ = new std::thread(Worker::main, this, &wg);
@@ -226,6 +228,7 @@ Worker::Run() {
 void 
 Worker::Stop() {
   state_ = kThreadStopping;
+  // notify event loop to stop
   signaler_.Send();
   thread_->join();
   mailbox_->Recv();
@@ -234,6 +237,9 @@ Worker::Stop() {
 
 void 
 Worker::main(Worker* worker, WaitGroup* wg) {
+  // save TLS worker pointer
+  gWorker = worker;    
+
   // notify thread has been created
   wg->Done();
   worker->Run();
@@ -241,20 +247,37 @@ Worker::main(Worker* worker, WaitGroup* wg) {
 
 void 
 Sendto(const EntityRef& dstRef, IMessage* msg) {
+  if (!gWorker) {
+    initMainWorker();
+  }  
   gWorker->worker_entity_->Sendto(dstRef, msg);
 }
 
 MessageId 
 NewMsgId() {
+  if (!gWorker) {
+    initMainWorker();
+  }  
   return gWorker->NewMsgId();
 }
 
 const string& 
 CurrentThreadName() {
+  if (!gWorker) {
+    initMainWorker();
+  }  
   return gWorker->String();
 }
 
 ThreadId CurrentThreadId() {
+  if (!gWorker) {
+    initMainWorker();
+  }
   return gWorker->Id();
+}
+
+void 
+initMainWorker() {
+  new Worker("main", true);
 }
 };

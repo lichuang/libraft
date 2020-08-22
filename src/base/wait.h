@@ -17,10 +17,14 @@ public:
   ~WaitGroup() {}
 
   void Add(int delta) {
+    unique_lock<mutex> lock(mutex_);
+    
     count_ += delta;
   }
 
   void Done() {
+    unique_lock<mutex> lock(mutex_);
+
     if (--count_ <= 0) {
       cv_.notify_all();
     }

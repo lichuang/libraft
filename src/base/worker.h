@@ -44,7 +44,7 @@ class Worker : public IIOEventHandler {
   friend MessageId NewMsgId();
 
 public:
-  Worker(const string& name);
+  Worker(const string& name, bool isMain = false);
   virtual ~Worker();
 
   void AddEntity(IEntity*);
@@ -141,5 +141,7 @@ protected:
 
   DISALLOW_COPY_AND_ASSIGN(Worker);
 };
+
+extern void initMainWorker();
 
 };

@@ -33,7 +33,9 @@ public:
   }
 
   void Handle(IMessage* m) {
-    //logMessage *msg = (logMessage*)m;
+    logMessage *msg = (logMessage*)m;
+    printf("log:%s\n", msg->data->text_);
+    delete msg->data;
   }
 
 };
@@ -50,12 +52,17 @@ Logger::~Logger() {
 
 void
 Logger::Send(LogMessageData *data) {
-  Sendto(logger_entity_->Ref(), nullptr);
+  Sendto(logger_entity_->Ref(), new logMessage(data));
 }
 
 void
 Logger::doInit() {
 
+}
+
+void
+Logger::Flush(bool end) {
+  //flush();	
 }
 
 void
@@ -70,6 +77,6 @@ Flush(bool end) {
 
 const char*
 CurrentLogtimeString() {
-  return "";
+  return "logtime";
 }
 };
