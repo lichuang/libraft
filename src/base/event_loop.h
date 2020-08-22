@@ -9,7 +9,7 @@
 
 namespace libraft {
 
-class Event;
+class IOEvent;
 
 class EventLoop {
 public:
@@ -18,14 +18,16 @@ public:
   ~EventLoop();
 
   void Run();
+
+  // Stop MUST be called in event loop
   void Stop();
   
   void* EventBase() {
     return ev_base_;
   }
 
-  void Add(Event*, int flags);
-  
+  void Add(IOEvent*, int flags);  
+
 private:
   struct event_base *ev_base_;
 

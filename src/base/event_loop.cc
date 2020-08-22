@@ -7,7 +7,7 @@
 namespace libraft {
 
 EventLoop::EventLoop()
-  : ev_base_(NULL) {
+  : ev_base_(nullptr) {
   ev_base_ = event_base_new();
 }
 
@@ -19,7 +19,7 @@ EventLoop::~EventLoop() {
 
 void
 EventLoop::Run() {
-  event_base_dispatch(ev_base_);
+  event_base_loop(ev_base_, EVLOOP_NO_EXIT_ON_EMPTY);
 }
 
 void 

@@ -36,6 +36,10 @@ public:
 		tail_.store((tagged_node_t)n, memory_order_release);
 	}
 
+	bool Empty() {
+		return head_.load(memory_order_acquire) == tail_.load(memory_order_acquire);
+	}
+
 	bool Push(T const &t) {
 		node *n = new node(t);
 
@@ -68,7 +72,7 @@ public:
 		node *next = tag2nextNodePtr(head_);
 		node *head = tag2nodePtr(head_);
 
-    if (!next) {
+    if (!next || next == head) {
       return false;
     }
 

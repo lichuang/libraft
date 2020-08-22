@@ -4,7 +4,8 @@
 
 #pragma once
 
-// every message type MUST BE define here
+// every message type MUST BE defined here
 namespace libraft {
-
+static const int kLogMessage      = 1;
+static const int kAddTimerMessage = 2;
 }

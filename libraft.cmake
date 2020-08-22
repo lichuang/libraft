@@ -5,6 +5,9 @@ set(libraft_files
   src/base/mailbox.cc   
   src/base/signaler.cc 
   src/base/worker.cc  
+
+  src/core/log.cc  
+  src/core/logger.cc  
 )
 
 add_library(raft 

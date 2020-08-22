@@ -12,7 +12,7 @@
 
 namespace libraft {
 
-extern MessageId newMsgId();
+extern MessageId NewMsgId();
 
 struct IMessage {
 public:
@@ -22,7 +22,7 @@ public:
       isResponse_(isResponse) {
     // response message id is the src message id
     if (!isResponse) {
-      id_ = newMsgId();
+      id_ = NewMsgId();
     }
   }
 
@@ -41,6 +41,18 @@ public:
     srcRef_ = msg->dstRef_;
     dstRef_ = msg->srcRef_;
     id_ = msg->id_;
+  }
+
+  MessageType Type() const {
+    return type_;
+  }
+
+  const EntityRef& DstRef() const {
+    return dstRef_;
+  }
+
+  const EntityRef& SrcRef() const {
+    return srcRef_;
   }
 
   MessageId id_;

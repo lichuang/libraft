@@ -10,13 +10,17 @@ namespace libraft {
 
 void 
 EntityRef::Send(IMessage* msg) {
-  worker->Send(msg);
+  worker_->Send(msg);
 }
 
 void 
 EntityRef::Response(IMessage* msg, IMessage* srcMsg) {
   msg->responseFor(srcMsg);
-  worker->Send(msg);
+  worker_->Send(msg);
+}
+
+IEntity::IEntity(Worker* worker) {
+  worker->AddEntity(this);
 }
 
 void 
@@ -24,7 +28,7 @@ IEntity::Ask(const EntityRef& dstRef, IMessage* msg, MessageResponseFn fn) {
   resp_fn_map_[msg->id_] = fn;
   msg->setDstEntiity(dstRef);
   msg->setSrcEntiity(ref_);
-  dstRef.worker->Send(msg);  
+  dstRef.worker_->Send(msg);  
 }
 
 void 
@@ -41,7 +45,7 @@ void
 IEntity::Sendto(const EntityRef& dstRef, IMessage* msg) {
   msg->setSrcEntiity(ref_);
   msg->setDstEntiity(dstRef);
-  dstRef.worker->Send(msg);
+  dstRef.worker_->Send(msg);
 }
 
 }

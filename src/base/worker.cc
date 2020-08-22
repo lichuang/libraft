@@ -17,18 +17,41 @@ using namespace std;
 
 namespace libraft {
 
+struct addTimerMsg: public IMessage {
+public:
+  addTimerMsg(TimerEvent* event)
+    : IMessage(kAddTimerMessage),
+      event_(event) {
+  }
+
+  TimerEvent* event_;
+};
+
 class workerEntity : public IEntity {
 public:
-  workerEntity() {
+  workerEntity(Worker* w)
+    : IEntity(w) {
   }
 
   virtual ~workerEntity() {
   }
 
-  void Handle(IMessage* m) {
-  }
+  void Handle(IMessage* m);
 
 };
+
+void
+workerEntity::Handle(IMessage *m) {
+  MessageType typ = m->Type();
+
+  switch (typ) {
+  case kAddTimerMessage:
+    ref_.worker_->addTimer(((addTimerMsg*)m)->event_);
+    break;
+  default:
+    break;
+  }
+}
 
 // TLS worker pointer
 thread_local static Worker* gWorker;
@@ -42,17 +65,17 @@ Worker::Worker(const string &name)
     event_(nullptr),
     current_(0),
     worker_entity_(nullptr),
-    current_msg_id_(0) {  
+    current_msg_id_(0),
+    current_timer_id_(0) {  
   mailbox_ = new Mailbox(this);
   // add mailbox signal fd into event loop
   fd_t fd = signaler_.Fd();
 
-  event_ = new Event(ev_loop_, fd, this);
+  event_ = new IOEvent(ev_loop_, fd, this);
   event_->EnableRead();
 
   // worker entity is the id 1 entity in each worker
-  worker_entity_ = new workerEntity();
-  AddEntity(worker_entity_);
+  worker_entity_ = new workerEntity(this);
 
   // save TLS worker pointer
   gWorker = this;
@@ -60,7 +83,7 @@ Worker::Worker(const string &name)
   // start worker thread
   WaitGroup wg;
   wg.Add(1);
-  thread_ = new std::thread(Worker::workerMain, this, &wg);
+  thread_ = new std::thread(Worker::main, this, &wg);
   wg.Wait();
 }
 
@@ -81,14 +104,14 @@ Worker::AddEntity(IEntity* entity) {
   while (entities_.find(id) != entities_.end()) {
     id++;
   }
+  current_ = id;
 
-  entity->ref_.id = id;
-  entity->ref_.worker = this;
+  entity->Bind(this, id);
   entities_[id] = entity;
 }
 
 void
-Worker::handleRead(Event*) {
+Worker::handleRead(IOEvent*) {
   signaler_.Recv();
   mailbox_->Recv();
 
@@ -98,19 +121,19 @@ Worker::handleRead(Event*) {
 }
 
 void
-Worker::handleWrite(Event*) {
+Worker::handleWrite(IOEvent*) {
   // nothing to do
 }
 
 MessageId 
-Worker::newMsgId() {
+Worker::NewMsgId() {
   return ++current_msg_id_;
 }
 
 void
-Worker::processMsgInEntity(IMessage *msg) {
-  const EntityRef& dstRef = msg->dstRef_;
-  EntityId id = dstRef.id;
+Worker::process(IMessage *msg) {
+  const EntityRef& dstRef = msg->DstRef();
+  EntityId id = dstRef.id();
 
   EntityMap::iterator iter = entities_.find(id);
   if (iter == entities_.end()) {
@@ -127,11 +150,6 @@ Worker::processMsgInEntity(IMessage *msg) {
   delete msg;
 }
 
-void
-Worker::process(IMessage *msg) {
-  processMsgInEntity(msg);
-}
-
 void 
 Worker::notify() {
   signaler_.Send();
@@ -140,6 +158,57 @@ Worker::notify() {
 void
 Worker::Send(IMessage *msg) {
   mailbox_->Send(msg);
+}
+
+void 
+Worker::SendtoWorker(IMessage *msg) {
+  msg->setDstEntiity(worker_entity_->Ref());
+  mailbox_->Send(msg);
+}
+
+bool
+Worker::runningInWorker() {
+  return false;
+  return Running() && CurrentThreadId() == Id();
+}
+
+void
+Worker::addTimer(TimerEvent* event) {  
+  event->Start();
+}
+
+TimerEventId
+Worker::newTimerEventId() {
+  TimerEventId id = ++current_timer_id_;
+  while (timer_event_map_.find(id) != timer_event_map_.end()) {
+    ++id;
+  }
+  current_timer_id_ = id;
+  return id;
+}
+
+TimerEventId 
+Worker::newTimer(ITimerHandler* handler, const Duration& delay, bool once) {
+  TimerEventId id = newTimerEventId();
+  TimerEvent *event = new TimerEvent(ev_loop_, handler, delay, once, id);
+  if (runningInWorker()) {
+    addTimer(event);
+  } else {
+    IMessage *msg = new addTimerMsg(event);
+    SendtoWorker(msg);
+  }
+
+  return id;
+}
+
+TimerEventId 
+Worker::RunEvery(ITimerHandler* handler, const Duration& internal) {
+  return newTimer(handler, internal, true);
+}
+
+TimerEventId 
+Worker::RunOnce(ITimerHandler* handler, const Duration& delay) {
+  return newTimer(handler, delay, false);
 }
 
 void
@@ -164,7 +233,8 @@ Worker::Stop() {
 }
 
 void 
-Worker::workerMain(Worker* worker, WaitGroup* wg) {
+Worker::main(Worker* worker, WaitGroup* wg) {
+  // notify thread has been created
   wg->Done();
   worker->Run();
 }
@@ -175,8 +245,8 @@ Sendto(const EntityRef& dstRef, IMessage* msg) {
 }
 
 MessageId 
-newMsgId() {
-  return gWorker->newMsgId();
+NewMsgId() {
+  return gWorker->NewMsgId();
 }
 
 const string& 

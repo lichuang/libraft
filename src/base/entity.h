@@ -7,11 +7,12 @@
 #include <functional>
 #include <map>
 
+#include "base/event.h"
 #include "base/define.h"
 #include "base/typedef.h"
 
 // class Entity is the core element in this server framework
-// each Entity is bind in a worker thread, it can send message through worker mailbox to other Entity
+// each Entity is binded in a worker thread, it can send message through worker mailbox to other Entity
 
 namespace libraft {
 
@@ -21,35 +22,43 @@ class IEntity;
 
 // entity reference is composed by worker and entity id
 struct EntityRef {
-  Worker *worker;
-  EntityId id;
+  EntityRef() : worker_(nullptr), id_(0) {
+  }
 
-  EntityRef() : worker(nullptr), id(0) {
+  EntityId id() const {
+    return id_;
   }
 
   void Send(IMessage* msg);
   void Response(IMessage* msg, IMessage* srcMsg);
 
   EntityRef& operator= (const EntityRef& ref) {
-    worker = ref.worker;
-    id = ref.id;
+    worker_ = ref.worker_;
+    id_ = ref.id_;
     return *this;
   }
+
+  Worker *worker_;
+  EntityId id_;  
 };
 
-class IEntity {
+class IEntity : public ITimerHandler {
   friend class Worker;
   typedef std::function<void(const IMessage*)> MessageResponseFn;
 
 public:
-  IEntity() { 
-  }
+  IEntity(Worker*);
 
   virtual ~IEntity() {
   }
 
   const EntityRef& Ref() const {
     return ref_;
+  }
+
+  void Bind(Worker *w, EntityId id) {
+    ref_.worker_ = w;
+    ref_.id_ = id;
   }
 
   // send a message to dst entity, unlike Ask, Sendto has no response
@@ -61,7 +70,11 @@ public:
   // src entity handle response from dst
   void HandleResponse(IMessage* msg);
 
+  void AddTimer();
+
   virtual void Handle(IMessage* msg) {}
+
+  virtual void onTimeout(TimerEvent*) {}
 
 protected:
   EntityRef ref_;

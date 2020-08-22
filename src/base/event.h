@@ -4,23 +4,19 @@
 
 #pragma once
 
+#include <map>
+#include "base/duration.h"
 #include "base/typedef.h"
 
+using namespace std;
 struct event;
 
 namespace libraft {
 
-class Event;
+class IOEvent;
+class TimerEvent;
 class EventLoop;
-
-class IEventHandler {
-public:
-  virtual ~IEventHandler() {}
-
-  virtual void handleRead(Event*) = 0;
-
-  virtual void handleWrite(Event*) = 0;
-};
+class ITimerHandler;
 
 enum EventFlag {
   kNone     = 0x00,
@@ -28,15 +24,37 @@ enum EventFlag {
   kWritable = 0x04,
 };
 
-// base class for notify events
-class Event {
+// virtual class for event
+class IEvent {
 public:
-  Event(EventLoop*, fd_t, IEventHandler*);
-  virtual ~Event();
+  IEvent(EventLoop *evloop);
+  virtual ~IEvent();
 
-  void* EventData() { return event_; }
-  
   void Close();
+
+protected:
+  struct event *event_;
+  EventLoop* ev_loop_;
+
+  // if or not attached to a event loop
+  bool attached_;
+};
+
+// virtual class for io event handler
+class IIOEventHandler {
+public:
+  virtual ~IIOEventHandler() {}
+
+  virtual void handleRead(IOEvent*) = 0;
+
+  virtual void handleWrite(IOEvent*) = 0;
+};
+
+// class for IO events
+class IOEvent : public IEvent {
+public:
+  IOEvent(EventLoop*, fd_t, IIOEventHandler*);
+  virtual ~IOEvent();  
 
   void EnableRead();
   void EnableWrite();
@@ -56,26 +74,65 @@ public:
     return flags_ == kNone;
   }
   
-  void AttachToLoop();
-
 private:
   void Handle(fd_t fd, short which);
   static void Handle(fd_t fd, short which, void* v);
 
-  void updateEventLoop();
+  void AttachToLoop();
   void DetachFromLoop();
 
+  void updateEventLoop();
+
 protected:
-  struct event *event_;
-  EventLoop* loop_;
   fd_t fd_;
 
-  IEventHandler* handler_;
+  IIOEventHandler* handler_;
   // event flags
   int flags_;
-
-  // if or not attached to a event loop
-  bool attached_;
 };
 
-};  // namespace serverkit
+// class for timer events
+class TimerEvent : public IEvent {
+public:
+  TimerEvent(EventLoop *, ITimerHandler *, const Duration& timeout, bool, TimerEventId);
+
+  void Start();
+
+  TimerEventId id() const {
+    return id_;
+  }
+
+private:
+  static void Handle(fd_t fd, short which, void* v);
+
+protected:
+  // if this timer is called periodic or once?
+  bool once_;
+
+  ITimerHandler* handler_;
+  Duration timeout_;
+
+  TimerEventId id_;
+};
+
+class ITimerHandler {
+public:
+  virtual ~ITimerHandler() {}
+
+  virtual void onTimeout(TimerEvent*) {}
+
+  void AddTimer(TimerEventId id, TimerEvent* event) {
+    event_map_[id] = event;
+  }
+
+  void DelTimer(TimerEventId id) {
+    delete event_map_[id];
+    event_map_.erase(id);
+  }
+
+protected:
+  typedef map<TimerEventId, TimerEvent*> TimerMap;
+  TimerMap event_map_;
+};
+
+};  // namespace libraft

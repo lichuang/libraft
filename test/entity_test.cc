@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include "base/entity.h"
+#include "base/duration.h"
 #include "base/message.h"
 #include "base/wait.h"
 #include "base/worker.h"
@@ -31,6 +32,9 @@ TEST(EntityTest, send_msg) {
 
   class TestEntity : public IEntity {
   public:
+    TestEntity(Worker* w) : IEntity(w) {
+    }
+    
     void Handle(IMessage* m) {
       TestSendEntityMsg* msg = (TestSendEntityMsg*)m;
       *(msg->num_) = test_num;
@@ -43,8 +47,7 @@ TEST(EntityTest, send_msg) {
 
   Worker worker1("worker1");
 
-  TestEntity te1;
-  worker1.AddEntity(&te1);
+  TestEntity te1(&worker1);
 
   IMessage *msg = new TestSendEntityMsg(&a);
   Sendto(te1.Ref(), msg);
@@ -83,6 +86,9 @@ TEST(EntityTest, ask_msg) {
 
   class TestAskEntity : public IEntity {
   public:
+    TestAskEntity(Worker *w) : IEntity(w) {
+
+    }
     void Handle(IMessage* m) {
 
     }
@@ -90,6 +96,10 @@ TEST(EntityTest, ask_msg) {
 
   class TestRespEntity : public IEntity {
   public:
+    TestRespEntity(Worker *w) : IEntity(w) {
+      
+    }
+
     void Handle(IMessage* m) {      
       TestAskEntityMsg* msg = (TestAskEntityMsg*)m;
       TestAskRespEntityMsg* resp = new TestAskRespEntityMsg(msg->str_);
@@ -100,11 +110,9 @@ TEST(EntityTest, ask_msg) {
   Worker worker1("worker1");
   Worker worker2("worker2");
 
-  TestAskEntity te1;
-  worker1.AddEntity(&te1);
+  TestAskEntity te1(&worker1);
 
-  TestRespEntity te2;
-  worker2.AddEntity(&te2);
+  TestRespEntity te2(&worker2);
 
   TestAskEntityMsg *msg = new TestAskEntityMsg("libraft");
   ASSERT_EQ(msg->str_, "libraft");
@@ -117,6 +125,31 @@ TEST(EntityTest, ask_msg) {
 
   worker1.Stop();
   worker2.Stop();
+}
+
+TEST(EntityTest, timer) {
+  static WaitGroup wg;
+  wg.Add(1);
+
+  class TestTimerEntity : public IEntity {
+  public:
+    TestTimerEntity(Worker* w) : IEntity(w) {
+    }
+    
+    void onTimeout(TimerEvent*) {
+      wg.Done();
+      cout << "ontimeout\n";
+    }
+  };
+
+  Worker worker1("worker1");
+
+  TestTimerEntity te1(&worker1);
+
+  worker1.RunOnce(&te1, Duration(kSecond));
+
+  wg.Wait();
+  worker1.Stop();
 }
 
 int main(int argc, char* argv[]) {
