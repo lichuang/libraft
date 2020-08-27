@@ -14,7 +14,7 @@ struct event;
 namespace libraft {
 
 class IOEvent;
-class TimerEvent;
+class ITimerEvent;
 class EventLoop;
 class ITimerHandler;
 
@@ -41,19 +41,19 @@ protected:
 };
 
 // virtual class for io event handler
-class IIOEventHandler {
+class IIOHandler {
 public:
-  virtual ~IIOEventHandler() {}
+  virtual ~IIOHandler() {}
 
-  virtual void handleRead(IOEvent*) = 0;
+  virtual void onRead(IOEvent*) = 0;
 
-  virtual void handleWrite(IOEvent*) = 0;
+  virtual void onWrite(IOEvent*) = 0;
 };
 
 // class for IO events
 class IOEvent : public IEvent {
 public:
-  IOEvent(EventLoop*, fd_t, IIOEventHandler*);
+  IOEvent(EventLoop*, fd_t, IIOHandler*);
   virtual ~IOEvent();  
 
   void EnableRead();
@@ -86,15 +86,15 @@ private:
 protected:
   fd_t fd_;
 
-  IIOEventHandler* handler_;
+  IIOHandler* handler_;
   // event flags
   int flags_;
 };
 
 // class for timer events
-class TimerEvent : public IEvent {
+class ITimerEvent : public IEvent {
 public:
-  TimerEvent(EventLoop *, ITimerHandler *, const Duration& timeout, bool, TimerEventId);
+  ITimerEvent(EventLoop *, ITimerHandler *, const Duration& timeout, bool, TimerEventId);
 
   void Start();
 
@@ -119,9 +119,9 @@ class ITimerHandler {
 public:
   virtual ~ITimerHandler() {}
 
-  virtual void onTimeout(TimerEvent*) {}
+  virtual void onTimeout(ITimerEvent*) {}
 
-  void AddTimer(TimerEventId id, TimerEvent* event) {
+  void AddTimer(TimerEventId id, ITimerEvent* event) {
     event_map_[id] = event;
   }
 
@@ -131,7 +131,7 @@ public:
   }
 
 protected:
-  typedef map<TimerEventId, TimerEvent*> TimerMap;
+  typedef map<TimerEventId, ITimerEvent*> TimerMap;
   TimerMap event_map_;
 };
 

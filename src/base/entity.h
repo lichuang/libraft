@@ -74,7 +74,7 @@ public:
 
   virtual void Handle(IMessage* msg) {}
 
-  virtual void onTimeout(TimerEvent*) {}
+  virtual void onTimeout(ITimerEvent*) {}
 
 protected:
   EntityRef ref_;

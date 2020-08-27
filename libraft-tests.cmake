@@ -5,3 +5,9 @@ add_executable ( entity_test
 
 target_link_libraries (entity_test PRIVATE raft gtest event pthread protobuf gflags)
 
+
+add_executable ( buffer_test
+  test/buffer_test.cc
+)
+
+target_link_libraries (buffer_test PRIVATE raft gtest event pthread protobuf gflags)

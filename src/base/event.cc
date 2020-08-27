@@ -29,7 +29,7 @@ IEvent::Close() {
   }
 }
 
-IOEvent::IOEvent(EventLoop* loop, fd_t fd, IIOEventHandler *handler)
+IOEvent::IOEvent(EventLoop* loop, fd_t fd, IIOHandler *handler)
   : IEvent(loop),
     fd_(fd),
     handler_(handler),
@@ -123,11 +123,11 @@ IOEvent::DisableAllEvent() {
 void 
 IOEvent::Handle(fd_t fd, short which) {
   if ((which & kReadable) && event_) {
-    handler_->handleRead(this);
+    handler_->onRead(this);
   }
 
   if ((which & kWritable) && event_) {
-    handler_->handleWrite(this);
+    handler_->onWrite(this);
   }
 }
 
@@ -137,7 +137,7 @@ IOEvent::Handle(fd_t fd, short which, void* v) {
   ev->Handle(fd, which);
 }
 
-TimerEvent::TimerEvent(EventLoop *loop, ITimerHandler *handler, const Duration& timeout, bool once, TimerEventId id)
+ITimerEvent::ITimerEvent(EventLoop *loop, ITimerHandler *handler, const Duration& timeout, bool once, TimerEventId id)
   : IEvent(loop),
     once_(once),
     handler_(handler),
@@ -147,18 +147,18 @@ TimerEvent::TimerEvent(EventLoop *loop, ITimerHandler *handler, const Duration& 
 }
 
 void
-TimerEvent::Start() {
+ITimerEvent::Start() {
   struct timeval tv;
   timeout_.To(&tv);
 
   ::event_assign(event_, (struct event_base *)ev_loop_->EventBase(), -1, 
-                 once_ ? 0 : EV_PERSIST, &TimerEvent::Handle, this);  
+                 once_ ? 0 : EV_PERSIST, &ITimerEvent::Handle, this);  
   ::event_add(event_, &tv);
 }
 
 void
-TimerEvent::Handle(fd_t, short ,void *v) {
-  TimerEvent* ev = (TimerEvent*)v;
+ITimerEvent::Handle(fd_t, short ,void *v) {
+  ITimerEvent* ev = (ITimerEvent*)v;
   ev->handler_->onTimeout(ev);
   if (ev->once_) {
     ev->handler_->DelTimer(ev->id_);

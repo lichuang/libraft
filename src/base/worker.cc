@@ -19,12 +19,12 @@ namespace libraft {
 
 struct addTimerMsg: public IMessage {
 public:
-  addTimerMsg(TimerEvent* event)
+  addTimerMsg(ITimerEvent* event)
     : IMessage(kAddTimerMessage),
       event_(event) {
   }
 
-  TimerEvent* event_;
+  ITimerEvent* event_;
 };
 
 // the default entity class bind to a worker
@@ -113,7 +113,7 @@ Worker::AddEntity(IEntity* entity) {
 }
 
 void
-Worker::handleRead(IOEvent*) {
+Worker::onRead(IOEvent*) {
   signaler_.Recv();
   mailbox_->Recv();
 
@@ -123,7 +123,7 @@ Worker::handleRead(IOEvent*) {
 }
 
 void
-Worker::handleWrite(IOEvent*) {
+Worker::onWrite(IOEvent*) {
   // nothing to do
 }
 
@@ -175,7 +175,7 @@ Worker::runningInWorker() {
 }
 
 void
-Worker::addTimer(TimerEvent* event) {  
+Worker::addTimer(ITimerEvent* event) {  
   event->Start();
 }
 
@@ -192,7 +192,7 @@ Worker::newTimerEventId() {
 TimerEventId 
 Worker::newTimer(ITimerHandler* handler, const Duration& delay, bool once) {
   TimerEventId id = newTimerEventId();
-  TimerEvent *event = new TimerEvent(ev_loop_, handler, delay, once, id);
+  ITimerEvent *event = new ITimerEvent(ev_loop_, handler, delay, once, id);
   if (runningInWorker()) {
     addTimer(event);
   } else {

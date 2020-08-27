@@ -36,7 +36,7 @@ extern ThreadId CurrentThreadId();
 // worker thread
 // inside each worker there is a mailbox,
 // other threads can communicate to the thread using message though mailbox
-class Worker : public IIOEventHandler {
+class Worker : public IIOHandler {
   friend class Mailbox;
   friend class workerEntity;
 
@@ -61,9 +61,9 @@ public:
   // create and return a fire-once timer id
   TimerEventId RunOnce(ITimerHandler*, const Duration& delay);
 
-  virtual void handleRead(IOEvent*);
+  virtual void onRead(IOEvent*);
 
-  virtual void handleWrite(IOEvent*);
+  virtual void onWrite(IOEvent*);
 
   void Stop();
 
@@ -97,7 +97,7 @@ private:
 protected:  
   virtual void Run();
   static void main(Worker*, WaitGroup*);
-  void addTimer(TimerEvent* event);
+  void addTimer(ITimerEvent* event);
   TimerEventId newTimerEventId();
 
 private:
@@ -136,7 +136,7 @@ protected:
 
   // timer event
   TimerEventId current_timer_id_;
-  typedef map<TimerEventId, TimerEvent*> TimerEventMap;
+  typedef map<TimerEventId, ITimerEvent*> TimerEventMap;
   TimerEventMap timer_event_map_;
 
   DISALLOW_COPY_AND_ASSIGN(Worker);

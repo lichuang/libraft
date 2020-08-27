@@ -143,7 +143,7 @@ TEST(EntityTest, timer) {
     TestTimerEntity(Worker* w) : IEntity(w) {
     }
     
-    void onTimeout(TimerEvent*) {
+    void onTimeout(ITimerEvent*) {
       wg.Done();
       cout << "ontimeout\n";
     }

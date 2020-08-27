@@ -46,7 +46,7 @@ private:
   Worker *worker_;
   IEntity *logger_entity_;
 
-  static const int kTimeSlots = 10;
+  static const int kTimeSlots = 64;
 
   struct Time {
     time_t    sec;    // seconds since 1970.01.01 00:00:00

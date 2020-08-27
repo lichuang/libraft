@@ -43,7 +43,7 @@ public:
     delete msg->data;
   }
 
-  void onTimeout(TimerEvent*) {
+  void onTimeout(ITimerEvent*) {
     logger_->updateTime();
   }  
 
@@ -123,12 +123,12 @@ Logger::Flush(bool end) {
 
 void
 SendLog(LogMessageData *data) {
-  Singleton<Logger>::Instance()->Send(data);
+  gLogger->Send(data);
 }
 
 void 
 Flush(bool end) {
-	Singleton<Logger>::Instance()->Flush(end);
+	gLogger->Flush(end);
 }
 
 };

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <errno.h>
 #include <string>
 
 using namespace std;
@@ -37,5 +38,10 @@ private:
   int code_;
   string msg_;
 };
+
+#define IsIOTryAgain(err) (((err) == EAGAIN) || ((err) == EWOULDBLOCK))
+
+#define gErrno         errno
+#define StrError       strerror
 
 };
