@@ -19,8 +19,21 @@ EntityRef::Response(IMessage* msg, IMessage* srcMsg) {
   worker_->Send(msg);
 }
 
-IEntity::IEntity(Worker* worker) {
-  worker->AddEntity(this);
+IEntity::IEntity(EntityType typ) {
+  ref_.type_ = typ;
+}
+
+void 
+IEntity::afterBindToWorker(Worker* w) {
+  w->AddEntity(this);
+  // do subclass init
+  afterBindToWorker(w);
+}
+
+void 
+IEntity::Bind(Worker *w, EntityId id) {
+  ref_.worker_ = w;
+  ref_.id_ = id;
 }
 
 void 

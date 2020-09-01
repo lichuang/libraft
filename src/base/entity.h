@@ -39,7 +39,8 @@ struct EntityRef {
   }
 
   Worker *worker_;
-  EntityId id_;  
+  EntityId id_;
+  EntityType type_;  
 };
 
 class IEntity : public ITimerHandler {
@@ -47,19 +48,26 @@ class IEntity : public ITimerHandler {
   typedef std::function<void(const IMessage*)> MessageResponseFn;
 
 public:
-  IEntity(Worker*);
+  IEntity(EntityType typ);
 
   virtual ~IEntity() {
+  }
+
+  void afterBindToWorker(Worker*);
+
+  // do init in binding worker, can be re-implemented by subclass
+  virtual void initAfterBind(Worker*) {}
+
+  // can be re-implemented by subclass
+  virtual int64_t Hash() const {
+    return ref_.id_;
   }
 
   const EntityRef& Ref() const {
     return ref_;
   }
 
-  void Bind(Worker *w, EntityId id) {
-    ref_.worker_ = w;
-    ref_.id_ = id;
-  }
+  void Bind(Worker *w, EntityId id);
 
   // send a message to dst entity, unlike Ask, Sendto has no response
   void Sendto(const EntityRef& dstRef, IMessage* msg);

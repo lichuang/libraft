@@ -17,28 +17,26 @@
 #include "base/status.h"
 #include "net/net.h"
 #include "net/socket.h"
-#include "core/log.h"
+#include "base/log.h"
 #include "util/string.h"
 
 namespace libraft {
 
-static int createListenSocket(int*);
-static int setNonBlocking(int fd);
+static int createListenSocket(Status*);
+static int setNonBlocking(int fd, Status *err);
 
 static int
-createListenSocket(int* err) {
+createListenSocket(Status* err) {
   int fd, on;
 
   on = 1;
   if ((fd = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
-    Error() << "create socket fail:" << strerror(errno);
-    *err = errno;
+    *err = Status(errno,strerror(errno));
     return -1;
   }
 
   if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
-    Error() << "setsockopt fail:" << strerror(errno);
-    *err = errno;
+    *err = Status(errno,strerror(errno));
     return -1;
   }
 
@@ -46,56 +44,54 @@ createListenSocket(int* err) {
 }
 
 int
-setNonBlocking(int fd) {
+setNonBlocking(int fd, Status *err) {
   int flags;
 
   if ((flags = fcntl(fd, F_GETFL)) == -1) {
-    return errno;
+    *err = Status(errno,strerror(errno));
+    
+    return kError;
   }
   if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-    return errno;
+    *err = Status(errno,strerror(errno));
+    return kError;
   }
 
   return kOK;
 }
 
 int
-Listen(const Endpoint& endpoint, int backlog, int *err) {
+Listen(const Endpoint& endpoint, int backlog, Status *err) {
   int                 fd;
   struct sockaddr_in  sa;
-  int                 ret;
 
   *err = kOK;
   fd = createListenSocket(err);
-  if (*err != kOK) {
+  if (!err->Ok()) {
     return kError;
   }
 
-  ret = setNonBlocking(fd);
-  if (ret != kOK) {
+  setNonBlocking(fd, err);
+  if (!err->Ok()) {
     goto error;
   }
 
-  memset(&sa,0,sizeof(sa));
+  ::memset(&sa,0,sizeof(sa));
   sa.sin_family = AF_INET;
-  sa.sin_port = htons(static_cast<uint16_t>(endpoint.Port()));
+  sa.sin_port = ::htons(static_cast<uint16_t>(endpoint.Port()));
 
-  if (inet_aton(endpoint.Address().c_str(), &sa.sin_addr) == 0) {
-    *err = errno;
-    Error() << "inet_aton fail:" << strerror(errno);
+  if (::inet_aton(endpoint.Address().c_str(), &sa.sin_addr) == 0) {
+    *err = Status(errno,strerror(errno));
     goto error;
   }
 
-  if (bind(fd, reinterpret_cast<struct sockaddr*>(&sa), sizeof(sa)) < 0) {
-    *err = errno;
-    Error() << "bind fail:" << strerror(errno);
+  if (::bind(fd, reinterpret_cast<struct sockaddr*>(&sa), sizeof(sa)) < 0) {
+    *err = Status(errno,strerror(errno));
     goto error;
   }
 
-  if (listen(fd, backlog) == -1) {
-    *err = errno;
-    Error() << "listen to " <<  endpoint.String() << " fail:" << strerror(errno);
-    goto error;
+  if (::listen(fd, backlog) == -1) {
+    *err = Status(errno,strerror(errno));
   }
 
   return fd;
@@ -106,38 +102,39 @@ error:
 }
 
 int
-Accept(int listen_fd, int* err) {
+Accept(int listen_fd, Endpoint *ep, Status* err) {
   struct sockaddr_in addr;
   socklen_t addrlen = sizeof(addr);
-  int fd, ret;
+  int fd;
 
   *err = kOK;
   while (true) {
     fd = ::accept(listen_fd, reinterpret_cast<struct sockaddr *>(&addr), &addrlen);
     if (fd == -1) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        *err = errno;
+        *err = kTryIOAgain;
         return kOK;
       }
       if (errno == EINTR) {
         continue;
       }
-      *err = errno;
+      *err = Status(errno, strerror(errno));;
       return kError;
     }
     
-    ret = setNonBlocking(fd);
-    if (ret != kOK) {
+    setNonBlocking(fd, err);
+    if (!err->Ok()) {
       return kError;
     }
+    *ep = addr;
     break;
   }
   return fd;
 }
 
-int   
-ConnectAsync(const Endpoint& remote, int fd) {
-  int ret, err;
+void   
+ConnectAsync(const Endpoint& remote, int fd, Status* err) {
+  int ret;
 
   sockaddr_in addr;
   socklen_t addr_len = sizeof(addr);
@@ -146,26 +143,22 @@ ConnectAsync(const Endpoint& remote, int fd) {
   addr.sin_port = htons(remote.Port());
 
   do {
-    gErrno = 0;
     ret = ::connect(fd, reinterpret_cast<struct sockaddr *>(&addr), addr_len);
-  } while (ret == -1 && gErrno == EINTR);
+  } while (ret == -1 && errno == EINTR);
 
-  if (ret == -1) {
-    err = gErrno;
-    if (err == EINPROGRESS) {
-      return kOK;
+  if (ret == -1) {    
+    if (errno == EINPROGRESS) {
+      return;
     }
 
-    Error() << "connect to " << remote.String() << " failed: "
-      << StrError(gErrno);
-    return gErrno;
+    *err = Status(errno, strerror(errno));
+  } else {
+    *err = kOK;
   }
-
-  return kOK;
 }
 
-int
-Recv(Socket *socket, Buffer *buffer, int *err) {
+int   
+Recv(Socket *socket, Buffer *buffer, Status* err) {
   ssize_t nbytes;
   int ret;
   int fd = socket->fd();
@@ -178,7 +171,6 @@ Recv(Socket *socket, Buffer *buffer, int *err) {
 	 */
   nbytes = 0;
   ret = 0;
-  *err = 0;
 
   while(true) {
     nbytes = ::read(fd, buffer->WritePosition(), buffer->WritableBytes());
@@ -186,25 +178,19 @@ Recv(Socket *socket, Buffer *buffer, int *err) {
       buffer->WriteAdvance(nbytes);
       ret += static_cast<int>(nbytes);
     } else if (nbytes < 0) {
-      if (IsIOTryAgain(errno)) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
         // there is nothing in the tcp stack,return and wait for the next in event
-        *err = gErrno;
+        *err = kTryIOAgain;
         break;        
       } else if (errno == EINTR) {
         continue;
       } else {
         // something wrong has occoured
-        *err = gErrno;
-        Error() << "recv from " << socket->String() 
-          << " failed: " << strerror(gErrno);
-        return kError;
+        *err = Status(errno, strerror(errno));
       }
     } else {
-      // socket has been closed
-      Error() << "socket from " << socket->String() 
-        << " has been closed: " << strerror(gErrno);      
-      *err = gErrno;
-      return kError;
+      // socket has been closed  
+      *err = Status(errno, strerror(errno));
     }
   };
 
@@ -212,19 +198,14 @@ Recv(Socket *socket, Buffer *buffer, int *err) {
 }
 
 int
-Send(Socket *socket, Buffer *buffer, int *err) {
+Send(Socket *socket, Buffer *buffer, Status* err) {
   ssize_t nbytes;
   int ret;
   int fd = socket->fd();
 
   nbytes = 0;
   ret = 0;
-  *err = 0;
-  while (true) {
-    if (buffer->ReadableBytes() == 0)  {
-      // there is nothing in user-space stack to send
-      break;
-    }
+  while (buffer->ReadableBytes() > 0) {
     nbytes = ::write(fd, buffer->ReadPosition(), buffer->ReadableBytes());
 
     if (nbytes > 0) {
@@ -233,21 +214,14 @@ Send(Socket *socket, Buffer *buffer, int *err) {
     } else if (nbytes < 0) {
       if (errno == EINTR) {
         continue;
-      } else if (IsIOTryAgain(errno)) {
-        *err = gErrno;
+      } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        *err = kTryIOAgain;
         break;
       } else {
-        *err = gErrno;
-        Error() << "send to " << socket->String() 
-          << " failed: " << strerror(gErrno);        
-        return kError;
+        *err = Status(errno, strerror(errno));
       }
     } else {
-      // connection has been closed
-      *err = gErrno;
-      Error() << "socket from " << socket->String() 
-        << " has been closed: " << strerror(gErrno);       
-      return kError;
+      *err = Status(errno, strerror(errno));
     }
   }
 
@@ -272,9 +246,9 @@ Close(int fd) {
 }
 
 int
-TcpSocket() {
+TcpSocket(Status *err) {
   int fd = socket(PF_INET, SOCK_STREAM, 0);
-  setNonBlocking(fd);
+  setNonBlocking(fd, err);
   return fd;
 }
 };

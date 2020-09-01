@@ -4,9 +4,12 @@
 
 #include <map>
 #include <sys/prctl.h>
+#include "base/bind_entity_msg.h"
 #include "base/entity.h"
+#include "base/entity_type.h"
 #include "base/event.h"
 #include "base/event_loop.h"
+#include "base/log.h"
 #include "base/message.h"
 #include "base/mailbox.h"
 #include "base/typedef.h"
@@ -30,8 +33,8 @@ public:
 // the default entity class bind to a worker
 class workerEntity : public IEntity {
 public:
-  workerEntity(Worker* w)
-    : IEntity(w) {
+  workerEntity(Worker* w) : IEntity(kWorkerEntity) {
+    w->AddEntity(this);
   }
 
   virtual ~workerEntity() {
@@ -39,6 +42,14 @@ public:
 
   void Handle(IMessage* m);
 
+  void handleTimerMessage(IMessage *m) {
+    ref_.worker_->addTimer(((addTimerMsg*)m)->event_);
+  }
+
+  void handleBindEntityMessage(IMessage *m) {
+    IEntity *en = ((bindEntityMsg*)m)->entity_;
+    en->afterBindToWorker(ref_.worker_);
+  }  
 };
 
 void
@@ -47,7 +58,10 @@ workerEntity::Handle(IMessage *m) {
 
   switch (typ) {
   case kAddTimerMessage:
-    ref_.worker_->addTimer(((addTimerMsg*)m)->event_);
+    handleTimerMessage(m);
+    break;
+  case kBindEntityMessage:
+    handleBindEntityMessage(m);
     break;
   default:
     break;
@@ -57,7 +71,7 @@ workerEntity::Handle(IMessage *m) {
 // TLS worker pointer
 thread_local static Worker* gWorker = nullptr;
 
-Worker::Worker(const string &name, bool isMain)
+Worker::Worker(const string &name, threadType typ, bool isMain)
   : state_(kThreadNone),
     name_(name),
     thread_(nullptr),
@@ -67,7 +81,8 @@ Worker::Worker(const string &name, bool isMain)
     current_(0),
     worker_entity_(nullptr),
     current_msg_id_(0),
-    current_timer_id_(0) {  
+    current_timer_id_(0),
+    type_(typ) {  
   mailbox_ = new Mailbox(this);
   // add mailbox signal fd into event loop
   fd_t fd = signaler_.Fd();
@@ -80,7 +95,8 @@ Worker::Worker(const string &name, bool isMain)
   // start worker thread
   if (isMain) {
     // save TLS worker pointer
-    gWorker = this;    
+    gWorker = this;
+    init();
     return;
   }
   WaitGroup wg;
@@ -99,7 +115,8 @@ Worker::~Worker() {
 
 void 
 Worker::AddEntity(IEntity* entity) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  // AddEntity can only be called in current thread
+  ASSERT(CurrentThread() == this);
 
   // register entity in worker
   EntityId id = ++current_;
@@ -278,6 +295,16 @@ ThreadId CurrentThreadId() {
 
 void 
 initMainWorker() {
-  new Worker("main", true);
+  new Worker("main", kMainThread, true);
+}
+
+Worker*
+CurrentThread() {
+  return gWorker;
+}
+
+bool 
+InMainThread() {
+  return gWorker->Type() == kMainThread;
 }
 };

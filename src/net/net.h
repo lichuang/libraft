@@ -17,22 +17,20 @@ namespace libraft {
 class Buffer;
 class Socket;
 
-int   Listen(const Endpoint&, int backlog, int *err);
-int   ConnectAsync(const Endpoint&, int);
+int   Listen(const Endpoint&, int backlog, Status *err);
+void  ConnectAsync(const Endpoint&, int fd, Status* err);
 
-int   Accept(int listen_fd, int*);
+int   Accept(int listen_fd, Endpoint*, Status* err);
 
-// recv data from socket, put it into buffer,
-// if some error occurred, save error in err param
-int   Recv(Socket *, Buffer *buffer, int *err);
+// recv data from socket, put it into buffer
+int   Recv(Socket *, Buffer *buffer, Status* err);
 
-// send data to socket from buffer,
-// if some error occurred, save error in err param
-int   Send(Socket *, Buffer *buffer, int *err);
+// send data to socket from buffer
+int   Send(Socket *, Buffer *buffer, Status* err);
 
 void  Close(int fd);
 void  GetEndpointByFd(int fd, Endpoint*);
 
-int   TcpSocket();
+int   TcpSocket(Status* err);
 
 };

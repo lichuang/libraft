@@ -4,6 +4,7 @@
 
 #pragma once
 #include <pthread.h>
+#include "base/define.h"
 
 namespace libraft {
 

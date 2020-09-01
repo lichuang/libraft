@@ -8,7 +8,7 @@
 #include <pthread.h>
 #include "base/define.h"
 #include "base/singleton.h"
-#include "core/log.h"
+#include "base/log.h"
 
 using namespace std;
 

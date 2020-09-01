@@ -7,7 +7,7 @@
 #include <string.h>
 #include "base/define.h"
 #include "base/object_pool.h"
-#include "core/log.h"
+#include "base/log.h"
 
 namespace libraft {
 
@@ -47,6 +47,10 @@ public:
     return capacity_ - write_index_;
   }
 
+  bool Empty() const {
+    return write_index_ > read_index_;
+  }
+  
   size_t ReadableBytes() const {
     ASSERT(write_index_ >= read_index_);
     return write_index_ - read_index_;
@@ -55,6 +59,7 @@ public:
   void WriteAdvance(size_t len) {
     write_index_ += len;
     ASSERT(capacity_ >= write_index_);
+    EnsureWritableBytes(kInitBufferSize);
   }
 
   void ReadAdvance(size_t len) {

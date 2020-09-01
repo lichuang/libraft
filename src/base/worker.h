@@ -21,10 +21,12 @@ namespace libraft {
 class IOEvent;
 class ITimerHandler;
 class EventLoop;
+class Logger;
 class Mailbox;
 class IEntity;
 class WaitGroup;
 class workerEntity;
+class WorkerPool;
 
 typedef std::thread::id ThreadId;
 
@@ -33,18 +35,26 @@ extern MessageId NewMsgId();
 extern const string& CurrentThreadName();
 extern ThreadId CurrentThreadId();
 
+enum threadType {
+  kMainThread = 1,
+  kWorkThread = 2,
+  kLogThread  = 3,
+};
+
 // worker thread
 // inside each worker there is a mailbox,
 // other threads can communicate to the thread using message though mailbox
 class Worker : public IIOHandler {
   friend class Mailbox;
+  friend class Logger;
   friend class workerEntity;
+  friend class WorkerPool;
 
   friend void Sendto(const EntityRef& dstRef, IMessage* msg);
   friend MessageId NewMsgId();
+  friend void initMainWorker();
 
 public:
-  Worker(const string& name, bool isMain = false);
   virtual ~Worker();
 
   void AddEntity(IEntity*);
@@ -79,7 +89,13 @@ public:
     return state_ == kThreadRunning;
   }
 
+  threadType Type() const {
+    return type_;
+  }
+
 private:
+  // worker can only be created in worker poll and logger
+  Worker(const string& name, threadType, bool isMain = false);
   bool runningInWorker();
 
   void process(IMessage*);
@@ -121,8 +137,6 @@ protected:
   // Signaler to pass signals from writer thread to reader thread.
   Signaler signaler_;
 
-  // protect entity register operation
-  std::mutex mutex_;
   EntityId current_;
 
   typedef map<EntityId, IEntity*> EntityMap;
@@ -139,9 +153,14 @@ protected:
   typedef map<TimerEventId, ITimerEvent*> TimerEventMap;
   TimerEventMap timer_event_map_;
 
+  // thread type
+  threadType type_;
   DISALLOW_COPY_AND_ASSIGN(Worker);
 };
 
 extern void initMainWorker();
+
+extern bool InMainThread();
+extern Worker* CurrentThread();
 
 };

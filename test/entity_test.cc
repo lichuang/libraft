@@ -10,11 +10,12 @@
 #include "base/message.h"
 #include "base/wait.h"
 #include "base/worker.h"
-#include "core/log.h"
+#include "base/log.h"
 
 using namespace libraft;
 using namespace std;
 
+/*
 TEST(EntityTest, send_msg) {
   static int kTestSendEntityMsgType = 10100;
   static int test_num = 10101;
@@ -158,6 +159,7 @@ TEST(EntityTest, timer) {
   wg.Wait();
   worker1.Stop();
 }
+*/
 
 int main(int argc, char* argv[]) {
   testing::InitGoogleTest(&argc, argv);

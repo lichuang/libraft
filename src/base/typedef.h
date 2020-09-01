@@ -13,6 +13,7 @@ typedef uint64_t MessageId;
 typedef uint32_t MessageType;
 
 typedef uint64_t EntityId;
+typedef uint32_t EntityType;
 
 typedef uint32_t TimerEventId;
 

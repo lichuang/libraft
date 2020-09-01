@@ -14,6 +14,7 @@ namespace libraft {
 enum {
   kOK = 0,
   kError = -1,
+  kTryIOAgain = 1,
 };
 
 // Status class describe operation status
@@ -23,13 +24,22 @@ public:
     : code_(code), msg_(msg) {
   }
 
+  bool Ok() const { return code_ == kOK; }
+  bool TryIOAgain() const { return code_ == kTryIOAgain; }
+
   int Code() const { return code_; }
 
-  const std::string& Message() const { return msg_; }
+  const std::string& String() const { return msg_; }
 
   Status& operator= (const Status& error) {
     code_ = error.code_;
     msg_ = error.msg_;
+
+    return *this;
+  }
+
+  Status& operator= (int code) {
+    code_ = code;
 
     return *this;
   }
@@ -39,9 +49,6 @@ private:
   string msg_;
 };
 
-#define IsIOTryAgain(err) (((err) == EAGAIN) || ((err) == EWOULDBLOCK))
 
-#define gErrno         errno
-#define StrError       strerror
 
 };

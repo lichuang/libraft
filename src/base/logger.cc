@@ -6,11 +6,12 @@
 #include <sys/time.h>
 #include <gflags/gflags.h>
 #include "base/entity.h"
+#include "base/entity_type.h"
 #include "base/message.h"
 #include "base/time.h"
 #include "base/worker.h"
-#include "core/log.h"
-#include "core/logger.h"
+#include "base/log.h"
+#include "base/logger.h"
 
 namespace libraft {
 
@@ -31,7 +32,8 @@ public:
 
 class loggerEntity : public IEntity {
 public:
-  loggerEntity(Worker* w, Logger* logger) : IEntity(w), logger_(logger) {
+  loggerEntity(Worker* w, Logger* logger) : IEntity(kLoggerEntity), logger_(logger) {
+    w->AddEntity(this);
   }
 
   virtual ~loggerEntity() {
@@ -51,7 +53,7 @@ public:
 };
 
 Logger::Logger() {
-  worker_ = new Worker("logger");
+  worker_ = new Worker("logger", kLogThread);
 
   // init time
   index_.store(0, std::memory_order_relaxed);

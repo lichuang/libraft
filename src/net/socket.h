@@ -7,8 +7,9 @@
 #include <string>
 #include "base/buffer.h"
 #include "base/define.h"
-#include "base/typedef.h"
 #include "base/event.h"
+#include "base/status.h"
+#include "base/typedef.h"
 #include "net/endpoint.h"
 
 using namespace std;
@@ -23,8 +24,8 @@ class EventLoop;
 // If send data fail, IDataHandler->onError will be called.
 // When read data from socket, it will read data from the buffer.
 class Socket : public IIOHandler {
-  friend Socket* CreateServerSocket(const Endpoint& local, EventLoop*, IDataHandler*, fd_t);
-  friend Socket* CreateClientSocket(const Endpoint&,EventLoop*, IDataHandler*);
+  friend Socket* CreateServerSocket(const Endpoint& local, IDataHandler*, fd_t);
+  friend Socket* CreateClientSocket(const Endpoint&, IDataHandler*);
 
 public:
   virtual ~Socket();
@@ -36,24 +37,33 @@ public:
 
   virtual void onWrite(IOEvent*);
 
+  void SetEventLoop(EventLoop *loop) {
+    event_loop_ = loop;
+  }
+
   const Endpoint& GetEndpoint() const {
-    return remote_endpoint_;
+    return local_endpoint_;
   }
 
   inline const string& String() {
+    return local_endpoint_.String();
+  }
+
+  inline const string& RemoteString() {
     return remote_endpoint_.String();
   }
-  
+
   int fd() const { 
     return fd_;
   }
+
 private:
   // only be called if it is a client socket
   void connect();
 
   // socket constructor is private, it can only be creat from CreateServerSocket or CreateClientSocket
-  Socket(const Endpoint& local, EventLoop* loop, IDataHandler* handler, fd_t fd);
-  Socket(const Endpoint& remote, EventLoop* loop, IDataHandler* h);
+  Socket(const Endpoint& local, IDataHandler* handler, fd_t fd);
+  Socket(const Endpoint& remote, IDataHandler* h);
   Socket();
   void close();
 
@@ -105,9 +115,9 @@ private:
 };
 
 // create a server accepted socket
-extern Socket* CreateServerSocket(const Endpoint& local, EventLoop*, IDataHandler*, fd_t);
+extern Socket* CreateServerSocket(const Endpoint& local, IDataHandler*, fd_t);
 
 // create a client socket
-extern Socket* CreateClientSocket(const Endpoint&,EventLoop*, IDataHandler*);
+extern Socket* CreateClientSocket(const Endpoint&, IDataHandler*);
 
 };

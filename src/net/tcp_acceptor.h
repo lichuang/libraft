@@ -11,31 +11,36 @@
 
 namespace libraft {
 
+class IEvent;
 class EventLoop;
-class SessionFactory;
+class IHandlerFactory;
 
 class TcpAcceptor : public IIOHandler  {
 public:
-  TcpAcceptor(SessionFactory* factory, const Endpoint& ep, EventLoop* loop);
+  TcpAcceptor(IHandlerFactory* factory, const Endpoint& ep, EventLoop* loop);
 
   ~TcpAcceptor();
 
-  Status Listen(const Endpoint& ep);
+  void Listen();
 
   virtual void onRead(IOEvent*);
 
   virtual void onWrite(IOEvent*);
 
-private:
-  // SessionFactory
-  SessionFactory* factory_;
+  string String() const;
 
+private:
+  IHandlerFactory* factory_;
+
+  // listen socket
   fd_t fd_;
 
+  // listen address
   Endpoint address_;
 
   EventLoop *event_loop_;
 
-  Event* event_;
+  // listen event
+  IEvent* event_;
 };
 };

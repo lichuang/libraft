@@ -8,12 +8,14 @@ set(libraft_files
   
   src/base/time.cc  
   src/base/worker.cc  
+  src/base/worker_pool.cc  
 
-  src/core/log.cc  
-  src/core/logger.cc  
+  src/base/log.cc  
+  src/base/logger.cc  
 
   src/net/net.cc 
   src/net/socket.cc 
+  src/net/tcp_acceptor.cc 
 
   src/util/hash.cc  
   src/util/string.cc  

@@ -10,8 +10,8 @@
 #include <sstream>
 #include <string>
 #include "base/worker.h"
-#include "core/log.h"
-#include "core/logger.h"
+#include "base/log.h"
+#include "base/logger.h"
 
 using namespace std;
 
