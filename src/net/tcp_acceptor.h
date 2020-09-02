@@ -11,7 +11,7 @@
 
 namespace libraft {
 
-class IEvent;
+class IOEvent;
 class EventLoop;
 class IHandlerFactory;
 
@@ -41,6 +41,6 @@ private:
   EventLoop *event_loop_;
 
   // listen event
-  IEvent* event_;
+  IOEvent* event_;
 };
 };

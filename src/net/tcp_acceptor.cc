@@ -18,15 +18,17 @@ TcpAcceptor::TcpAcceptor(IHandlerFactory* factory, const Endpoint& ep, EventLoop
   : factory_(factory),
     fd_(-1),
     address_(ep),
-    event_loop_(loop) {
+    event_loop_(loop),
+    event_(nullptr) {
 }
 
 TcpAcceptor::~TcpAcceptor() {
-
+  delete event_;
 }
 
 void 
 TcpAcceptor::Listen() {
+  // must listen in main thread
   ASSERT(InMainThread());
 
   Status err;
@@ -36,8 +38,11 @@ TcpAcceptor::Listen() {
     Fatal() << "listen to " << address_.String() << " fail:" << err.String();
     return;
   }
-
-  Info() << "listening to " << address_.String() << " ...";
+  
+  EventLoop* loop = CurrentEventLoop();
+  event_ = new IOEvent(loop, fd_, this);
+  event_->EnableRead();
+  Info() << "listening to " << address_.String() << " ...";  
 }
  
 void 

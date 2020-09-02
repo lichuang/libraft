@@ -16,6 +16,7 @@
 
 namespace libraft {
 
+class EventLoop;
 class IMessage;
 class Worker;
 class IEntity;
@@ -56,7 +57,7 @@ public:
   void afterBindToWorker(Worker*);
 
   // do init in binding worker, can be re-implemented by subclass
-  virtual void initAfterBind(Worker*) {}
+  virtual void initAfterBind() {}
 
   // can be re-implemented by subclass
   virtual int64_t Hash() const {

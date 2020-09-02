@@ -20,6 +20,10 @@ using namespace std;
 
 namespace libraft {
 
+extern bool InMainThread();
+extern Worker* CurrentThread();
+extern EventLoop* CurrentEventLoop();
+
 struct addTimerMsg: public IMessage {
 public:
   addTimerMsg(ITimerEvent* event)
@@ -301,6 +305,11 @@ initMainWorker() {
 Worker*
 CurrentThread() {
   return gWorker;
+}
+
+EventLoop* 
+CurrentEventLoop() {
+  return gWorker->GetEventLoop();
 }
 
 bool 

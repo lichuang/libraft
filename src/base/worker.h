@@ -13,6 +13,7 @@
 #include "base/event.h"
 #include "base/duration.h"
 #include "base/signaler.h"
+#include "base/worker_extern.h"
 
 using namespace std;
 
@@ -93,6 +94,10 @@ public:
     return type_;
   }
 
+  EventLoop* GetEventLoop() {
+    return ev_loop_;
+  }
+
 private:
   // worker can only be created in worker poll and logger
   Worker(const string& name, threadType, bool isMain = false);
@@ -157,10 +162,5 @@ protected:
   threadType type_;
   DISALLOW_COPY_AND_ASSIGN(Worker);
 };
-
-extern void initMainWorker();
-
-extern bool InMainThread();
-extern Worker* CurrentThread();
 
 };

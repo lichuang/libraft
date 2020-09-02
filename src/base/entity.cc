@@ -27,7 +27,7 @@ void
 IEntity::afterBindToWorker(Worker* w) {
   w->AddEntity(this);
   // do subclass init
-  afterBindToWorker(w);
+  initAfterBind();
 }
 
 void 

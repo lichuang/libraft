@@ -11,38 +11,40 @@
 namespace libraft {
 
 // create a server side accepted socket
-Socket* CreateServerSocket(const Endpoint& local, IDataHandler *handler, fd_t fd) {
-  return new Socket(local, handler, fd);
+Socket* CreateServerSocket(const Endpoint& local, IDataHandler *handler, EventLoop* loop, fd_t fd) {
+  return new Socket(local, handler, loop, fd);
 }
 
 // create a client side connect to server socket
-Socket* CreateClientSocket(const Endpoint& remote,IDataHandler* handler) {
-  return new Socket(remote, handler);
+Socket* CreateClientSocket(const Endpoint& remote, IDataHandler* handler, EventLoop* loop) {
+  return new Socket(remote, handler, loop);
 }
 
 // create a server side socket
-Socket::Socket(const Endpoint& local, IDataHandler* handler, fd_t fd)
+Socket::Socket(const Endpoint& local, IDataHandler* handler, EventLoop* loop, fd_t fd)
   : fd_(fd),
     handler_(handler),
-    event_loop_(nullptr),
+    event_loop_(loop),
     is_writable_(false),
     status_(kSocketConnected),
     server_side_(true),
     local_endpoint_(local) {  
-  //GetEndpointByFd(fd, &remote_endpoint_);
-  //event_ = new IOEvent(event_loop_, fd_, this);
+  GetEndpointByFd(fd, &remote_endpoint_);
+  event_ = new IOEvent(event_loop_, fd_, this);
 }
 
 // create a client side socket
-Socket::Socket(const Endpoint& remote, IDataHandler* h)
+Socket::Socket(const Endpoint& remote, IDataHandler* h, EventLoop* loop)
   : fd_(TcpSocket(NULL)),
     handler_(h),
-    event_loop_(nullptr),
+    event_loop_(loop),
     is_writable_(false),
     status_(kSocketInit),
     server_side_(false),
-    remote_endpoint_(remote) { 
-  //event_ = new IOEvent(event_loop_, fd_, this);
+    remote_endpoint_(remote) {
+  Status err;
+  ConnectAsync(remote_endpoint_, fd_, &err);
+  event_ = new IOEvent(event_loop_, fd_, this);
 }
 
 Socket::~Socket() {

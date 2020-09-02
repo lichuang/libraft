@@ -6,6 +6,7 @@
 
 #include <vector>
 #include "base/singleton.h"
+#include "base/worker_extern.h"
 
 using namespace std;
 
@@ -40,9 +41,6 @@ private:
   vector<Worker*> workers_;
   int current_;
 };
-
-extern void CreateWorkerPool(int);
-extern bool InMainThread();
 
 #define gWorkerPool libraft::Singleton<libraft::WorkerPool>::Instance()
 };

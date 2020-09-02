@@ -16,6 +16,7 @@ set(libraft_files
   src/net/net.cc 
   src/net/socket.cc 
   src/net/tcp_acceptor.cc 
+  src/net/session_entity.cc 
 
   src/util/hash.cc  
   src/util/string.cc  
