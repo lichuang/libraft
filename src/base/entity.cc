@@ -24,13 +24,6 @@ IEntity::IEntity(EntityType typ) {
 }
 
 void 
-IEntity::afterBindToWorker(Worker* w) {
-  w->AddEntity(this);
-  // do subclass init
-  initAfterBind();
-}
-
-void 
 IEntity::Bind(Worker *w, EntityId id) {
   ref_.worker_ = w;
   ref_.id_ = id;

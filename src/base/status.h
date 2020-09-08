@@ -20,7 +20,7 @@ enum {
 // Status class describe operation status
 class Status {
 public:
-  Status(int code=kOK, const std::string& msg="")
+  Status(int code=kOK, const std::string& msg="OK")
     : code_(code), msg_(msg) {
   }
 

@@ -5,6 +5,7 @@
 #include "base/entity_type.h"
 #include "base/worker_extern.h"
 #include "net/session_entity.h"
+#include "net/data_handler.h"
 #include "net/socket.h"
 
 namespace libraft {
@@ -33,8 +34,10 @@ void
 SessionEntity::initAfterBind() {
   EventLoop* loop = CurrentEventLoop();
   if (fd_ != -1) {
-    socket_ = CreateServerSocket(address_, handler_, loop, fd_);
+    Info() << "create a server accepted entity for fd:" << fd_;
+    socket_ = CreateServerSocket(address_, handler_, loop, fd_);    
   } else {
+    Info() << "create a client connect entity";
     socket_ = CreateClientSocket(address_, handler_, loop);
   }
 }

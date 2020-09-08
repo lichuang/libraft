@@ -17,7 +17,7 @@ class IHandlerFactory;
 
 class TcpAcceptor : public IIOHandler  {
 public:
-  TcpAcceptor(IHandlerFactory* factory, const Endpoint& ep, EventLoop* loop);
+  TcpAcceptor(IHandlerFactory* factory, const Endpoint& ep);
 
   ~TcpAcceptor();
 

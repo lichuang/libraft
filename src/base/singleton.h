@@ -3,6 +3,7 @@
  */
 
 #pragma once
+
 #include <pthread.h>
 #include "base/define.h"
 
@@ -32,5 +33,6 @@ template<typename T>
 pthread_once_t Singleton<T>::ponce_ = PTHREAD_ONCE_INIT;
 
 template<typename T>
-T* Singleton<T>::value_ = NULL;
+T* Singleton<T>::value_ = nullptr;
+
 };

@@ -60,8 +60,8 @@ public:
     return local_endpoint_;
   }
 
-  inline const string& String() {
-    return local_endpoint_.String();
+  inline const string& String() const {
+    return desc_;
   }
 
   inline const string& RemoteString() {
@@ -114,6 +114,7 @@ private:
 
   IOEvent* event_;
 
+  string desc_;
   // disable copy and assign operate
   DISALLOW_COPY_AND_ASSIGN(Socket);
 };

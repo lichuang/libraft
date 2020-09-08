@@ -47,14 +47,14 @@ WorkerPool::next(IEntity* ) {
 
 void 
 WorkerPool::Bind(IEntity* en) {
-  Worker *worker = next(en);
-  worker->SendtoWorker(new bindEntityMsg(en));
-  worker->AddEntity(en);
   // send bind message to worker
+  Worker *worker = next(en);
+  worker->SendtoWorker(new bindEntityMsg(en));  
 }
 
 void 
 CreateWorkerPool(int num) {
+  initMainWorker();
   gWorkerPool->start(num);
 }
 };

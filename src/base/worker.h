@@ -114,7 +114,7 @@ private:
   void init();
 
   TimerEventId newTimer(ITimerHandler*, const Duration& delay, bool);
-
+  
 protected:  
   virtual void Run();
   static void main(Worker*, WaitGroup*);
@@ -145,6 +145,7 @@ protected:
   EntityId current_;
 
   typedef map<EntityId, IEntity*> EntityMap;
+  std::mutex mutex_;
   EntityMap entities_;
 
   // default worker entity

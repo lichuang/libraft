@@ -31,6 +31,10 @@ Socket::Socket(const Endpoint& local, IDataHandler* handler, EventLoop* loop, fd
     local_endpoint_(local) {  
   GetEndpointByFd(fd, &remote_endpoint_);
   event_ = new IOEvent(event_loop_, fd_, this);
+  event_->EnableRead();
+  //event_->EnableWrite();
+  handler_->SetSocket(this);
+  desc_ = local_endpoint_.String();
 }
 
 // create a client side socket
@@ -42,9 +46,12 @@ Socket::Socket(const Endpoint& remote, IDataHandler* h, EventLoop* loop)
     status_(kSocketInit),
     server_side_(false),
     remote_endpoint_(remote) {
-  Status err;
-  ConnectAsync(remote_endpoint_, fd_, &err);
+  Status err;  
   event_ = new IOEvent(event_loop_, fd_, this);
+  event_->EnableRead();
+  //event_->EnableWrite();  
+  handler_->SetSocket(this);
+  connect();
 }
 
 Socket::~Socket() {
@@ -55,7 +62,7 @@ void
 Socket::connect() {
   ASSERT(!server_side_);
 
-  Info() << "try connect to " << String();
+  Info() << "try connect to " << remote_endpoint_.String();
 
   if (status_ != kSocketInit) {
     return;
@@ -68,6 +75,7 @@ Socket::connect() {
   
   if (!err.Ok()) {
     //poller_->Add(fd_, this);
+    event_->EnableWrite();
   } else {
     handler_->onConnect(err);
     status_ = kSocketConnected;
@@ -87,12 +95,11 @@ Socket::onRead(IOEvent*) {
     return;
   }
   Status err;
-  int n;
-  bool flag = false;
 
   while (true) {
-    n = Recv(this, &read_buf_, &err);
+    Recv(this, &read_buf_, &err);
     Info()  << "readable size:" << read_buf_.ReadableBytes();
+
     if (!err.Ok() && !err.TryIOAgain()) {
       if (handler_) {
         handler_->onError(err);
@@ -102,13 +109,10 @@ Socket::onRead(IOEvent*) {
       return;
     } else if (err.TryIOAgain()) {
         break;      
-    } else if (n > 0 && !flag) {
-      // has read data from socket
-      flag = true;
     }
   }
 
-  if (flag && handler_) {
+  if (read_buf_.ReadableBytes() > 0 && handler_) {
     // if read data from socket, call handler->onRead
     handler_->onRead();
   }
@@ -136,10 +140,13 @@ Socket::onWrite(IOEvent*) {
     if (write_buf_.Empty()) {
       // when write buffer empty, clear the writeable flag
       is_writable_ = false;
+      event_->DisableWrite();
       break;
     }
 
     n = Send(this, &write_buf_, &err);
+    Info() << "send " << n << " bytes, err:" << err.String() << write_buf_.Empty();
+
     if (!err.Ok() && !err.TryIOAgain()) {
       if (handler_) {
         handler_->onError(err);
@@ -159,25 +166,19 @@ Socket::onWrite(IOEvent*) {
   }
 }
 
-/*
 void
 Socket::Write(const char* from, size_t n) {
   // write data to write buffer
   write_buf_.Write(from, n);
   if (!is_writable_) {
-    // when write buffer is not empty, set the writeable flag
     is_writable_ = true;
-    // mark this handler writeable
-    //poller_->MarkWriteable(handle_);
+    event_->EnableWrite();
   }
 }
 
 size_t
 Socket::Read(char* to, size_t n) {
-  // read data info read buffer
-  //int   Recv(Socket *, Buffer *buffer, int *err);
-  //return Recv.Read(to, n);
-  return 0;
+  return read_buf_.Read(to, n);
 }
-*/
+
 };

@@ -52,7 +52,8 @@ public:
 
   void handleBindEntityMessage(IMessage *m) {
     IEntity *en = ((bindEntityMsg*)m)->entity_;
-    en->afterBindToWorker(ref_.worker_);
+    ref_.worker_->AddEntity(this);
+    en->initAfterBind();
   }  
 };
 
@@ -87,6 +88,10 @@ Worker::Worker(const string &name, threadType typ, bool isMain)
     current_msg_id_(0),
     current_timer_id_(0),
     type_(typ) {  
+  if (isMain) {
+    gWorker = this;
+  }
+
   mailbox_ = new Mailbox(this);
   // add mailbox signal fd into event loop
   fd_t fd = signaler_.Fd();
@@ -98,8 +103,7 @@ Worker::Worker(const string &name, threadType typ, bool isMain)
 
   // start worker thread
   if (isMain) {
-    // save TLS worker pointer
-    gWorker = this;
+    // save TLS worker pointer   
     init();
     return;
   }
@@ -119,9 +123,8 @@ Worker::~Worker() {
 
 void 
 Worker::AddEntity(IEntity* entity) {
-  // AddEntity can only be called in current thread
-  ASSERT(CurrentThread() == this);
-
+  std::lock_guard<std::mutex> lock(mutex_);
+  
   // register entity in worker
   EntityId id = ++current_;
   while (entities_.find(id) != entities_.end()) {
@@ -267,33 +270,21 @@ Worker::main(Worker* worker, WaitGroup* wg) {
 }
 
 void 
-Sendto(const EntityRef& dstRef, IMessage* msg) {
-  if (!gWorker) {
-    initMainWorker();
-  }  
+Sendto(const EntityRef& dstRef, IMessage* msg) { 
   gWorker->worker_entity_->Sendto(dstRef, msg);
 }
 
 MessageId 
 NewMsgId() {
-  if (!gWorker) {
-    initMainWorker();
-  }  
   return gWorker->NewMsgId();
 }
 
 const string& 
-CurrentThreadName() {
-  if (!gWorker) {
-    initMainWorker();
-  }  
+CurrentThreadName() { 
   return gWorker->String();
 }
 
 ThreadId CurrentThreadId() {
-  if (!gWorker) {
-    initMainWorker();
-  }
   return gWorker->Id();
 }
 

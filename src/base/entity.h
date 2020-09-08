@@ -54,8 +54,6 @@ public:
   virtual ~IEntity() {
   }
 
-  void afterBindToWorker(Worker*);
-
   // do init in binding worker, can be re-implemented by subclass
   virtual void initAfterBind() {}
 
@@ -68,6 +66,10 @@ public:
     return ref_;
   }
 
+  EntityType Type() const {
+    return ref_.type_;
+  }
+  
   void Bind(Worker *w, EntityId id);
 
   // send a message to dst entity, unlike Ask, Sendto has no response

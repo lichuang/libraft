@@ -9,21 +9,15 @@
 using namespace libraft;
 
 TEST(BufferTest, BufferTest) {
-  /*
   Buffer buf;
 
-  EXPECT_EQ(buf.Length(), 0);
-  EXPECT_EQ(buf.Available(), kInitBufferSize);
+  EXPECT_EQ(buf.Length(), (size_t)0);
+  EXPECT_EQ(buf.WritableBytes(), kPacketSize);
 
   string str = "hello";
   buf.AppendString(str);
-  EXPECT_EQ(buf.Length(), static_cast<int>(str.length()));
-  EXPECT_EQ(buf.Available(), static_cast<int>(kInitBufferSize - str.length()));
-
-  buf.Reset();
-  EXPECT_EQ(buf.Length(), 0);
-  EXPECT_EQ(buf.Available(), kInitBufferSize); 
-  */ 
+  EXPECT_EQ(buf.Length(), static_cast<size_t>(str.length()));
+  EXPECT_EQ(buf.WritableBytes(), static_cast<size_t>(kPacketSize - str.length()));
 }
 
 int main(int argc, char* argv[]) {

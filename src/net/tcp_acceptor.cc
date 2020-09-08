@@ -14,23 +14,27 @@ namespace libraft {
 
 DEFINE_int32(backlog, 1024, "tcp listen backlog");
 
-TcpAcceptor::TcpAcceptor(IHandlerFactory* factory, const Endpoint& ep, EventLoop* loop)
+TcpAcceptor::TcpAcceptor(IHandlerFactory* factory, const Endpoint& ep)
   : factory_(factory),
     fd_(-1),
     address_(ep),
-    event_loop_(loop),
-    event_(nullptr) {
+    event_loop_(CurrentEventLoop()),
+    event_(nullptr) {    
 }
 
 TcpAcceptor::~TcpAcceptor() {
-  delete event_;
+  printf("dele\n");
+  if (event_) {
+    event_->DisableAllEvent();
+    Close(fd_);
+    delete event_;
+  }
+
+  delete factory_;
 }
 
 void 
 TcpAcceptor::Listen() {
-  // must listen in main thread
-  ASSERT(InMainThread());
-
   Status err;
 
   fd_ = libraft::Listen(address_, FLAGS_backlog, &err);

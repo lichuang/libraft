@@ -13,10 +13,12 @@ set(libraft_files
   src/base/log.cc  
   src/base/logger.cc  
 
+  src/net/tcp_acceptor.cc 
   src/net/net.cc 
   src/net/socket.cc 
   src/net/tcp_acceptor.cc 
   src/net/session_entity.cc 
+  src/net/acceptor_entity.cc 
 
   src/util/hash.cc  
   src/util/string.cc  
