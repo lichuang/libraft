@@ -10,12 +10,12 @@
 #include "net/data_handler.h"
 
 namespace libraft {
-AcceptorEntity::AcceptorEntity(IHandlerFactory *factory, const Endpoint& ep, ListenFunc func)
+AcceptorEntity::AcceptorEntity(const ServiceOptions& options)
   : IEntity(kAcceptorEntity),
     acceptor_(nullptr),
-    factory_(factory),
-    address_(ep),
-    func_(func) {   
+    factory_(options.factory),
+    address_(options.endpoint),
+    after_listen_func_(options.after_listen_func) {   
   BindEntity(this);
 }
 
@@ -31,8 +31,8 @@ AcceptorEntity::initAfterBind() {
   acceptor_ = new TcpAcceptor(factory_, address_);
   acceptor_->Listen();
 
-  if (func_) {
-    func_();
+  if (after_listen_func_) {
+    after_listen_func_();
   }
 }
 

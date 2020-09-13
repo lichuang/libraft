@@ -8,6 +8,9 @@
 #include "base/server.h"
 #include "base/worker_extern.h"
 #include "base/worker_pool.h"
+#include "net/acceptor_entity.h"
+#include "net/data_handler.h"
+#include "net/session_entity.h"
 
 namespace libraft {
 
@@ -26,6 +29,20 @@ Server::Server()
 Server::~Server() {
   delete worker_pool_;
   delete logger_;
+}
+
+void 
+Server::AddService(const ServiceOptions& options) {
+  ASSERT(acceptors_.find(options.endpoint) == acceptors_.end()) << "service for " << options.endpoint.String() << " existed";
+  AcceptorEntity *ae = new AcceptorEntity(options);
+  ASSERT(ae != nullptr) << "create service for " << options.endpoint.String() << " FAIL";
+  acceptors_[options.endpoint] = ae;
+}
+
+void 
+Server::ConnectTo(const ConnectorOptions& options) {
+  SessionEntity *ce = new SessionEntity(options.factory->NewHandler(), options.endpoint);
+  BindEntity(ce);
 }
 
 void 
@@ -52,8 +69,18 @@ StopServer() {
   delete gServer;
 }
 
-void BindEntity(IEntity* en) {
+void 
+BindEntity(IEntity* en) {
   gServer->Bind(en);
 }
 
+void 
+AddService(const ServiceOptions& options) {
+  gServer->AddService(options);
+}
+
+void 
+ConnectTo(const ConnectorOptions& options) {
+  gServer->ConnectTo(options);
+}
 }

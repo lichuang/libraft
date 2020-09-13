@@ -34,7 +34,8 @@ public:
   void operator=(const Endpoint& ep);
 	void operator=(const struct sockaddr_in& address);
 
-	bool operator==(const Endpoint& ep);
+	bool operator==(const Endpoint& ep) const;
+	bool operator<(const Endpoint& ep)const;
 
 	const string& Address() const {
 		return addr_;
@@ -80,8 +81,15 @@ Endpoint::operator=(const struct sockaddr_in& addr) {
 }
 
 inline bool 
-Endpoint::operator==(const Endpoint& ep) {
+Endpoint::operator==(const Endpoint& ep) const {
 	return this->port_ == ep.port_ && this->str_ == ep.str_;
 }
 
+inline bool 
+Endpoint::operator<(const Endpoint& ep) const {
+	if (this->port_ != ep.port_) {
+		return this->port_ < ep.port_;
+	}
+	return this->str_ < ep.str_;
+}
 };

@@ -11,8 +11,6 @@
 #include "base/wait.h"
 #include "base/log.h"
 #include "net/data_handler.h"
-#include "net/acceptor_entity.h"
-#include "net/session_entity.h"
 #include "net/socket.h"
 #include "base/server.h"
 
@@ -115,13 +113,17 @@ TEST(ServerTest, echo) {
 
   wait.Add(1);
   
-  Endpoint ep = Endpoint("127.0.0.1", 22222);
-
   // create acceptor entity
-  AcceptorEntity *ae = new AcceptorEntity(new EchoServerHandlerFactory(), ep, []() { 
+  Endpoint ep = Endpoint("127.0.0.1", 22222);
+  ServiceOptions options;
+  options.endpoint = ep;
+  options.factory = new EchoServerHandlerFactory();
+  options.after_listen_func = []() { 
     Info() << "begin accept new connection";
     wait.Done(); 
-  });
+  };
+  
+  AddService(options);  
 
   // wait until acceptor bind
   wait.Wait();
@@ -129,12 +131,13 @@ TEST(ServerTest, echo) {
   wait.Add(1);
 
   // create client entity
-  EchoClientHandlerFactory *cf = new EchoClientHandlerFactory();
-  SessionEntity ce(cf->NewHandler(), ep);
-  BindEntity(&ce);
+  ConnectorOptions connector_options;
   
+  connector_options.factory = new EchoClientHandlerFactory();
+  connector_options.endpoint = ep;
+  ConnectTo(connector_options);
+
   wait.Wait();
-  delete ae;
 }
 
 int main(int argc, char* argv[]) {

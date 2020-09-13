@@ -6,7 +6,7 @@
 
 #include "base/entity.h"
 #include "base/typedef.h"
-#include "net/endpoint.h"
+#include "net/net_options.h"
 
 namespace libraft {
 
@@ -20,7 +20,7 @@ typedef void (*ListenFunc)();
 // class for acceptor entity
 class AcceptorEntity : public IEntity {
 public:
-  AcceptorEntity(IHandlerFactory *factory, const Endpoint&, ListenFunc func = nullptr);
+  AcceptorEntity(const ServiceOptions&);
 
   ~AcceptorEntity();
 
@@ -32,6 +32,6 @@ protected:
   IHandlerFactory *factory_;
   Endpoint address_;
 
-  ListenFunc func_;
+  AfterListenFunc after_listen_func_;
 };
 };

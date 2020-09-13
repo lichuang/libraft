@@ -71,7 +71,7 @@ Logger::~Logger() {
 
 void
 Logger::processLog(LogMessageData *data) {
-  printf("%s\n", data->text_);
+  printf("%s", data->text_);
 }
 
 void

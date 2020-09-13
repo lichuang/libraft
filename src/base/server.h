@@ -4,7 +4,11 @@
 
 #pragma once
 
+#include <map>
 #include "base/singleton.h"
+#include "net/net_options.h"
+
+using namespace std;
 
 namespace libraft {
 
@@ -16,6 +20,7 @@ struct ServerOptions {
   int worker_num;
 };
 
+class AcceptorEntity;
 class WorkerPool;
 class Logger;
 class IEntity;
@@ -24,6 +29,9 @@ class Server {
   friend class Singleton<Server>;
   
 public:
+  void AddService(const ServiceOptions&);
+  void ConnectTo(const ConnectorOptions&);
+
   void Bind(IEntity* en);
   void Start(const ServerOptions& options);
   Logger* logger() {
@@ -40,6 +48,8 @@ private:
 private:
   WorkerPool *worker_pool_;
   Logger *logger_;
+  typedef map<Endpoint, AcceptorEntity*> AcceptorEntityMap;
+  AcceptorEntityMap acceptors_;
 };
 
 #define gServer libraft::Singleton<libraft::Server>::Instance()
@@ -49,5 +59,6 @@ extern void StartServer(const ServerOptions&);
 extern void StopServer();
 
 extern void BindEntity(IEntity*);
-
+extern void AddService(const ServiceOptions&);
+extern void ConnectTo(const ConnectorOptions&);
 }
