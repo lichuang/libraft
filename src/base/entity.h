@@ -51,9 +51,9 @@ class IEntity : public ITimerHandler {
 public:
   IEntity(EntityType typ);
 
-  virtual ~IEntity() {
-  }
-
+  // cannot delete directly
+  virtual ~IEntity();
+  
   // do init in binding worker, can be re-implemented by subclass
   virtual void initAfterBind() {}
 

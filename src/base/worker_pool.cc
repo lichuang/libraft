@@ -16,8 +16,13 @@ DEFINE_int32(select_worker_algo, 1, "select worker algorithm,1:round robin,2:has
 static const int kByRoundRobin = 1;
 static const int kByHashAddress = 2;
 
-WorkerPool::WorkerPool()
+WorkerPool::WorkerPool(int num)
   : current_(0) {
+  int i;
+  for (i = 0; i < num; ++i) {
+    Worker* worker = new Worker(StringPrintf("worker_%d", i+1), kWorkThread);
+    workers_.push_back(worker);
+  }    
 }
 
 WorkerPool::~WorkerPool() {
@@ -29,15 +34,6 @@ WorkerPool::~WorkerPool() {
   }
 
   workers_.clear();
-}
-
-void
-WorkerPool::start(int num) {
-  int i;
-  for (i = 0; i < num; ++i) {
-    Worker* worker = new Worker(StringPrintf("worker_%d", i+1), kWorkThread);
-    workers_.push_back(worker);
-  }
 }
 
 Worker* 
@@ -52,9 +48,4 @@ WorkerPool::Bind(IEntity* en) {
   worker->SendtoWorker(new bindEntityMsg(en));  
 }
 
-void 
-CreateWorkerPool(int num) {
-  initMainWorker();
-  gWorkerPool->start(num);
-}
 };

@@ -5,7 +5,6 @@
 #pragma once
 
 #include <vector>
-#include "base/singleton.h"
 #include "base/worker_extern.h"
 
 using namespace std;
@@ -16,11 +15,11 @@ class IEntity;
 class IMessage;
 class Worker;
 class Endpoint;
+class Server;
 
 class WorkerPool {
-  friend class Singleton<WorkerPool>;
   friend class Worker;
-  friend void CreateWorkerPool(int);
+  friend class Server;
 public:
   ~WorkerPool();  
 
@@ -32,8 +31,7 @@ public:
   }
 
 private:
-  WorkerPool();
-  void start(int);
+  WorkerPool(int num);
   void doInit() {}
   Worker* next(IEntity* en);  
 
@@ -42,5 +40,4 @@ private:
   int current_;
 };
 
-#define gWorkerPool libraft::Singleton<libraft::WorkerPool>::Instance()
 };

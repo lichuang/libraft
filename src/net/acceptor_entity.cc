@@ -3,6 +3,7 @@
  */
 
 #include "base/entity_type.h"
+#include "base/server.h"
 #include "base/worker_pool.h"
 #include "net/tcp_acceptor.h"
 #include "net/acceptor_entity.h"
@@ -15,7 +16,7 @@ AcceptorEntity::AcceptorEntity(IHandlerFactory *factory, const Endpoint& ep, Lis
     factory_(factory),
     address_(ep),
     func_(func) {   
-  gWorkerPool->Bind(this);
+  BindEntity(this);
 }
 
 AcceptorEntity::~AcceptorEntity() {

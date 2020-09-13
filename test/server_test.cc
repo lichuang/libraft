@@ -9,15 +9,28 @@
 #include "base/duration.h"
 #include "base/message.h"
 #include "base/wait.h"
-#include "base/worker_extern.h"
-#include "base/worker_pool.h"
 #include "base/log.h"
 #include "net/data_handler.h"
 #include "net/acceptor_entity.h"
 #include "net/session_entity.h"
 #include "net/socket.h"
+#include "base/server.h"
 
 using namespace libraft;
+
+class ServerTestEnvironment : public testing::Environment
+{
+public:
+    virtual void SetUp()
+    {
+        std::cout << "server test SetUP" << std::endl;
+        StartServer(ServerOptions());
+    }
+    virtual void TearDown()
+    {
+        std::cout << "server test TearDown" << std::endl;
+    }
+};
 
 TEST(ServerTest, echo) {
   static WaitGroup wait;
@@ -104,7 +117,6 @@ TEST(ServerTest, echo) {
   
   Endpoint ep = Endpoint("127.0.0.1", 22222);
 
-  CreateWorkerPool(2);
   // create acceptor entity
   AcceptorEntity *ae = new AcceptorEntity(new EchoServerHandlerFactory(), ep, []() { 
     Info() << "begin accept new connection";
@@ -119,13 +131,14 @@ TEST(ServerTest, echo) {
   // create client entity
   EchoClientHandlerFactory *cf = new EchoClientHandlerFactory();
   SessionEntity ce(cf->NewHandler(), ep);
-  gWorkerPool->Bind(&ce);
+  BindEntity(&ce);
   
   wait.Wait();
-  ae = ae;
+  delete ae;
 }
 
 int main(int argc, char* argv[]) {
+  testing::AddGlobalTestEnvironment(new ServerTestEnvironment);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

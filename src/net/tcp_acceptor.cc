@@ -5,6 +5,7 @@
 #include <gflags/gflags.h>
 #include "base/worker_pool.h"
 #include "base/log.h"
+#include "base/server.h"
 #include "net/data_handler.h"
 #include "net/net.h"
 #include "net/session_entity.h"
@@ -23,14 +24,11 @@ TcpAcceptor::TcpAcceptor(IHandlerFactory* factory, const Endpoint& ep)
 }
 
 TcpAcceptor::~TcpAcceptor() {
-  printf("dele\n");
   if (event_) {
     event_->DisableAllEvent();
     Close(fd_);
     delete event_;
   }
-
-  delete factory_;
 }
 
 void 
@@ -64,9 +62,8 @@ TcpAcceptor::onRead(IOEvent*) {
     }
     IDataHandler *handler = factory_->NewHandler();
     SessionEntity* se = new SessionEntity(handler, ep, fd);
-    gWorkerPool->Bind(se);
-  }
-  
+    BindEntity(se);
+  }  
 }
 
 void 

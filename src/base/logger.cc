@@ -7,11 +7,12 @@
 #include <gflags/gflags.h>
 #include "base/entity.h"
 #include "base/entity_type.h"
-#include "base/message.h"
-#include "base/time.h"
-#include "base/worker.h"
 #include "base/log.h"
 #include "base/logger.h"
+#include "base/message.h"
+#include "base/server.h"
+#include "base/time.h"
+#include "base/worker.h"
 
 namespace libraft {
 
@@ -114,11 +115,6 @@ Logger::Send(LogMessageData *data) {
 }
 
 void
-Logger::doInit() {
-
-}
-
-void
 Logger::Flush(bool end) {
   //flush();	
 }
@@ -131,6 +127,11 @@ SendLog(LogMessageData *data) {
 void 
 Flush(bool end) {
 	gLogger->Flush(end);
+}
+
+const char* 
+CurrentLogtimeString() {
+  return gLogger->GetNowLogtimeString();
 }
 
 };

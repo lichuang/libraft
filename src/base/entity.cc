@@ -3,6 +3,7 @@
  */
 
 #include "base/entity.h"
+#include "base/log.h"
 #include "base/message.h"
 #include "base/worker.h"
 
@@ -21,6 +22,10 @@ EntityRef::Response(IMessage* msg, IMessage* srcMsg) {
 
 IEntity::IEntity(EntityType typ) {
   ref_.type_ = typ;
+}
+
+IEntity::~IEntity() {
+  //ASSERT(CurrentThread() == ref_.worker_) << "entity MUST be deleted in the bound worker";
 }
 
 void 

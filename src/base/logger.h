@@ -7,7 +7,6 @@
 #include <atomic>
 #include <time.h>
 #include "base/entity.h"
-#include "base/singleton.h"
 
 namespace libraft {
 
@@ -15,13 +14,14 @@ struct LogMessageData;
 class Worker;
 class IEntity;
 class loggerEntity;
+class Server;
 
 // log time string length
 static const int kLogTimeStringLength = sizeof("2019/01/01 00:00:00.000");
 
 class Logger {
-  friend class Singleton<Logger>;
   friend class loggerEntity;
+  friend class Server;
 
 public:
   ~Logger();
@@ -36,7 +36,6 @@ public:
 
 private:
   Logger();
-  void doInit();
 
   void updateTime();
 
@@ -61,8 +60,6 @@ private:
   std::atomic<int> index_;    
 };
 
-#define gLogger libraft::Singleton<libraft::Logger>::Instance()
-
 // send log message data to logger 
 extern void SendLog(LogMessageData *data);
 
@@ -70,6 +67,6 @@ extern void SendLog(LogMessageData *data);
 extern void Flush(bool end);
 
 // return current log time string
-#define CurrentLogtimeString gLogger->GetNowLogtimeString
+extern const char* CurrentLogtimeString();
 
 };
