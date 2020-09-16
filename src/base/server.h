@@ -20,7 +20,7 @@ struct ServerOptions {
   int worker_num;
 };
 
-class AcceptorEntity;
+class ServiceEntity;
 class WorkerPool;
 class Logger;
 class IEntity;
@@ -48,8 +48,8 @@ private:
 private:
   WorkerPool *worker_pool_;
   Logger *logger_;
-  typedef map<Endpoint, AcceptorEntity*> AcceptorEntityMap;
-  AcceptorEntityMap acceptors_;
+  typedef map<Endpoint, ServiceEntity*> AcceptorEntityMap;
+  AcceptorEntityMap service_entities_;
 };
 
 #define gServer libraft::Singleton<libraft::Server>::Instance()

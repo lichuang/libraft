@@ -19,14 +19,11 @@ using namespace libraft;
 class ServerTestEnvironment : public testing::Environment
 {
 public:
-    virtual void SetUp()
-    {
-        std::cout << "server test SetUP" << std::endl;
-        StartServer(ServerOptions());
+    virtual void SetUp() {        
+      StartServer(ServerOptions());
     }
-    virtual void TearDown()
-    {
-        std::cout << "server test TearDown" << std::endl;
+    virtual void TearDown() {
+      StopServer();    
     }
 };
 
@@ -46,7 +43,7 @@ TEST(ServerTest, echo) {
       Info() << "server on write";
     }
 
-    virtual void onRead() { 
+    virtual void onRead(Buffer*) { 
       Info() << "server on read";
       //EXPECT_EQ();
       wait.Done();
@@ -85,7 +82,7 @@ TEST(ServerTest, echo) {
       Info() << "client on write";
     }
 
-    virtual void onRead() { 
+    virtual void onRead(Buffer*) { 
       Info() << "client on read";
     }
     

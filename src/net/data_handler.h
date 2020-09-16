@@ -7,6 +7,7 @@
 
 namespace libraft {
 
+class Buffer;
 class Socket;
 
 // virtual interface for socket data handler
@@ -26,7 +27,7 @@ public:
 
   }
 
-  virtual void onRead() { 
+  virtual void onRead(Buffer*) { 
 
   }
   

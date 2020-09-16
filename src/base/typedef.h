@@ -19,6 +19,8 @@ typedef uint32_t TimerEventId;
 
 typedef int fd_t;
 
+typedef uint64_t MethodId;
+
 // invalid fd const
 static const fd_t kInvalidFd     = -1;
 

@@ -11,5 +11,5 @@ namespace libraft {
 static const EntityType kWorkerEntity     = 1;
 static const EntityType kLoggerEntity     = 2;
 static const EntityType kSessionEntity    = 3;
-static const EntityType kAcceptorEntity   = 4;
+static const EntityType kServiceEntity   = 4;
 }

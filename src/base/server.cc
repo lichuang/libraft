@@ -8,7 +8,7 @@
 #include "base/server.h"
 #include "base/worker_extern.h"
 #include "base/worker_pool.h"
-#include "net/acceptor_entity.h"
+#include "net/service_entity.h"
 #include "net/data_handler.h"
 #include "net/session_entity.h"
 
@@ -33,10 +33,10 @@ Server::~Server() {
 
 void 
 Server::AddService(const ServiceOptions& options) {
-  ASSERT(acceptors_.find(options.endpoint) == acceptors_.end()) << "service for " << options.endpoint.String() << " existed";
-  AcceptorEntity *ae = new AcceptorEntity(options);
+  ASSERT(service_entities_.find(options.endpoint) == service_entities_.end()) << "service for " << options.endpoint.String() << " existed";
+  ServiceEntity *ae = new ServiceEntity(options);
   ASSERT(ae != nullptr) << "create service for " << options.endpoint.String() << " FAIL";
-  acceptors_[options.endpoint] = ae;
+  service_entities_[options.endpoint] = ae;
 }
 
 void 

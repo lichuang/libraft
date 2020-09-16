@@ -9,26 +9,27 @@
 #include "net/net_options.h"
 
 namespace libraft {
-
 class EventLoop;
 class IHandlerFactory;
 class Socket;
-class TcpAcceptor;
+class IService;
 
 typedef void (*ListenFunc)();
 
 // class for acceptor entity
-class AcceptorEntity : public IEntity {
+class ServiceEntity : public IEntity {
 public:
-  AcceptorEntity(const ServiceOptions&);
+  ServiceEntity(const ServiceOptions&);
 
-  ~AcceptorEntity();
+  ~ServiceEntity();
 
   void initAfterBind();
   
   void Stop();
+
 protected:
-  TcpAcceptor* acceptor_;
+  IService* service_;
+  ServiceOptions options_;
   IHandlerFactory *factory_;
   Endpoint address_;
 

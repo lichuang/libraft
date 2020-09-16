@@ -9,21 +9,21 @@
 #include "net/data_handler.h"
 #include "net/net.h"
 #include "net/session_entity.h"
-#include "net/tcp_acceptor.h"
+#include "net/service.h"
 
 namespace libraft {
 
 DEFINE_int32(backlog, 1024, "tcp listen backlog");
 
-TcpAcceptor::TcpAcceptor(IHandlerFactory* factory, const Endpoint& ep)
-  : factory_(factory),
+IService::IService(const ServiceOptions& options)
+  : factory_(options.factory),
     fd_(-1),
-    address_(ep),
+    address_(options.endpoint),
     event_loop_(CurrentEventLoop()),
     event_(nullptr) {    
 }
 
-TcpAcceptor::~TcpAcceptor() {
+IService::~IService() {
   if (event_) {
     event_->DisableAllEvent();
     Close(fd_);
@@ -32,7 +32,7 @@ TcpAcceptor::~TcpAcceptor() {
 }
 
 void 
-TcpAcceptor::Listen() {
+IService::Listen() {
   Status err;
 
   fd_ = libraft::Listen(address_, FLAGS_backlog, &err);
@@ -48,7 +48,7 @@ TcpAcceptor::Listen() {
 }
  
 void 
-TcpAcceptor::onRead(IOEvent*) {
+IService::onRead(IOEvent*) {
   Endpoint ep;
   Status status;
 
@@ -67,7 +67,7 @@ TcpAcceptor::onRead(IOEvent*) {
 }
 
 void 
-TcpAcceptor::onWrite(IOEvent*) {
+IService::onWrite(IOEvent*) {
   // nothing to do
   Fatal() << "acceptor cannot has write event";
 }

@@ -8,6 +8,7 @@
 #include "base/status.h"
 #include "base/typedef.h"
 #include "net/endpoint.h"
+#include "net/net_options.h"
 
 namespace libraft {
 
@@ -15,11 +16,11 @@ class IOEvent;
 class EventLoop;
 class IHandlerFactory;
 
-class TcpAcceptor : public IIOHandler  {
+class IService : public IIOHandler  {
 public:
-  TcpAcceptor(IHandlerFactory* factory, const Endpoint& ep);
+  IService(const ServiceOptions&);
 
-  ~TcpAcceptor();
+  virtual ~IService();
 
   void Listen();
 
