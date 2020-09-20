@@ -11,6 +11,7 @@
 #include "net/service_entity.h"
 #include "net/data_handler.h"
 #include "net/session_entity.h"
+#include "net/socket.h"
 
 namespace libraft {
 
@@ -41,7 +42,8 @@ Server::AddService(const ServiceOptions& options) {
 
 void 
 Server::ConnectTo(const ConnectorOptions& options) {
-  SessionEntity *ce = new SessionEntity(options.factory->NewHandler(), options.endpoint);
+  Socket* socket = CreateClientSocket(options.endpoint);
+  SessionEntity *ce = new SessionEntity(options.factory->NewHandler(socket), options.endpoint);
   BindEntity(ce);
 }
 

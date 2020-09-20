@@ -11,51 +11,58 @@
 namespace libraft {
 
 // create a server side accepted socket
-Socket* CreateServerSocket(const Endpoint& local, IDataHandler *handler, EventLoop* loop, fd_t fd) {
-  return new Socket(local, handler, loop, fd);
+Socket* CreateServerSocket(const Endpoint& local, fd_t fd) {
+  return new Socket(local, fd);
 }
 
 // create a client side connect to server socket
-Socket* CreateClientSocket(const Endpoint& remote, IDataHandler* handler, EventLoop* loop) {
-  return new Socket(remote, handler, loop);
+Socket* CreateClientSocket(const Endpoint& remote) {
+  return new Socket(remote);
 }
 
 // create a server side socket
-Socket::Socket(const Endpoint& local, IDataHandler* handler, EventLoop* loop, fd_t fd)
+Socket::Socket(const Endpoint& local, fd_t fd)
   : fd_(fd),
-    handler_(handler),
-    event_loop_(loop),
+    handler_(nullptr),
+    event_loop_(nullptr),
     is_writable_(false),
     status_(kSocketConnected),
     server_side_(true),
     local_endpoint_(local) {  
   GetEndpointByFd(fd, &remote_endpoint_);
-  event_ = new IOEvent(event_loop_, fd_, this);
-  event_->EnableRead();
-  //event_->EnableWrite();
-  handler_->SetSocket(this);
+
   desc_ = local_endpoint_.String();
 }
 
 // create a client side socket
-Socket::Socket(const Endpoint& remote, IDataHandler* h, EventLoop* loop)
+Socket::Socket(const Endpoint& remote)
   : fd_(TcpSocket(NULL)),
-    handler_(h),
-    event_loop_(loop),
+    handler_(nullptr),
+    event_loop_(nullptr),
     is_writable_(false),
     status_(kSocketInit),
     server_side_(false),
     remote_endpoint_(remote) {
-  Status err;  
-  event_ = new IOEvent(event_loop_, fd_, this);
-  event_->EnableRead();
-  //event_->EnableWrite();  
-  handler_->SetSocket(this);
-  connect();
+
 }
 
 Socket::~Socket() {
   delete event_;
+}
+
+void
+Socket::Init(IDataHandler* handler, EventLoop* loop) {
+  handler_ = handler;
+  event_loop_ = loop;
+
+  if (server_side_) {
+    event_ = new IOEvent(event_loop_, fd_, this);
+    event_->EnableRead();
+  } else {
+    event_ = new IOEvent(event_loop_, fd_, this);
+    event_->EnableRead();
+    connect();
+  }
 }
 
 void 

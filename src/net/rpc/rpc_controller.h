@@ -10,7 +10,7 @@
 using namespace std;
 namespace gpb = ::google::protobuf;
 
-namespace serverkit {
+namespace libraft {
 
 class RpcController : public gpb::RpcController {
 public:

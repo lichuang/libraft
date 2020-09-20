@@ -134,4 +134,8 @@ CurrentLogtimeString() {
   return gLogger->GetNowLogtimeString();
 }
 
+uint64_t 
+CurrentMs() {
+  return gLogger->CurrentMs();
+}
 };

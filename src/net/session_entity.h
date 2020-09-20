@@ -14,7 +14,6 @@ class EventLoop;
 class IDataHandler;
 class Socket;
 
-// class for server accepted entity
 class SessionEntity : public IEntity {
 public:
   SessionEntity(IDataHandler *handler, const Endpoint&, fd_t);

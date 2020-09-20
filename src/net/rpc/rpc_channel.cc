@@ -2,31 +2,28 @@
  * Copyright (C) codedump
  */
 
-#include "base/errcode.h"
-#include "core/poller.h"
-#include "core/socket.h"
-#include "rpc/packet_parser.h"
-#include "rpc/request_context.h"
-#include "rpc/rpc_channel.h"
-#include "rpc/rpc_controller.h"
+#include "net/socket.h"
+#include "net/rpc/packet_parser.h"
+#include "net/rpc/request_context.h"
+#include "net/rpc/rpc_channel.h"
+#include "net/rpc/rpc_controller.h"
 #include "util/global_id.h"
 
 namespace libraft {
 
-RpcSession::RpcSession()
-	: parser_(new PacketParser(socket_)),
-    guid_(NewGlobalID()),
-    allocate_guid_(0),
-    endpoint_(endpoint),
-    poller_(poller) {	
+RpcChannel::RpcChannel(Socket* socket)
+	: IDataHandler(socket),
+    parser_(new PacketParser(socket_)),
+    id_(NewGlobalID()),
+    allocate_id_(0) {	
 }
 
-RpcSession::~RpcSession() {
+RpcChannel::~RpcChannel() {
 	delete parser_;
 }
 
 void 
-RpcSession::pushRequestToQueue(
+RpcChannel::pushRequestToQueue(
   const gpb::MethodDescriptor *method,
   RpcController *controller,
   const gpb::Message *request,
@@ -34,21 +31,21 @@ RpcSession::pushRequestToQueue(
   gpb::Closure *done) {
   Info() << "pushRequestToQueue";
 
-  uint64_t call_guid = allocateGuid();
-  controller->Init(GetGuid(), call_guid);
+  uint64_t call_guid = allocateId();
+  controller->Init(Id(), call_guid);
   packet_queue_.push(new Packet(call_guid, method, request));
 
   request_context_[call_guid] = new RequestContext(controller, response, done);
 }
 
 void 
-RpcSession::OnWrite() { 
+RpcChannel::onWrite() { 
 
 }
 
 void 
-RpcSession::OnRead() {
-  Info() << "RpcSession::OnRead";
+RpcChannel::onRead() {
+  Info() << "RpcChannel::OnRead";
   while (parser_->RecvPacket()) {
     const Packet& packet = parser_->GetPacket();
 
@@ -88,8 +85,8 @@ RpcSession::OnRead() {
 }
   
 void 
-RpcSession::OnConnect(int error) {
-  if (error == kOK) {
+RpcChannel::onConnect(const Status& status) {
+  if (status.Ok()) {
     while (!packet_queue_.empty()) {
       parser_->SendPacket(packet_queue_.front());
       packet_queue_.pop();
@@ -97,15 +94,15 @@ RpcSession::OnConnect(int error) {
     return;
   }
 
-  Error() << "connect to " << socket_->String() << " failed: " << error;
+  //Error() << "connect to " << socket_->String() << " failed: " << error;
 }
 
 void 
-RpcSession::OnError(int error) {
+RpcChannel::onError(const Status&) {
 }
 
 void 
-RpcSession::CallMethod(
+RpcChannel::CallMethod(
   const gpb::MethodDescriptor *method,
   gpb::RpcController *controller,
   const gpb::Message *request,
@@ -113,18 +110,13 @@ RpcSession::CallMethod(
   gpb::Closure *done) {
   RpcController *rpc_controller = reinterpret_cast<RpcController*>(controller);
 
-  SocketStatus status = socket_->Status();
-
-  Debug() << __FUNCTION__ << " status: " 
-    << status << request->DebugString();
-
-  if (status == SOCKET_CLOSED) {
+  if (socket_->IsClosed()) {
     return;
   }
 
-  if (status == SOCKET_CONNECTED) {
-    uint64_t call_guid = allocateGuid();
-    rpc_controller->Init(GetGuid(), call_guid);
+  if (socket_->IsConnected()) {
+    uint64_t call_guid = allocateId();
+    rpc_controller->Init(Id(), call_guid);
 
     Packet *packet = new Packet(call_guid, method, request);
     Debug() << "write to socket: " << call_guid << " : " << request->DebugString();
@@ -134,15 +126,12 @@ RpcSession::CallMethod(
     return;
   }
 
-  if (status == SOCKET_INIT) {
-    Info() << "rpc channel start connect, guid:" << GetGuid()
-      << ", endpoint: " << endpoint_.String();
-
+  if (socket_->IsInit()) {
     pushRequestToQueue(method, rpc_controller, request, response, done);
-    socket_->Connect();
+    //socket_->Connect();
   }
 
-  if (status == SOCKET_CONNECTING) {
+  if (socket_->IsConnecting()) {
     Debug() << "connecting";
     pushRequestToQueue(method, rpc_controller, request, response, done);
   }

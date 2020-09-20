@@ -35,14 +35,32 @@ enum socketStatus {
 // If send data fail, IDataHandler->onError will be called.
 // When read data from socket, it will read data from the buffer.
 class Socket : public IIOHandler {
-  friend Socket* CreateServerSocket(const Endpoint& local, IDataHandler*, EventLoop* loop, fd_t);
-  friend Socket* CreateClientSocket(const Endpoint&, IDataHandler*, EventLoop* loop);
+  friend Socket* CreateServerSocket(const Endpoint& local, fd_t);
+  friend Socket* CreateClientSocket(const Endpoint&);
 
 public:
+  void Init(IDataHandler*, EventLoop* loop);
+
   virtual ~Socket();
 
   bool ServerSide() const {
     return server_side_;
+  }
+
+  bool IsClosed() const {
+    return status_ == kSocketClosed;
+  }
+
+  bool IsConnected() const {
+    return status_ == kSocketConnected;
+  }
+
+  bool IsInit() const {
+    return status_ == kSocketInit;
+  }
+
+  bool IsConnecting() const {
+    return status_ == kSocketConnecting;
   }
 
   size_t ReadBufferSize() const {
@@ -85,8 +103,8 @@ private:
   void connect();
 
   // socket constructor is private, it can only be creat from CreateServerSocket or CreateClientSocket
-  Socket(const Endpoint& local, IDataHandler* handler, EventLoop* , fd_t fd);
-  Socket(const Endpoint& remote, IDataHandler* h, EventLoop* );
+  Socket(const Endpoint& local, fd_t fd);
+  Socket(const Endpoint& remote);
   Socket();
   void close();
 
@@ -129,8 +147,8 @@ private:
 };
 
 // create a server accepted socket
-extern Socket* CreateServerSocket(const Endpoint& local, IDataHandler*, EventLoop* loop, fd_t);
+extern Socket* CreateServerSocket(const Endpoint& local, fd_t);
 
 // create a client socket
-extern Socket* CreateClientSocket(const Endpoint&, IDataHandler*, EventLoop* loop);
+extern Socket* CreateClientSocket(const Endpoint&);
 };

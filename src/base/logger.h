@@ -34,6 +34,10 @@ public:
     return const_cast<const char*>(cached_log_time_strs_[index_.load(memory_order_acquire)]);
   }
 
+  inline uint64_t CurrentMs() {
+    return cached_msecs_[index_.load(memory_order_acquire)];
+  }
+
 private:
   Logger();
 
@@ -69,4 +73,6 @@ extern void Flush(bool end);
 // return current log time string
 extern const char* CurrentLogtimeString();
 
+// return current time ms
+extern uint64_t CurrentMs();
 };

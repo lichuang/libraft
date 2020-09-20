@@ -34,7 +34,7 @@ TEST(ServerTest, echo) {
   // echo server socket data handler
   class EchoServerHandler : public IDataHandler {
   public:
-    EchoServerHandler() {}
+    EchoServerHandler(Socket* socket) : IDataHandler(socket){}
           
     virtual ~EchoServerHandler() {
     }
@@ -65,15 +65,15 @@ TEST(ServerTest, echo) {
     virtual ~EchoServerHandlerFactory() {
     }
 
-    virtual IDataHandler* NewHandler() {
-      return new EchoServerHandler();
+    virtual IDataHandler* NewHandler(Socket* socket) {
+      return new EchoServerHandler(socket);
     }
   };
 
   // echo client socket data handler
   class EchoClientHandler : public IDataHandler {
   public:
-    EchoClientHandler() {}
+    EchoClientHandler(Socket* socket) : IDataHandler(socket) {}
           
     virtual ~EchoClientHandler() {
     }
@@ -103,8 +103,8 @@ TEST(ServerTest, echo) {
     virtual ~EchoClientHandlerFactory() {
     }
 
-    virtual IDataHandler* NewHandler() {
-      return new EchoClientHandler();
+    virtual IDataHandler* NewHandler(Socket* socket) {
+      return new EchoClientHandler(socket);
     }
   };  
 

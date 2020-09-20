@@ -103,4 +103,4 @@ PacketParser::SendPacket(Packet* packet) {
 	// now free packet
 	delete packet;
 }
-};  // namespace serverkit
+};  // namespace libraft

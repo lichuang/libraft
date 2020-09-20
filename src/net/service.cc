@@ -10,6 +10,7 @@
 #include "net/net.h"
 #include "net/session_entity.h"
 #include "net/service.h"
+#include "net/socket.h"
 
 namespace libraft {
 
@@ -60,7 +61,8 @@ Service::onRead(IOEvent*) {
       }
       break;
     }
-    IDataHandler *handler = factory_->NewHandler();
+    Socket* socket = CreateServerSocket(ep, fd);
+    IDataHandler *handler = factory_->NewHandler(socket);
     SessionEntity* se = new SessionEntity(handler, ep, fd);
     BindEntity(se);
   }  

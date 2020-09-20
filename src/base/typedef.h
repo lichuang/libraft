@@ -19,6 +19,8 @@ typedef uint32_t TimerEventId;
 
 typedef int fd_t;
 
+typedef uint64_t id_t;
+
 typedef uint64_t RpcMethodId;
 
 // invalid fd const

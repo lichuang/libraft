@@ -4,6 +4,7 @@
 
 #pragma once
 #include "base/status.h"
+#include "net/socket.h"
 
 namespace libraft {
 
@@ -13,14 +14,15 @@ class Socket;
 // virtual interface for socket data handler
 class IDataHandler {
 public:
-  IDataHandler()
-    : socket_(NULL) {}
+  IDataHandler(Socket* socket)
+    : socket_(socket) {}
         
   virtual ~IDataHandler() {
+    delete socket_;
   }
 
-  void SetSocket(Socket* sk) {
-    socket_ = sk;
+  Socket* socket() {
+    return socket_;
   }
 
   virtual void onWrite() { 
@@ -49,6 +51,6 @@ public:
   virtual ~IHandlerFactory() {
   }
 
-  virtual IDataHandler* NewHandler() = 0;
+  virtual IDataHandler* NewHandler(Socket*) = 0;
 };
 };

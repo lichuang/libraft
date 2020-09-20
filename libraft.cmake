@@ -19,12 +19,16 @@ set(libraft_files
   src/net/service.cc 
   src/net/session_entity.cc 
   src/net/service_entity.cc 
-
+  
+  src/net/rpc/rpc_channel.cc
   src/net/rpc/rpc_service.cc
   src/net/rpc/packet_parser.cc
 
+  src/util/global_id.cc  
   src/util/hash.cc  
+  src/util/lookup8.cc
   src/util/string.cc  
+  src/util/system.cc  
 )
 
 add_library(raft 
