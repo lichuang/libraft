@@ -4,7 +4,10 @@
 
 #pragma once
 
+#include <google/protobuf/service.h>
 #include "net/endpoint.h"
+
+namespace gpb = ::google::protobuf;
 
 namespace libraft {
 
@@ -30,9 +33,9 @@ struct ServiceOptions {
   // service listen endpoint
   Endpoint endpoint;
 
-  // service,if it is null,service entity will create a default service 
-  // in ServiceEntity::initAfterBind
-  Service *service;
+  // protobuf service(optional)
+  // if not null, will create a RpcService
+  gpb::Service* service;
 
   void operator=(const ServiceOptions& options) {
     this->after_listen_func = options.after_listen_func;

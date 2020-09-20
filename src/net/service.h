@@ -44,4 +44,9 @@ private:
   // listen event
   IOEvent* event_;
 };
+
+class IServiceFactory {
+public:
+  Service* NewService();
+};
 };

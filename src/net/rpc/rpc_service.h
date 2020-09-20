@@ -16,16 +16,8 @@ namespace gpb = ::google::protobuf;
 namespace libraft {
 class RpcMeta;
 
-// rpc service options
-struct RpcServiceOptions : public ServiceOptions {
-  RpcServiceOptions() : ServiceOptions() {
-
-  }
-
-  gpb::Service* service;
-};
-
 class RpcService : public Service {
+public:
   RpcService(const ServiceOptions&);
 
   ~RpcService();

@@ -5,10 +5,12 @@
 #pragma once
 
 #include <map>
+#include <google/protobuf/service.h>
 #include "base/singleton.h"
 #include "net/net_options.h"
 
 using namespace std;
+namespace gpb = ::google::protobuf;
 
 namespace libraft {
 
@@ -30,6 +32,7 @@ class Server {
   
 public:
   void AddService(const ServiceOptions&);
+  
   void ConnectTo(const ConnectorOptions&);
 
   void Bind(IEntity* en);

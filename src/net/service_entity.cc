@@ -8,6 +8,7 @@
 #include "net/service.h"
 #include "net/service_entity.h"
 #include "net/data_handler.h"
+#include "net/rpc/rpc_service.h"
 
 namespace libraft {
 ServiceEntity::ServiceEntity(const ServiceOptions& options)
@@ -30,11 +31,11 @@ ServiceEntity::~ServiceEntity() {
 void 
 ServiceEntity::initAfterBind() {
   if (options_.service) {
-    service_ = options_.service;
+    service_ = new RpcService(options_);
   } else {
     service_ = new Service(options_);
   }
-  
+
   service_->Listen();
 
   if (after_listen_func_) {

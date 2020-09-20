@@ -9,12 +9,16 @@
 namespace libraft {
 RpcService::RpcService(const ServiceOptions& options)
   : Service(options) {
-  RpcServiceOptions& op = (RpcServiceOptions&)options;
-  Register(op.service);
+  Register(options.service);
 }
 
 RpcService::~RpcService() {
-
+  MethodMetaMap::iterator iter = method_map_.begin();
+  while (iter != method_map_.end()) {
+    RpcMeta* meta = iter->second;
+    delete meta;
+    ++iter;
+  }
 }
 
 RpcMeta* 

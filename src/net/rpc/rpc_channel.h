@@ -80,10 +80,10 @@ private:
   RpcService *service_;
 };
 
-class RpcSessionFactory {
+class RpcChannelFactory : public IHandlerFactory {
 public:
-  RpcSessionFactory(){}
-  virtual ~RpcSessionFactory() {
+  RpcChannelFactory(){}
+  virtual ~RpcChannelFactory() {
   }
 
   virtual IDataHandler* NewHandler(Socket* socket) {
