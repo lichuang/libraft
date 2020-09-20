@@ -114,7 +114,7 @@ Socket::onRead(IOEvent*) {
 
   if (read_buf_.ReadableBytes() > 0 && handler_) {
     // if read data from socket, call handler->onRead
-    handler_->onRead(&read_buf_);
+    handler_->onRead();
   }
 }
 

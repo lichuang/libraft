@@ -8,13 +8,25 @@
 
 namespace libraft {
 RpcService::RpcService(const ServiceOptions& options)
-  : IService(options) {
+  : Service(options) {
   RpcServiceOptions& op = (RpcServiceOptions&)options;
   Register(op.service);
 }
 
 RpcService::~RpcService() {
 
+}
+
+RpcMeta* 
+RpcService::GetService(uint64_t method_id) {
+  MethodMetaMap::iterator iter = method_map_.find(method_id);
+  if (iter == method_map_.end()) {
+    Error() << "not found method for " << method_id;
+    //printMethod();
+    return NULL;
+  }
+
+	return iter->second;
 }
 
 void 

@@ -12,7 +12,7 @@ namespace libraft {
 class EventLoop;
 class IHandlerFactory;
 class Socket;
-class IService;
+class Service;
 
 typedef void (*ListenFunc)();
 
@@ -28,7 +28,7 @@ public:
   void Stop();
 
 protected:
-  IService* service_;
+  Service* service_;
   ServiceOptions options_;
   IHandlerFactory *factory_;
   Endpoint address_;

@@ -45,6 +45,14 @@ public:
     return server_side_;
   }
 
+  size_t ReadBufferSize() const {
+    return read_buf_.ReadableBytes();
+  }
+
+  size_t WriteBufferSize() const {
+    return write_buf_.WritableBytes();
+  }
+
   void Write(const char* from, size_t n);
   size_t Read(char* to, size_t n);
 
@@ -101,6 +109,7 @@ private:
   // write buffer
   Buffer write_buf_;
 
+  // socket status
   int status_;
   
   // if or not a server side socket

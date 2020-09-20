@@ -25,16 +25,17 @@ struct RpcServiceOptions : public ServiceOptions {
   gpb::Service* service;
 };
 
-class RpcService : public IService {
+class RpcService : public Service {
   RpcService(const ServiceOptions&);
 
   ~RpcService();
 
+  RpcMeta* GetService(RpcMethodId method_id);
 private:
   void Register(gpb::Service*);
 
 private:
-	typedef map<MethodId, RpcMeta*> MethodMetaMap;
+	typedef map<RpcMethodId, RpcMeta*> MethodMetaMap;
 	MethodMetaMap method_map_;
 };
 };

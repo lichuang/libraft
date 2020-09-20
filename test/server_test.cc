@@ -43,7 +43,7 @@ TEST(ServerTest, echo) {
       Info() << "server on write";
     }
 
-    virtual void onRead(Buffer*) { 
+    virtual void onRead() { 
       Info() << "server on read";
       //EXPECT_EQ();
       wait.Done();
@@ -82,7 +82,7 @@ TEST(ServerTest, echo) {
       Info() << "client on write";
     }
 
-    virtual void onRead(Buffer*) { 
+    virtual void onRead() { 
       Info() << "client on read";
     }
     

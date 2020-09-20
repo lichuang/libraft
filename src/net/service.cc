@@ -15,7 +15,7 @@ namespace libraft {
 
 DEFINE_int32(backlog, 1024, "tcp listen backlog");
 
-IService::IService(const ServiceOptions& options)
+Service::Service(const ServiceOptions& options)
   : factory_(options.factory),
     fd_(-1),
     address_(options.endpoint),
@@ -23,7 +23,7 @@ IService::IService(const ServiceOptions& options)
     event_(nullptr) {    
 }
 
-IService::~IService() {
+Service::~Service() {
   if (event_) {
     event_->DisableAllEvent();
     Close(fd_);
@@ -32,7 +32,7 @@ IService::~IService() {
 }
 
 void 
-IService::Listen() {
+Service::Listen() {
   Status err;
 
   fd_ = libraft::Listen(address_, FLAGS_backlog, &err);
@@ -48,7 +48,7 @@ IService::Listen() {
 }
  
 void 
-IService::onRead(IOEvent*) {
+Service::onRead(IOEvent*) {
   Endpoint ep;
   Status status;
 
@@ -67,7 +67,7 @@ IService::onRead(IOEvent*) {
 }
 
 void 
-IService::onWrite(IOEvent*) {
+Service::onWrite(IOEvent*) {
   // nothing to do
   Fatal() << "acceptor cannot has write event";
 }

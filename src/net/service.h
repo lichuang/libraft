@@ -16,11 +16,11 @@ class IOEvent;
 class EventLoop;
 class IHandlerFactory;
 
-class IService : public IIOHandler  {
+class Service : public IIOHandler  {
 public:
-  IService(const ServiceOptions&);
+  Service(const ServiceOptions&);
 
-  virtual ~IService();
+  virtual ~Service();
 
   void Listen();
 

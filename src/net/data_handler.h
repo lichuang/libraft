@@ -27,7 +27,7 @@ public:
 
   }
 
-  virtual void onRead(Buffer*) { 
+  virtual void onRead() { 
 
   }
   

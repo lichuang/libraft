@@ -29,7 +29,12 @@ ServiceEntity::~ServiceEntity() {
 
 void 
 ServiceEntity::initAfterBind() {
-  service_ = new IService(options_);
+  if (options_.service) {
+    service_ = options_.service;
+  } else {
+    service_ = new Service(options_);
+  }
+  
   service_->Listen();
 
   if (after_listen_func_) {
