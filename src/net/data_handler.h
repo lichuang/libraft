@@ -9,16 +9,22 @@
 namespace libraft {
 
 class Buffer;
+class SessionEntity;
 class Socket;
 
 // virtual interface for socket data handler
 class IDataHandler {
 public:
   IDataHandler(Socket* socket)
-    : socket_(socket) {}
+    : socket_(socket),
+      entity_(nullptr) {}
         
   virtual ~IDataHandler() {
     delete socket_;
+  }
+
+  void SetEntity(SessionEntity *entity) {
+    entity_ = entity;
   }
 
   Socket* socket() {
@@ -43,6 +49,7 @@ public:
 
 protected:
   Socket* socket_;
+  SessionEntity *entity_;
 };
 
 class IHandlerFactory {

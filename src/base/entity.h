@@ -44,10 +44,15 @@ struct EntityRef {
   EntityType type_;  
 };
 
+// the message handler function type
+typedef std::function<void(IMessage*)> MessageFunc;
+
+// the message response handler function type
+typedef std::function<void(const IMessage*)> MessageResponseFn;
+
 class IEntity : public ITimerHandler {
   friend class Worker;
-  typedef std::function<void(const IMessage*)> MessageResponseFn;
-
+  
 public:
   IEntity(EntityType typ);
 
@@ -70,11 +75,17 @@ public:
     return ref_.type_;
   }
   
+  // return true is current thread is the entity binding thread
+  bool InSameWorker();
+
   void Bind(Worker *w, EntityId id);
 
   // send a message to dst entity, unlike Ask, Sendto has no response
   void Sendto(const EntityRef& dstRef, IMessage* msg);
   
+  // send a message to this entity, unlike Ask, Sendto has no response
+  void Send(IMessage* msg);
+
   // ask dst entity something, and the callback fn will be called when receive response
   void Ask(const EntityRef& dstRef, IMessage* msg, MessageResponseFn fn);
 
@@ -83,16 +94,21 @@ public:
 
   void AddTimer();
 
-  virtual void Handle(IMessage* msg) {}
+  void RegisterMessageHandler(MessageType, MessageFunc fn);
+
+  virtual void Handle(IMessage* msg);
 
   virtual void onTimeout(ITimerEvent*) {}
 
 protected:
   EntityRef ref_;
 
-  typedef std::map<MessageId, MessageResponseFn> MessageResponseMap;
-  // when receive a response, entity get callback fn in resp_fn_map_ by message id
-  MessageResponseMap resp_fn_map_;
+  typedef std::map<MessageId, MessageResponseFn> MessageRespFuncMap;
+  // when receive a response, entity get callback fn in resp_func_map_ by message id
+  MessageRespFuncMap resp_func_map_;
+
+  typedef std::map<MessageType, MessageFunc> MessageFuncMap;
+  MessageFuncMap msg_func_map_;
 };
 
 // if use this global Sendto function, message src entity is the worker entity

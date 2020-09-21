@@ -15,6 +15,7 @@ SessionEntity::SessionEntity(IDataHandler *handler, const Endpoint& ep, fd_t fd)
     handler_(handler),
     address_(ep),
     fd_(fd) {
+  handler_->SetEntity(this);
 }
 
 SessionEntity::SessionEntity(IDataHandler *handler, const Endpoint& ep)
@@ -23,6 +24,7 @@ SessionEntity::SessionEntity(IDataHandler *handler, const Endpoint& ep)
     handler_(handler),
     address_(ep),
     fd_(-1) {
+  handler_->SetEntity(this);
 }
 
 SessionEntity::~SessionEntity() {

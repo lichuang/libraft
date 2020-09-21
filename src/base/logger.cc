@@ -35,12 +35,13 @@ class loggerEntity : public IEntity {
 public:
   loggerEntity(Worker* w, Logger* logger) : IEntity(kLoggerEntity), logger_(logger) {
     w->AddEntity(this);
+    RegisterMessageHandler(kLogMessage, std::bind(&loggerEntity::handleLogMessage, this, std::placeholders::_1));
   }
 
   virtual ~loggerEntity() {
   }
 
-  void Handle(IMessage* m) {
+  void handleLogMessage(IMessage* m) {
     logMessage *msg = (logMessage*)m;
     logger_->processLog(msg->data);
     delete msg->data;

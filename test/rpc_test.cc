@@ -16,19 +16,20 @@
 #include "base/server.h"
 #include "echo.pb.h"
 #include "net/rpc/rpc_channel.h"
+#include "net/rpc/rpc_controller.h"
 
 using namespace libraft;
 
 class RpcTestEnvironment : public testing::Environment
 {
 public:
-    virtual void SetUp() {
-      StartServer(ServerOptions());
-    }
+  virtual void SetUp() {
+    StartServer(ServerOptions());
+  }
 
-    virtual void TearDown() {
-      StopServer();
-    }
+  virtual void TearDown() {
+    StopServer();
+  }
 };
 
 TEST(RpcServerTest, echo) {
@@ -47,11 +48,14 @@ TEST(RpcServerTest, echo) {
         string content;
         response->SerializeToString(&content);
 
+        /*
         EchoResponse msg;
         msg.ParseFromString(content);
         string str = StringToHex(content);
         Info() << "in EchoService::Echo:" << str;
+        */
 
+        wait.Done();
         done->Run();
     }
   };
@@ -73,6 +77,15 @@ TEST(RpcServerTest, echo) {
 
   // wait until acceptor bind
   wait.Wait();
+
+  RpcChannel channel(ep);
+  RpcController controller;
+  EchoRequest request;
+  EchoResponse response;
+
+  request.set_msg("hello");
+  EchoService_Stub stub(&channel);
+  stub.Echo(&controller, &request, &response, nullptr);
 
   wait.Add(1);
 }

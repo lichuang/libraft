@@ -39,6 +39,8 @@ class workerEntity : public IEntity {
 public:
   workerEntity(Worker* w) : IEntity(kWorkerEntity) {
     w->AddEntity(this);
+    RegisterMessageHandler(kAddTimerMessage, std::bind(&workerEntity::handleTimerMessage, this, std::placeholders::_1));
+    RegisterMessageHandler(kBindEntityMessage, std::bind(&workerEntity::handleBindEntityMessage, this, std::placeholders::_1));
   }
 
   virtual ~workerEntity() {

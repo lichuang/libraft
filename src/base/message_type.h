@@ -9,4 +9,7 @@ namespace libraft {
 static const int kLogMessage          = 1;
 static const int kAddTimerMessage     = 2;
 static const int kBindEntityMessage   = 3;
+
+// rpc related message
+static const int kRpcCallMethodMessage   = 20;
 }

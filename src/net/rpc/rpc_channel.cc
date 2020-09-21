@@ -2,6 +2,9 @@
  * Copyright (C) codedump
  */
 
+#include "base/message.h"
+#include "base/message_type.h"
+#include "net/session_entity.h"
 #include "net/socket.h"
 #include "net/rpc/packet_parser.h"
 #include "net/rpc/request_context.h"
@@ -11,11 +14,43 @@
 
 namespace libraft {
 
+struct RpcCallMethodMsg: public IMessage {
+public:
+  RpcCallMethodMsg(const gpb::MethodDescriptor *method,
+      gpb::RpcController *controller,
+      const gpb::Message *request,
+      gpb::Message *response,
+      gpb::Closure *done)
+    : IMessage(kRpcCallMethodMessage),
+      method_(method),
+      controller_(controller),
+      request_(request),
+      response_(response),
+      done_(done) {
+  }
+
+  const gpb::MethodDescriptor *method_;
+  gpb::RpcController *controller_;
+  const gpb::Message *request_;
+  gpb::Message *response_;
+  gpb::Closure *done_;
+};
+
 RpcChannel::RpcChannel(Socket* socket)
 	: IDataHandler(socket),
     parser_(new PacketParser(socket_)),
     id_(NewGlobalID()),
     allocate_id_(0) {	
+}
+
+RpcChannel::RpcChannel(const Endpoint& server)
+	: IDataHandler(CreateClientSocket(server)),
+    //parser_(new PacketParser(socket_)),
+    id_(NewGlobalID()),
+    allocate_id_(0) {
+  entity_ = new SessionEntity(this, server);
+  parser_ = new PacketParser(socket_);
+  entity_->RegisterMessageHandler(kRpcCallMethodMessage, std::bind(&RpcChannel::handleCallMethodMessage, this, std::placeholders::_1));
 }
 
 RpcChannel::~RpcChannel() {
@@ -103,6 +138,35 @@ RpcChannel::onError(const Status&) {
 
 void 
 RpcChannel::CallMethod(
+  const gpb::MethodDescriptor *method,
+  gpb::RpcController *controller,
+  const gpb::Message *request,
+  gpb::Message *response,
+  gpb::Closure *done) {
+  if (!entity_->InSameWorker()) {
+    RpcCallMethodMsg* msg = new RpcCallMethodMsg(method, controller, request, response, done);
+    entity_->Send(msg);
+    return;
+  }
+  // in the same thread, call method directly
+  doCallMethod(method, controller, request, response, done);
+}
+
+void 
+RpcChannel::handleCallMethodMessage(IMessage* msg) {
+  RpcCallMethodMsg* call_msg = (RpcCallMethodMsg*)msg;
+
+  const gpb::MethodDescriptor *method = call_msg->method_;
+  gpb::RpcController *controller = call_msg->controller_;
+  const gpb::Message *request = call_msg->request_;
+  gpb::Message *response = call_msg->response_;
+  gpb::Closure *done = call_msg->done_;
+
+  doCallMethod(method, controller, request, response, done);
+}
+
+void 
+RpcChannel::doCallMethod(
   const gpb::MethodDescriptor *method,
   gpb::RpcController *controller,
   const gpb::Message *request,

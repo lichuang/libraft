@@ -15,6 +15,7 @@ namespace gpb = ::google::protobuf;
 
 namespace libraft {
 
+class IMessage;
 class Packet;
 class PacketParser;
 class RpcController;
@@ -25,8 +26,12 @@ struct RequestContext;
 class RpcChannel : public IDataHandler,
                    public gpb::RpcChannel::RpcChannel {
 public:
+  // called by Service::onRead
   RpcChannel(Socket*);
         
+  // create a client-server rpc channel
+  RpcChannel(const Endpoint& server);
+
   virtual ~RpcChannel();
 
 	// gpb::RpcChannel::RpcChannel virtual method
@@ -50,6 +55,15 @@ public:
   }
 
 private:
+  void handleCallMethodMessage(IMessage*);
+
+  void doCallMethod(
+      const gpb::MethodDescriptor *method,
+      gpb::RpcController *controller,
+      const gpb::Message *request,
+      gpb::Message *response,
+      gpb::Closure *done);
+
   void pushRequestToQueue(
       const gpb::MethodDescriptor *method,
       RpcController *controller,
