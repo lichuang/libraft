@@ -61,7 +61,7 @@ rm -fr ${libevent}
 tar xvf ${libevent}.tar.gz
 cd ${libevent}
 ./autogen.sh
-./configure --prefix=${third_party}
+./configure --prefix=${third_party} --disable-openssl
 make -j6
 make install
 cd ..
