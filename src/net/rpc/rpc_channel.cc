@@ -16,24 +16,10 @@ namespace libraft {
 
 struct RpcCallMethodMsg: public IMessage {
 public:
-  RpcCallMethodMsg(const gpb::MethodDescriptor *method,
-      gpb::RpcController *controller,
-      const gpb::Message *request,
-      gpb::Message *response,
-      gpb::Closure *done)
-    : IMessage(kRpcCallMethodMessage),
-      method_(method),
-      controller_(controller),
-      request_(request),
-      response_(response),
-      done_(done) {
+  RpcCallMethodMsg()
+    : IMessage(kRpcCallMethodMessage) {
   }
 
-  const gpb::MethodDescriptor *method_;
-  gpb::RpcController *controller_;
-  const gpb::Message *request_;
-  gpb::Message *response_;
-  gpb::Closure *done_;
 };
 
 RpcChannel::RpcChannel(Socket* socket)
@@ -58,6 +44,12 @@ RpcChannel::~RpcChannel() {
 }
 
 void 
+RpcChannel::onBound() {
+  IDataHandler::onBound();
+  handlerPacketQueue();
+}
+
+void 
 RpcChannel::pushRequestToQueue(
   const gpb::MethodDescriptor *method,
   RpcController *controller,
@@ -65,6 +57,8 @@ RpcChannel::pushRequestToQueue(
   gpb::Message *response,
   gpb::Closure *done) {
   Info() << "pushRequestToQueue";
+
+  std::lock_guard<std::mutex> lock(mutex_);
 
   uint64_t call_guid = allocateId();
   controller->Init(Id(), call_guid);
@@ -88,7 +82,7 @@ RpcChannel::onRead() {
         << ", method id: " << packet.method_id
         << ", content: " << packet.content;
 
-    if (packet.method_id != 0) {
+    if (packet.method_id == 0) {
       Error() << "receive request packet " << packet.method_id;
       continue;
     }
@@ -122,15 +116,23 @@ RpcChannel::onRead() {
 void 
 RpcChannel::onConnect(const Status& status) {
   if (status.Ok()) {
-    while (!packet_queue_.empty()) {
-      parser_->SendPacket(packet_queue_.front());
-      packet_queue_.pop();
-    }
-    return;
+
   }
 
   //Error() << "connect to " << socket_->String() << " failed: " << error;
 }
+
+void
+RpcChannel::handlerPacketQueue() {
+  std::lock_guard<std::mutex> lock(mutex_);
+
+  while (!packet_queue_.empty()) {
+    parser_->SendPacket(packet_queue_.front());
+    packet_queue_.pop();
+  }
+  return;
+}
+
 
 void 
 RpcChannel::onError(const Status&) {
@@ -142,12 +144,27 @@ RpcChannel::CallMethod(
   gpb::RpcController *controller,
   const gpb::Message *request,
   gpb::Message *response,
-  gpb::Closure *done) {
-  if (!entity_->InSameWorker()) {
-    RpcCallMethodMsg* msg = new RpcCallMethodMsg(method, controller, request, response, done);
-    entity_->Send(msg);
+  gpb::Closure *done) { 
+  if (socket_->IsClosed()) {
     return;
   }
+  RpcController *rpc_controller = (RpcController *)controller;
+
+  if (socket_->IsInit() || socket_->IsConnecting()) {
+    pushRequestToQueue(method, rpc_controller, request, response, done);
+    return;
+  }
+
+  if (!isBound() || !entity_->InSameWorker()) {
+    pushRequestToQueue(method, rpc_controller, request, response, done);
+    if (entity_) {
+      RpcCallMethodMsg* msg = new RpcCallMethodMsg();
+      entity_->Send(msg);
+    }
+
+    return;
+  }
+
   // in the same thread, call method directly
   doCallMethod(method, controller, request, response, done);
 }
@@ -155,14 +172,9 @@ RpcChannel::CallMethod(
 void 
 RpcChannel::handleCallMethodMessage(IMessage* msg) {
   RpcCallMethodMsg* call_msg = (RpcCallMethodMsg*)msg;
-
-  const gpb::MethodDescriptor *method = call_msg->method_;
-  gpb::RpcController *controller = call_msg->controller_;
-  const gpb::Message *request = call_msg->request_;
-  gpb::Message *response = call_msg->response_;
-  gpb::Closure *done = call_msg->done_;
-
-  doCallMethod(method, controller, request, response, done);
+  (void)call_msg;
+  handlerPacketQueue();
+  return;
 }
 
 void 
@@ -174,10 +186,6 @@ RpcChannel::doCallMethod(
   gpb::Closure *done) {
   RpcController *rpc_controller = reinterpret_cast<RpcController*>(controller);
 
-  if (socket_->IsClosed()) {
-    return;
-  }
-
   if (socket_->IsConnected()) {
     uint64_t call_guid = allocateId();
     rpc_controller->Init(Id(), call_guid);
@@ -188,16 +196,6 @@ RpcChannel::doCallMethod(
     request_context_[call_guid] = new RequestContext(rpc_controller, response, done);
     parser_->SendPacket(packet);
     return;
-  }
-
-  if (socket_->IsInit()) {
-    pushRequestToQueue(method, rpc_controller, request, response, done);
-    //socket_->Connect();
-  }
-
-  if (socket_->IsConnecting()) {
-    Debug() << "connecting";
-    pushRequestToQueue(method, rpc_controller, request, response, done);
   }
 }
 

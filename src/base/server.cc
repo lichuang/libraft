@@ -43,8 +43,7 @@ Server::AddService(const ServiceOptions& options) {
 void 
 Server::ConnectTo(const ConnectorOptions& options) {
   Socket* socket = CreateClientSocket(options.endpoint);
-  SessionEntity *ce = new SessionEntity(options.factory->NewHandler(socket), options.endpoint);
-  BindEntity(ce);
+  new SessionEntity(options.factory->NewHandler(socket), options.endpoint);  
 }
 
 void 

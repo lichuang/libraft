@@ -6,11 +6,13 @@
 
 #include <map>
 #include <queue>
+#include <mutex>
 #include <google/protobuf/message.h>
 #include <google/protobuf/service.h>
 #include "base/typedef.h"
 #include "net/data_handler.h"
 
+using namespace std;
 namespace gpb = ::google::protobuf;
 
 namespace libraft {
@@ -55,6 +57,8 @@ public:
   }
 
 private:
+  void handlerPacketQueue();
+
   void handleCallMethodMessage(IMessage*);
 
   void doCallMethod(
@@ -79,11 +83,15 @@ private:
     return id_;
   }
 
+protected:
+  virtual void onBound();
+
 private:
   // rpc packet parser
   PacketParser *parser_;
 
   // packet buffer queue
+  std::mutex mutex_;
   queue<Packet*> packet_queue_;
 
 	typedef map<uint64_t, RequestContext*> RequestContextMap;

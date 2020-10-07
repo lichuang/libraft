@@ -124,8 +124,6 @@ TEST(ServerTest, echo) {
 
   // wait until acceptor bind
   wait.Wait();
-
-  return;
   
   wait.Add(1);
 

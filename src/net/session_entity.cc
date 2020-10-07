@@ -16,6 +16,7 @@ SessionEntity::SessionEntity(IDataHandler *handler, const Endpoint& ep, fd_t fd)
     address_(ep),
     fd_(fd) {
   handler_->SetEntity(this);
+  BindEntity(this);
 }
 
 SessionEntity::SessionEntity(IDataHandler *handler, const Endpoint& ep)
@@ -25,6 +26,7 @@ SessionEntity::SessionEntity(IDataHandler *handler, const Endpoint& ep)
     address_(ep),
     fd_(-1) {
   handler_->SetEntity(this);
+  BindEntity(this);
 }
 
 SessionEntity::~SessionEntity() {
@@ -33,6 +35,8 @@ SessionEntity::~SessionEntity() {
 
 void 
 SessionEntity::initAfterBind() {
+  Info() << "SessionEntity::initAfterBind";
+
   EventLoop* loop = CurrentEventLoop();
   if (fd_ != -1) {
     Info() << "create a server accepted entity for fd:" << fd_;
@@ -41,5 +45,6 @@ SessionEntity::initAfterBind() {
     Info() << "create a client connect entity";
     socket_->Init(handler_, loop);
   }
+  handler_->onBound();
 }
 };

@@ -26,12 +26,12 @@ Socket::Socket(const Endpoint& local, fd_t fd)
     handler_(nullptr),
     event_loop_(nullptr),
     is_writable_(false),
-    status_(kSocketConnected),
     server_side_(true),
     local_endpoint_(local) {  
   GetEndpointByFd(fd, &remote_endpoint_);
 
   desc_ = local_endpoint_.String();
+  status_.store(kSocketConnected, std::memory_order_relaxed);
 }
 
 // create a client side socket
@@ -40,14 +40,16 @@ Socket::Socket(const Endpoint& remote)
     handler_(nullptr),
     event_loop_(nullptr),
     is_writable_(false),
-    status_(kSocketInit),
     server_side_(false),
-    remote_endpoint_(remote) {
-
+    remote_endpoint_(remote),
+    event_(nullptr) {
+  status_.store(kSocketInit, std::memory_order_relaxed);
 }
 
 Socket::~Socket() {
-  delete event_;
+  if (event_) {
+    delete event_;
+  }
 }
 
 void

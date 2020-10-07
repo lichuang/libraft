@@ -8,6 +8,7 @@
 namespace libraft {
 class EventLoop;
 class Worker;
+class IEntity;
 
 extern void CreateWorkerPool(int);
 
@@ -16,4 +17,6 @@ extern bool InMainThread();
 
 extern Worker* CurrentThread();
 extern EventLoop* CurrentEventLoop();
+
+extern void BindEntity(IEntity*);
 }

@@ -3,6 +3,8 @@
  */
 
 #pragma once
+
+#include <atomic>
 #include "base/status.h"
 #include "net/socket.h"
 
@@ -14,10 +16,13 @@ class Socket;
 
 // virtual interface for socket data handler
 class IDataHandler {
+  friend class SessionEntity;
+
 public:
   IDataHandler(Socket* socket)
     : socket_(socket),
-      entity_(nullptr) {}
+      entity_(nullptr),
+      bound_(ATOMIC_FLAG_INIT) {}
         
   virtual ~IDataHandler() {
     delete socket_;
@@ -48,8 +53,20 @@ public:
   }
 
 protected:
+  bool isBound() const {
+    return bound_.load();
+  }
+  
+  virtual void onBound() {
+    bound_.store(true);
+  }
+    
+protected:
   Socket* socket_;
   SessionEntity *entity_;
+
+  // whether or not has bound to a worker
+  std::atomic<bool> bound_;
 };
 
 class IHandlerFactory {

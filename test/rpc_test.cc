@@ -43,7 +43,9 @@ TEST(RpcServerTest, echo) {
                       const EchoRequest* request,
                       EchoResponse* response,
                       google::protobuf::Closure* done) {
-          
+        
+        Info() << "in EchoService::Echo:";
+
         response->set_echo_msg("world");
         string content;
         response->SerializeToString(&content);
@@ -77,6 +79,7 @@ TEST(RpcServerTest, echo) {
 
   // wait until acceptor bind
   wait.Wait();
+  wait.Add(1);
 
   RpcChannel channel(ep);
   RpcController controller;
@@ -87,7 +90,7 @@ TEST(RpcServerTest, echo) {
   EchoService_Stub stub(&channel);
   stub.Echo(&controller, &request, &response, nullptr);
 
-  wait.Add(1);
+  wait.Wait();
 }
 
 int main(int argc, char* argv[]) {

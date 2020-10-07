@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <string>
 #include "base/buffer.h"
 #include "base/define.h"
@@ -48,19 +49,19 @@ public:
   }
 
   bool IsClosed() const {
-    return status_ == kSocketClosed;
+    return status_.load(std::memory_order_acquire) == kSocketClosed;
   }
 
   bool IsConnected() const {
-    return status_ == kSocketConnected;
+    return status_.load(std::memory_order_acquire) == kSocketConnected;
   }
 
   bool IsInit() const {
-    return status_ == kSocketInit;
+    return status_.load(std::memory_order_acquire) == kSocketInit;
   }
 
   bool IsConnecting() const {
-    return status_ == kSocketConnecting;
+    return status_.load(std::memory_order_acquire) == kSocketConnecting;
   }
 
   size_t ReadBufferSize() const {
@@ -128,7 +129,7 @@ private:
   Buffer write_buf_;
 
   // socket status
-  int status_;
+  std::atomic<int> status_;
   
   // if or not a server side socket
   bool server_side_;
