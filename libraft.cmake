@@ -22,6 +22,7 @@ set(libraft_files
   
   src/net/rpc/rpc_channel.cc
   src/net/rpc/rpc_service.cc
+  src/net/rpc/rpc_session.cc
   src/net/rpc/packet_parser.cc
 
   src/util/global_id.cc  

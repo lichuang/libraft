@@ -63,6 +63,7 @@ Service::onRead(IOEvent*) {
     }
     Socket* socket = CreateServerSocket(ep, fd);
     IDataHandler *handler = factory_->NewHandler(socket);
+    handler->onBeAccepted(this);
     SessionEntity* se = new SessionEntity(handler, ep, fd);
     BindEntity(se);
   }  

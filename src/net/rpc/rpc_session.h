@@ -24,14 +24,16 @@ class RpcController;
 class RpcService;
 struct RequestContext;
 
-// protobuf rpc connection channel data handler
-class RpcChannel : public IDataHandler,
-                   public gpb::RpcChannel::RpcChannel {
-public:        
-  // create a client-server rpc channel
-  RpcChannel(const Endpoint& server);
+struct responseContext;
 
-  virtual ~RpcChannel();
+// protobuf rpc connection channel data handler
+class RpcSession : public IDataHandler,
+                   public gpb::RpcChannel::RpcChannel {
+public:
+  // called by Service::onRead
+  RpcSession(Socket*);        
+
+  virtual ~RpcSession();
 
 	// gpb::RpcChannel::RpcChannel virtual method
   virtual void CallMethod(
@@ -49,25 +51,11 @@ public:
 
   virtual void onError(const Status&);
 
+  virtual void onBeAccepted(Service* service) {
+    service_ = (RpcService*)service;
+  }
+
 private:
-  void handlerPacketQueue();
-
-  void handleCallMethodMessage(IMessage*);
-
-  void doCallMethod(
-      const gpb::MethodDescriptor *method,
-      gpb::RpcController *controller,
-      const gpb::Message *request,
-      gpb::Message *response,
-      gpb::Closure *done);
-
-  void pushRequestToQueue(
-      const gpb::MethodDescriptor *method,
-      RpcController *controller,
-      const gpb::Message *request,
-      gpb::Message *response,
-      gpb::Closure *done);
-
   id_t allocateId() {
     return ++allocate_id_;
   }
@@ -76,21 +64,29 @@ private:
     return id_;
   }
 
-protected:
-  virtual void onBound();
+  void runService(const Packet& packet, uint64_t channel_guid);
+  void onResponse(responseContext*);
 
 private:
   // rpc packet parser
   PacketParser *parser_;
-
-  // packet buffer queue
-  std::mutex mutex_;
-  queue<Packet*> packet_queue_;
 
 	typedef map<uint64_t, RequestContext*> RequestContextMap;
 	RequestContextMap request_context_;
 
   id_t id_;
   id_t allocate_id_;
+  RpcService *service_;
+};
+
+class RpcSessionFactory : public IHandlerFactory {
+public:
+  RpcSessionFactory(){}
+  virtual ~RpcSessionFactory() {
+  }
+
+  virtual IDataHandler* NewHandler(Socket* socket) {
+    return new RpcSession(socket);
+  }
 };
 };

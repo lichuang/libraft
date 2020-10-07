@@ -13,6 +13,7 @@ namespace libraft {
 class Buffer;
 class SessionEntity;
 class Socket;
+class Service;
 
 // virtual interface for socket data handler
 class IDataHandler {
@@ -49,6 +50,10 @@ public:
   }
 
   virtual void onError(const Status&) {
+
+  }
+
+  virtual void onBeAccepted(Service*) {
 
   }
 

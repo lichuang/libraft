@@ -22,13 +22,6 @@ public:
 
 };
 
-RpcChannel::RpcChannel(Socket* socket)
-	: IDataHandler(socket),
-    parser_(new PacketParser(socket_)),
-    id_(NewGlobalID()),
-    allocate_id_(0) {	
-}
-
 RpcChannel::RpcChannel(const Endpoint& server)
 	: IDataHandler(CreateClientSocket(server)),
     //parser_(new PacketParser(socket_)),
