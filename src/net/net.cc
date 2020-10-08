@@ -186,11 +186,11 @@ Recv(Socket *socket, Buffer *buffer, Status* err) {
         continue;
       } else {
         // something wrong has occoured
-        *err = Status(errno, strerror(errno));
+        *err = Status(kError, strerror(errno));
       }
     } else {
       // socket has been closed  
-      *err = Status(errno, strerror(errno));
+      *err = Status(kError, strerror(errno));
     }
   };
 

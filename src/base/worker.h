@@ -59,6 +59,7 @@ public:
   virtual ~Worker();
 
   void AddEntity(IEntity*);
+  void DestroyEntity(IEntity*);
 
   // send message to the entity bound in this worker
   void Send(IMessage *msg);    
@@ -115,6 +116,7 @@ private:
 
   TimerEventId newTimer(ITimerHandler*, const Duration& delay, bool);
   
+  void doStop();
 protected:  
   virtual void Run();
   static void main(Worker*, WaitGroup*);

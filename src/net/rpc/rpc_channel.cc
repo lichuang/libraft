@@ -4,6 +4,7 @@
 
 #include "base/message.h"
 #include "base/message_type.h"
+#include "base/worker_extern.h"
 #include "net/session_entity.h"
 #include "net/socket.h"
 #include "net/rpc/packet_parser.h"
@@ -19,7 +20,6 @@ public:
   RpcCallMethodMsg()
     : IMessage(kRpcCallMethodMessage) {
   }
-
 };
 
 RpcChannel::RpcChannel(const Endpoint& server)
@@ -29,15 +29,19 @@ RpcChannel::RpcChannel(const Endpoint& server)
     allocate_id_(0) {
   entity_ = new SessionEntity(this, server);
   parser_ = new PacketParser(socket_);
-  entity_->RegisterMessageHandler(kRpcCallMethodMessage, std::bind(&RpcChannel::handleCallMethodMessage, this, std::placeholders::_1));
+  Info() << "init channel with socket " << this << ":" << socket_;
+  entity_->RegisterMessageHandler(kRpcCallMethodMessage, std::bind(&RpcChannel::handleCallMethodMessage, this, std::placeholders::_1));  
 }
 
 RpcChannel::~RpcChannel() {
+  DestroySocket();
 	delete parser_;
+  parser_ = nullptr;
 }
 
 void 
 RpcChannel::onBound() {
+  Info() << "RpcChannel::onBound()";
   IDataHandler::onBound();
   handlerPacketQueue();
 }
@@ -67,7 +71,7 @@ RpcChannel::onWrite() {
 
 void 
 RpcChannel::onRead() {
-  Info() << "RpcChannel::OnRead";
+  Info() << "RpcChannel::OnRead: " << this << ":" << socket_;
   while (parser_->RecvPacket()) {
     const Packet& packet = parser_->GetPacket();
 
@@ -76,8 +80,8 @@ RpcChannel::onRead() {
         << ", content: " << packet.content;
 
     if (packet.method_id == 0) {
-      Error() << "receive request packet " << packet.method_id;
-      continue;
+      //Error() << "receive request packet " << packet.method_id;
+      //continue;
     }
 
     if (request_context_.find(packet.guid) ==
@@ -108,11 +112,12 @@ RpcChannel::onRead() {
   
 void 
 RpcChannel::onConnect(const Status& status) {
+  Info() << "connect to " << socket_->RemoteString() << " result: " << status.String();
+
   if (status.Ok()) {
-
-  }
-
-  //Error() << "connect to " << socket_->String() << " failed: " << error;
+    handlerPacketQueue();
+    return;
+  }  
 }
 
 void
@@ -125,7 +130,6 @@ RpcChannel::handlerPacketQueue() {
   }
   return;
 }
-
 
 void 
 RpcChannel::onError(const Status&) {
@@ -144,17 +148,21 @@ RpcChannel::CallMethod(
   RpcController *rpc_controller = (RpcController *)controller;
 
   if (socket_->IsInit() || socket_->IsConnecting()) {
+    Info() << "socket " << socket_->String();
     pushRequestToQueue(method, rpc_controller, request, response, done);
     return;
   }
 
   if (!isBound() || !entity_->InSameWorker()) {
+    Info() << "socket " << socket_->String();
     pushRequestToQueue(method, rpc_controller, request, response, done);
     if (entity_) {
       RpcCallMethodMsg* msg = new RpcCallMethodMsg();
       entity_->Send(msg);
     }
-
+    if (isBound()) {      
+      handlerPacketQueue();
+    }
     return;
   }
 
@@ -177,19 +185,27 @@ RpcChannel::doCallMethod(
   const gpb::Message *request,
   gpb::Message *response,
   gpb::Closure *done) {
+  ASSERT(socket_->IsConnected()) << socket_->String() << " has not connected";
   RpcController *rpc_controller = reinterpret_cast<RpcController*>(controller);
 
-  if (socket_->IsConnected()) {
-    uint64_t call_guid = allocateId();
-    rpc_controller->Init(Id(), call_guid);
+  uint64_t call_guid = allocateId();
+  rpc_controller->Init(Id(), call_guid);
 
-    Packet *packet = new Packet(call_guid, method, request);
-    Debug() << "write to socket: " << call_guid << " : " << request->DebugString();
+  Packet *packet = new Packet(call_guid, method, request);
+  Debug() << "write to socket: " << call_guid << " : " << request->DebugString();
 
-    request_context_[call_guid] = new RequestContext(rpc_controller, response, done);
-    parser_->SendPacket(packet);
-    return;
-  }
+  request_context_[call_guid] = new RequestContext(rpc_controller, response, done);
+  parser_->SendPacket(packet);
 }
 
-};
+RpcChannel* 
+CreateRpcChannel(const Endpoint& server) {
+  return new RpcChannel(server);
+}
+
+void
+DestroyRpcChannel(RpcChannel* channel) {
+  DestroyEntity(channel->entity_);
+}
+
+}

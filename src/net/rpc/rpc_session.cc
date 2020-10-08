@@ -43,6 +43,7 @@ RpcSession::RpcSession(Socket* socket)
 }
 
 RpcSession::~RpcSession() {
+  DestroySocket();
 	delete parser_;
 }
 

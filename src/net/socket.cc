@@ -4,6 +4,7 @@
 
 #include <error.h>
 #include <string.h>
+#include "base/log.h"
 #include "net/data_handler.h"
 #include "net/net.h"
 #include "net/socket.h"
@@ -49,11 +50,13 @@ Socket::Socket(const Endpoint& remote)
 Socket::~Socket() {
   if (event_) {
     delete event_;
+    event_ = nullptr;
   }
 }
 
 void
 Socket::Init(IDataHandler* handler, EventLoop* loop) {
+  ASSERT(handler_ == nullptr) << String() << " handler has been inited";
   handler_ = handler;
   event_loop_ = loop;
 
@@ -108,7 +111,6 @@ Socket::onRead(IOEvent*) {
   while (true) {
     Recv(this, &read_buf_, &err);
     Info()  << "readable size:" << read_buf_.ReadableBytes();
-
     if (!err.Ok() && !err.TryIOAgain()) {
       if (handler_) {
         handler_->onError(err);
@@ -117,12 +119,14 @@ Socket::onRead(IOEvent*) {
       Socket::close();
       return;
     } else if (err.TryIOAgain()) {
-        break;      
+      break;      
     }
   }
 
-  if (read_buf_.ReadableBytes() > 0 && handler_) {
-    // if read data from socket, call handler->onRead
+  int bytes = (int)read_buf_.ReadableBytes();
+  printf("ReadableBytes:%d\n", bytes);
+  if (bytes > 0 && handler_) {
+    // if read data from socket, call handler->onRead    
     handler_->onRead();
   }
 }

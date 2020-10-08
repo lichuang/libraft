@@ -19,4 +19,5 @@ extern Worker* CurrentThread();
 extern EventLoop* CurrentEventLoop();
 
 extern void BindEntity(IEntity*);
+extern void DestroyEntity(IEntity*);
 }

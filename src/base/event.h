@@ -98,7 +98,7 @@ public:
 
   void Start();
 
-  TimerEventId id() const {
+  TimerEventId Id() const {
     return id_;
   }
 

@@ -25,7 +25,7 @@ IEntity::IEntity(EntityType typ) {
 }
 
 IEntity::~IEntity() {
-  //ASSERT(CurrentThread() == ref_.worker_) << "entity MUST be deleted in the bound worker";
+  ASSERT(CurrentThread() == ref_.worker_) << "entity MUST be deleted in the bound worker";
 }
 
 bool 

@@ -24,15 +24,19 @@ class RpcController;
 class RpcService;
 struct RequestContext;
 
+class RpcChannel;
+
+extern RpcChannel* CreateRpcChannel(const Endpoint& server);
+extern void        DestroyRpcChannel(RpcChannel*);
+
 // protobuf rpc connection channel data handler
 class RpcChannel : public IDataHandler,
                    public gpb::RpcChannel::RpcChannel {
-public:        
-  // create a client-server rpc channel
-  RpcChannel(const Endpoint& server);
 
-  virtual ~RpcChannel();
+friend RpcChannel* CreateRpcChannel(const Endpoint& server);
+friend void        DestroyRpcChannel(RpcChannel*);
 
+public:
 	// gpb::RpcChannel::RpcChannel virtual method
   virtual void CallMethod(
       const gpb::MethodDescriptor *method,
@@ -50,6 +54,11 @@ public:
   virtual void onError(const Status&);
 
 private:
+  // create a client-server rpc channel
+  RpcChannel(const Endpoint& server);
+
+  virtual ~RpcChannel();
+
   void handlerPacketQueue();
 
   void handleCallMethodMessage(IMessage*);

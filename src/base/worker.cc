@@ -5,6 +5,7 @@
 #include <map>
 #include <sys/prctl.h>
 #include "base/bind_entity_msg.h"
+#include "base/destroy_entity_msg.h"
 #include "base/entity.h"
 #include "base/entity_type.h"
 #include "base/event.h"
@@ -12,6 +13,7 @@
 #include "base/log.h"
 #include "base/message.h"
 #include "base/mailbox.h"
+#include "base/stop_worker_msg.h"
 #include "base/typedef.h"
 #include "base/wait.h"
 #include "base/worker.h"
@@ -41,39 +43,35 @@ public:
     w->AddEntity(this);
     RegisterMessageHandler(kAddTimerMessage, std::bind(&workerEntity::handleTimerMessage, this, std::placeholders::_1));
     RegisterMessageHandler(kBindEntityMessage, std::bind(&workerEntity::handleBindEntityMessage, this, std::placeholders::_1));
+    RegisterMessageHandler(kDestroyEntityMessage, std::bind(&workerEntity::handleDestroyEntityMessage, this, std::placeholders::_1));
+    RegisterMessageHandler(kStopWorkerMessage, std::bind(&workerEntity::handleStopWorkerMessage, this, std::placeholders::_1));
   }
 
   virtual ~workerEntity() {
   }
 
-  void Handle(IMessage* m);
+  //void Handle(IMessage* m);
 
   void handleTimerMessage(IMessage *m) {
     ref_.worker_->addTimer(((addTimerMsg*)m)->event_);
   }
 
+  void handleStopWorkerMessage(IMessage *m) {
+    ref_.worker_->doStop();
+  }  
+
+  void handleDestroyEntityMessage(IMessage *m) {
+    IEntity *en = ((destroyEntityMsg*)m)->entity_;
+    ASSERT(en->InSameWorker());
+    ref_.worker_->DestroyEntity(en);
+  }  
+
   void handleBindEntityMessage(IMessage *m) {
     IEntity *en = ((bindEntityMsg*)m)->entity_;
-    ref_.worker_->AddEntity(this);
+    ref_.worker_->AddEntity(en);
     en->initAfterBind();
   }  
 };
-
-void
-workerEntity::Handle(IMessage *m) {
-  MessageType typ = m->Type();
-
-  switch (typ) {
-  case kAddTimerMessage:
-    handleTimerMessage(m);
-    break;
-  case kBindEntityMessage:
-    handleBindEntityMessage(m);
-    break;
-  default:
-    break;
-  }
-}
 
 // TLS worker pointer
 thread_local static Worker* gWorker = nullptr;
@@ -116,11 +114,23 @@ Worker::Worker(const string &name, threadType typ, bool isMain)
 }
 
 Worker::~Worker() {
-  delete mailbox_;
-  delete ev_loop_;
-  delete event_;
-  delete worker_entity_;
-  delete thread_;
+ 
+  //delete thread_;
+}
+
+void
+Worker::doStop() {
+  // first stop event loop
+  ev_loop_->Stop();  
+  
+  // worker entity MUST be deleted in bound worker
+  EntityMap::iterator iter = entities_.begin();
+  while (iter != entities_.end()) {
+    IEntity *en = iter->second;
+    delete en;
+    ++iter;
+  }
+  //delete worker_entity_;
 }
 
 void 
@@ -136,6 +146,23 @@ Worker::AddEntity(IEntity* entity) {
 
   entity->Bind(this, id);
   entities_[id] = entity;
+}
+
+void 
+Worker::DestroyEntity(IEntity* entity) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  EntityId id = entity->Ref().Id();
+
+  EntityMap::iterator iter = entities_.find(id);
+  if (iter == entities_.end()) {
+    return;
+  }
+  if (iter->second != entity) {
+    return;
+  }
+  entities_.erase(id);
+
+  delete entity;
 }
 
 void
@@ -161,7 +188,7 @@ Worker::NewMsgId() {
 void
 Worker::process(IMessage *msg) {
   const EntityRef& dstRef = msg->DstRef();
-  EntityId id = dstRef.id();
+  EntityId id = dstRef.Id();
 
   EntityMap::iterator iter = entities_.find(id);
   if (iter == entities_.end()) {
@@ -254,11 +281,21 @@ Worker::Run() {
 void 
 Worker::Stop() {
   state_ = kThreadStopping;
+  std::thread *thread = thread_;  
+  worker_entity_->Send(new stopWorkerMsg());
+  thread->join();
+  delete thread;
+  delete mailbox_;
+  delete ev_loop_;
+  delete event_;
+  /*
+  
   // notify event loop to stop
   signaler_.Send();
   thread_->join();
   mailbox_->Recv();
   state_ = kThreadStopped;
+  */
 }
 
 void 

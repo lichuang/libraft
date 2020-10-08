@@ -14,7 +14,7 @@ PacketParser::PacketParser(Socket *socket)
 }
 
 PacketParser::~PacketParser() {
-
+	socket_ = nullptr;
 }
 
 bool 
@@ -28,8 +28,7 @@ PacketParser::RecvPacket() {
 		switch (state_) {
 			case RECV_HEADER_STATE:
 				read_size = socket_->ReadBufferSize();
-				if (read_size < kMetaSize) {
-					Error() << "rpc from " << socket_->String() << " buffer size error:" << read_size;
+				if (read_size < kMetaSize) {					
 					return false;
 				}
 
@@ -63,7 +62,7 @@ PacketParser::RecvPacket() {
 				Debug() << "packet content size: " << read_size
 					<< ", current socket read buffer size: " << socket_->ReadBufferSize();
 				if (read_size > socket_->ReadBufferSize()) {
-					Error() << "rpc from " << socket_->String() << " packet size " << read_size << " error";
+					//Error() << "rpc from " << socket_->String() << " packet size " << read_size << " error";
 					return false;
 				}
 
@@ -77,6 +76,9 @@ PacketParser::RecvPacket() {
 				// recv a packet done
 				state_ = RECV_HEADER_STATE;
 				packet_.recv_done = true;
+				done = true;
+				break;
+			default:
 				done = true;
 				break;						
 		}

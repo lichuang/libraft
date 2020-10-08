@@ -24,9 +24,17 @@ public:
     : socket_(socket),
       entity_(nullptr),
       bound_(ATOMIC_FLAG_INIT) {}
-        
-  virtual ~IDataHandler() {
+
+  void DestroySocket() {
+    if (!socket_) {
+      return;
+    }
     delete socket_;
+    socket_ = nullptr;
+  } 
+
+  virtual ~IDataHandler() {
+    DestroySocket();
   }
 
   void SetEntity(SessionEntity *entity) {
@@ -53,6 +61,7 @@ public:
 
   }
 
+  // called when accepted by service
   virtual void onBeAccepted(Service*) {
 
   }

@@ -25,7 +25,7 @@ IEvent::Close() {
   if (event_) {
     event_del(event_);
     delete event_;
-    event_ = NULL;    
+    event_ = nullptr;    
   }
 }
 

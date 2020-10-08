@@ -62,6 +62,8 @@ extern void StartServer(const ServerOptions&);
 extern void StopServer();
 
 extern void BindEntity(IEntity*);
+extern void DestroyEntity(IEntity*);
+
 extern void AddService(const ServiceOptions&);
 extern void ConnectTo(const ConnectorOptions&);
 }

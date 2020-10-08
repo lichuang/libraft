@@ -17,6 +17,7 @@
 #include "echo.pb.h"
 #include "net/rpc/rpc_channel.h"
 #include "net/rpc/rpc_controller.h"
+#include "net/rpc/rpc_session.h"
 
 using namespace libraft;
 
@@ -31,6 +32,11 @@ public:
     StopServer();
   }
 };
+
+void onRpcRespose(WaitGroup* wait) {
+  Info() << "after response";
+  wait->Done();   
+}
 
 TEST(RpcServerTest, echo) {
   static WaitGroup wait;
@@ -57,7 +63,7 @@ TEST(RpcServerTest, echo) {
         Info() << "in EchoService::Echo:" << str;
         */
 
-        wait.Done();
+        //wait.Done();
         done->Run();
     }
   };
@@ -68,7 +74,7 @@ TEST(RpcServerTest, echo) {
   ServiceOptions options;
   Endpoint ep = Endpoint("127.0.0.1", 22222);
   options.endpoint = ep;
-  options.factory = new RpcChannelFactory();
+  options.factory = new RpcSessionFactory();
   options.service = &echo_service_impl;
   options.after_listen_func = []() { 
     Info() << "begin accept new connection";
@@ -81,16 +87,19 @@ TEST(RpcServerTest, echo) {
   wait.Wait();
   wait.Add(1);
 
-  RpcChannel channel(ep);
+  RpcChannel* channel = CreateRpcChannel(ep);
   RpcController controller;
   EchoRequest request;
   EchoResponse response;
 
   request.set_msg("hello");
-  EchoService_Stub stub(&channel);
-  stub.Echo(&controller, &request, &response, nullptr);
+  EchoService_Stub stub(channel);
+  stub.Echo(&controller, &request, &response, 
+    gpb::NewCallback(&::onRpcRespose, &wait));
 
   wait.Wait();
+
+  DestroyRpcChannel(channel);
 }
 
 int main(int argc, char* argv[]) {

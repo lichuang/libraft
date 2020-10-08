@@ -26,7 +26,7 @@ struct EntityRef {
   EntityRef() : worker_(nullptr), id_(0) {
   }
 
-  EntityId id() const {
+  EntityId Id() const {
     return id_;
   }
 

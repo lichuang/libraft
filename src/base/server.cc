@@ -3,6 +3,7 @@
  */
 
 #include <gflags/gflags.h>
+#include "base/destroy_entity_msg.h"
 #include "base/log.h"
 #include "base/logger.h"
 #include "base/server.h"
@@ -43,7 +44,8 @@ Server::AddService(const ServiceOptions& options) {
 void 
 Server::ConnectTo(const ConnectorOptions& options) {
   Socket* socket = CreateClientSocket(options.endpoint);
-  new SessionEntity(options.factory->NewHandler(socket), options.endpoint);  
+  SessionEntity *se = new SessionEntity(options.factory->NewHandler(socket), options.endpoint);  
+  (void)se;
 }
 
 void 
@@ -73,6 +75,11 @@ StopServer() {
 void 
 BindEntity(IEntity* en) {
   gServer->Bind(en);
+}
+
+void 
+DestroyEntity(IEntity* en) {
+  en->Send(new destroyEntityMsg(en));
 }
 
 void 
