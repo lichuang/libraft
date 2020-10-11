@@ -40,7 +40,7 @@ IEntity::Bind(Worker *w, EntityId id) {
 }
 
 void 
-IEntity::Ask(const EntityRef& dstRef, IMessage* msg, MessageResponseFn fn) {
+IEntity::Ask(const EntityRef& dstRef, IMessage* msg, MessageResponseFunc fn) {
   resp_func_map_[msg->id_] = fn;
   msg->setDstEntiity(dstRef);
   msg->setSrcEntiity(ref_);

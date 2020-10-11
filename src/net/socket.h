@@ -131,7 +131,7 @@ private:
   // socket status
   std::atomic<int> status_;
   
-  // if or not a server side socket
+  // whether is a server side socket
   bool server_side_;
 
   // locol endpoint 

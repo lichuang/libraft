@@ -13,6 +13,6 @@ static const int kDestroyEntityMessage  = 4;
 static const int kStopWorkerMessage     = 5;
 
 // rpc related message
-static const int kRpcCallMethodMessage      = 20;
+static const int kRpcChannelCallMethodMessage      = 20;
 
 }

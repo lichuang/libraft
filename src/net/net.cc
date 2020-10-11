@@ -229,10 +229,22 @@ Send(Socket *socket, Buffer *buffer, Status* err) {
 }
 
 void  
-GetEndpointByFd(int fd, Endpoint* endpoint) { 
+GetRemoteEndpoint(int fd, Endpoint* endpoint) { 
   sockaddr_in addr;
   socklen_t addrlen = sizeof(addr);
   if (::getpeername(fd, reinterpret_cast<struct sockaddr*>(&addr), &addrlen) < 0) {
+    Error() << "get peer addr fail, fd: " << fd << " error: " << errno;
+    return;
+  }
+
+  *endpoint = Endpoint(inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+}
+
+void
+GetLocalEndpoint(int fd, Endpoint* endpoint) { 
+  sockaddr_in addr;
+  socklen_t addrlen = sizeof(addr);
+  if (::getsockname(fd, reinterpret_cast<struct sockaddr*>(&addr), &addrlen) < 0) {
     Error() << "get peer addr fail, fd: " << fd << " error: " << errno;
     return;
   }

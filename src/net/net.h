@@ -29,7 +29,10 @@ int   Recv(Socket *, Buffer *buffer, Status* err);
 int   Send(Socket *, Buffer *buffer, Status* err);
 
 void  Close(int fd);
-void  GetEndpointByFd(int fd, Endpoint*);
+
+void  GetRemoteEndpoint(int fd, Endpoint*);
+
+void  GetLocalEndpoint(int fd, Endpoint*);
 
 int   TcpSocket(Status* err);
 

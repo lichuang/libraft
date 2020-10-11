@@ -12,7 +12,7 @@
 #include "base/typedef.h"
 
 // class Entity is the core element in this server framework
-// each Entity is binded in a worker thread, it can send message through worker mailbox to other Entity
+// each Entity is bound in a worker thread, it can send message through worker mailbox to other Entity
 
 namespace libraft {
 
@@ -48,7 +48,7 @@ struct EntityRef {
 typedef std::function<void(IMessage*)> MessageFunc;
 
 // the message response handler function type
-typedef std::function<void(const IMessage*)> MessageResponseFn;
+typedef std::function<void(const IMessage*)> MessageResponseFunc;
 
 class IEntity : public ITimerHandler {
   friend class Worker;
@@ -87,7 +87,7 @@ public:
   void Send(IMessage* msg);
 
   // ask dst entity something, and the callback fn will be called when receive response
-  void Ask(const EntityRef& dstRef, IMessage* msg, MessageResponseFn fn);
+  void Ask(const EntityRef& dstRef, IMessage* msg, MessageResponseFunc fn);
 
   // src entity handle response from dst
   void HandleResponse(IMessage* msg);
@@ -103,7 +103,7 @@ public:
 protected:
   EntityRef ref_;
 
-  typedef std::map<MessageId, MessageResponseFn> MessageRespFuncMap;
+  typedef std::map<MessageId, MessageResponseFunc> MessageRespFuncMap;
   // when receive a response, entity get callback fn in resp_func_map_ by message id
   MessageRespFuncMap resp_func_map_;
 

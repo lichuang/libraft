@@ -16,6 +16,8 @@ using namespace std;
 
 namespace libraft {
 
+static const string kUnknownEndpoint = "unknown endpoint";
+
 class Endpoint {
 public:
 	Endpoint(const string& addr, uint16_t port)
@@ -24,7 +26,7 @@ public:
 	}
 
 	Endpoint() 
-		: addr_(""), port_(0), str_("") {
+		: addr_(""), port_(0), str_(kUnknownEndpoint) {
 	}
 
   Endpoint(const Endpoint& ep) {

@@ -8,6 +8,7 @@
 #include "net/data_handler.h"
 #include "net/net.h"
 #include "net/socket.h"
+#include "util/string.h"
 
 namespace libraft {
 
@@ -29,9 +30,10 @@ Socket::Socket(const Endpoint& local, fd_t fd)
     is_writable_(false),
     server_side_(true),
     local_endpoint_(local) {  
-  GetEndpointByFd(fd, &remote_endpoint_);
+  GetRemoteEndpoint(fd, &remote_endpoint_);
+  //desc_ = local_endpoint_.String();
+  desc_ = StringPrintf("[%s->%s]", remote_endpoint_.String().c_str(), local_endpoint_.String().c_str());
 
-  desc_ = local_endpoint_.String();
   status_.store(kSocketConnected, std::memory_order_relaxed);
 }
 
@@ -45,6 +47,7 @@ Socket::Socket(const Endpoint& remote)
     remote_endpoint_(remote),
     event_(nullptr) {
   status_.store(kSocketInit, std::memory_order_relaxed);
+  desc_ = StringPrintf("[(init)->%s]", remote_endpoint_.String().c_str());
 }
 
 Socket::~Socket() {
@@ -84,9 +87,10 @@ Socket::connect() {
   Status err;
   
   ConnectAsync(remote_endpoint_, fd_, &err);
-  
+  GetLocalEndpoint(fd_, &local_endpoint_);
+  desc_ = StringPrintf("[%s->%s]", local_endpoint_.String().c_str(), remote_endpoint_.String().c_str());
+
   if (!err.Ok()) {
-    //poller_->Add(fd_, this);
     event_->EnableWrite();
   } else {
     handler_->onConnect(err);

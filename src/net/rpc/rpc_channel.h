@@ -38,7 +38,10 @@ struct RpcChannelOptions {
   AfterChannelBoundFunc after_bound_func;
 };
 
+// Forbid RpcChannel created as a stack object, so it cannot be created directly.
 extern RpcChannel* CreateRpcChannel(const RpcChannelOptions&);
+
+// Forbid destroy RpcChannel directly.
 extern void        DestroyRpcChannel(RpcChannel*);
 
 // protobuf rpc connection channel data handler
@@ -104,7 +107,8 @@ private:
   // rpc packet parser
   PacketParser *parser_;
 
-  // packet buffer queue
+  // packet buffer queue, when socket not connected, push request in the queue
+  std::mutex mutex_;
   queue<Packet*> packet_queue_;
 
 	typedef map<uint64_t, RequestContext*> RequestContextMap;
