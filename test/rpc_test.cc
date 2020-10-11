@@ -87,18 +87,24 @@ TEST(RpcServerTest, echo) {
   wait.Wait();
   wait.Add(1);
 
-  RpcChannel* channel = CreateRpcChannel(ep);
+  RpcChannelOptions channel_options;
+  channel_options.server = ep;
   RpcController controller;
-  EchoRequest request;
+  
   EchoResponse response;
 
-  request.set_msg("hello");
-  EchoService_Stub stub(channel);
-  stub.Echo(&controller, &request, &response, 
-    gpb::NewCallback(&::onRpcRespose, &wait));
+  channel_options.after_bound_func = [&] (RpcChannel* channel) {        
+    EchoRequest request;
+
+    request.set_msg("hello");
+    EchoService_Stub stub(channel);
+    stub.Echo(&controller, &request, &response, 
+      gpb::NewCallback(&::onRpcRespose, &wait));    
+  };
+
+  RpcChannel* channel = CreateRpcChannel(channel_options);
 
   wait.Wait();
-
   DestroyRpcChannel(channel);
 }
 

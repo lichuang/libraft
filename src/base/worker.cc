@@ -130,7 +130,6 @@ Worker::doStop() {
     delete en;
     ++iter;
   }
-  //delete worker_entity_;
 }
 
 void 

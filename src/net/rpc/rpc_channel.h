@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <functional>
 #include <map>
 #include <queue>
 #include <mutex>
@@ -26,14 +27,25 @@ struct RequestContext;
 
 class RpcChannel;
 
-extern RpcChannel* CreateRpcChannel(const Endpoint& server);
+typedef std::function<void (RpcChannel *)> AfterChannelBoundFunc;
+
+struct RpcChannelOptions {
+  RpcChannelOptions()
+    : after_bound_func(nullptr) {
+  }
+
+  Endpoint server;
+  AfterChannelBoundFunc after_bound_func;
+};
+
+extern RpcChannel* CreateRpcChannel(const RpcChannelOptions&);
 extern void        DestroyRpcChannel(RpcChannel*);
 
 // protobuf rpc connection channel data handler
 class RpcChannel : public IDataHandler,
                    public gpb::RpcChannel::RpcChannel {
 
-friend RpcChannel* CreateRpcChannel(const Endpoint& server);
+friend RpcChannel* CreateRpcChannel(const RpcChannelOptions&);
 friend void        DestroyRpcChannel(RpcChannel*);
 
 public:
@@ -55,7 +67,7 @@ public:
 
 private:
   // create a client-server rpc channel
-  RpcChannel(const Endpoint& server);
+  RpcChannel(const RpcChannelOptions&);
 
   virtual ~RpcChannel();
 
@@ -93,7 +105,6 @@ private:
   PacketParser *parser_;
 
   // packet buffer queue
-  std::mutex mutex_;
   queue<Packet*> packet_queue_;
 
 	typedef map<uint64_t, RequestContext*> RequestContextMap;
@@ -101,5 +112,7 @@ private:
 
   id_t id_;
   id_t allocate_id_;
+
+  AfterChannelBoundFunc after_bound_func_;
 };
 };

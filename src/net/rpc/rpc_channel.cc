@@ -22,12 +22,13 @@ public:
   }
 };
 
-RpcChannel::RpcChannel(const Endpoint& server)
-	: IDataHandler(CreateClientSocket(server)),
+RpcChannel::RpcChannel(const RpcChannelOptions& options)
+	: IDataHandler(CreateClientSocket(options.server)),
     //parser_(new PacketParser(socket_)),
     id_(NewGlobalID()),
-    allocate_id_(0) {
-  entity_ = new SessionEntity(this, server);
+    allocate_id_(0),
+    after_bound_func_(options.after_bound_func) {
+  entity_ = new SessionEntity(this, options.server);
   parser_ = new PacketParser(socket_);
   Info() << "init channel with socket " << this << ":" << socket_;
   entity_->RegisterMessageHandler(kRpcCallMethodMessage, std::bind(&RpcChannel::handleCallMethodMessage, this, std::placeholders::_1));  
@@ -43,6 +44,9 @@ void
 RpcChannel::onBound() {
   Info() << "RpcChannel::onBound()";
   IDataHandler::onBound();
+  if (after_bound_func_) {
+    after_bound_func_(this);
+  }
   handlerPacketQueue();
 }
 
@@ -55,7 +59,7 @@ RpcChannel::pushRequestToQueue(
   gpb::Closure *done) {
   Info() << "pushRequestToQueue";
 
-  std::lock_guard<std::mutex> lock(mutex_);
+  ASSERT(entity_->InSameWorker()) << "entity not in the same worker";
 
   uint64_t call_guid = allocateId();
   controller->Init(Id(), call_guid);
@@ -122,8 +126,6 @@ RpcChannel::onConnect(const Status& status) {
 
 void
 RpcChannel::handlerPacketQueue() {
-  std::lock_guard<std::mutex> lock(mutex_);
-
   while (!packet_queue_.empty()) {
     parser_->SendPacket(packet_queue_.front());
     packet_queue_.pop();
@@ -150,19 +152,6 @@ RpcChannel::CallMethod(
   if (socket_->IsInit() || socket_->IsConnecting()) {
     Info() << "socket " << socket_->String();
     pushRequestToQueue(method, rpc_controller, request, response, done);
-    return;
-  }
-
-  if (!isBound() || !entity_->InSameWorker()) {
-    Info() << "socket " << socket_->String();
-    pushRequestToQueue(method, rpc_controller, request, response, done);
-    if (entity_) {
-      RpcCallMethodMsg* msg = new RpcCallMethodMsg();
-      entity_->Send(msg);
-    }
-    if (isBound()) {      
-      handlerPacketQueue();
-    }
     return;
   }
 
@@ -199,8 +188,8 @@ RpcChannel::doCallMethod(
 }
 
 RpcChannel* 
-CreateRpcChannel(const Endpoint& server) {
-  return new RpcChannel(server);
+CreateRpcChannel(const RpcChannelOptions& options) {
+  return new RpcChannel(options);
 }
 
 void

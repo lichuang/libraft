@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <functional>
 #include <google/protobuf/service.h>
 #include "net/endpoint.h"
 
@@ -12,7 +13,8 @@ namespace gpb = ::google::protobuf;
 namespace libraft {
 
 // function type be called after server call listen()
-typedef void (*AfterListenFunc)();
+typedef std::function<void ()> AfterListenFunc;
+
 class IHandlerFactory;
 class Service;
 
