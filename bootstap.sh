@@ -9,6 +9,9 @@ gtest=googletest-release-1.8.0
 gflags=gflags-2.2.2
 libevent=libevent-2.1.12-stable
 leveldb=leveldb-1.20
+rocksdb=rocksdb-6.12.6
+
+rm -fr ${third_party}
 
 mkdir ${third_party}/include -p
 mkdir ${third_party}/lib -p
@@ -22,6 +25,9 @@ cd ${leveldb}
 make -j8
 cp -r include/* ${third_party}/include/
 cp ./out-static/libleveldb.a ${third_party}/lib/
+cd ../
+rm -fr ${leveldb}
+echo "compile ${leveldb} done"
 
 echo "compile ${gflags}..."
 rm -fr ${gflags}
@@ -77,5 +83,15 @@ make install
 cd ..
 rm -fr ${libevent}
 echo "compile ${libevent} done"
+
+echo "compile ${rocksdb}..."
+rm -fr ${rocksdb}
+tar xvf ${rocksdb}.tar.gz
+cd ${rocksdb}
+make static_lib -j8
+cp -r include/* ${third_party}/include/
+cp librocksdb.a ${third_party}/lib/
+rm -fr ${rocksdb}
+echo "compile ${rocksdb} done"
 
 cd ${pwd}
