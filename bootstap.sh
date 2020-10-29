@@ -8,11 +8,21 @@ protobuf=protobuf-3.9.0
 gtest=googletest-release-1.8.0
 gflags=gflags-2.2.2
 libevent=libevent-2.1.12-stable
+leveldb=leveldb-1.20
 
 mkdir ${third_party}/include -p
 mkdir ${third_party}/lib -p
 
 cd $pwd/deps
+
+echo "compile ${leveldb}..."
+rm -fr ${leveldb}
+tar xvf ${leveldb}.tar.gz
+cd ${leveldb}
+make -j8
+cp -r include/* ${third_party}/include/
+cp ./out-static/libleveldb.a ${third_party}/lib/
+
 echo "compile ${gflags}..."
 rm -fr ${gflags}
 tar xvf ${gflags}.tar.gz
