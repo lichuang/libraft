@@ -12,13 +12,13 @@ OBJS=$(patsubst $(SRC_DIR)/%.$(EXTENSION), $(OBJ_DIR)/%.o,$(wildcard $(SRC_DIR)/
 TEST_OBJS=$(patsubst $(TEST_DIR)/%.$(EXTENSION), $(TEST_DIR)/%.o,$(wildcard $(TEST_DIR)/*.$(EXTENSION)))
 DEPS=$(patsubst $(OBJ_DIR)/%.o, $(DEPS_DIR)/%.d, $(OBJS))
 
-INCLUDE=-I ./include -I ./src
+INCLUDE=-I ./include -I ./src -I ./third_party/include
 		
 CC=g++
 AR= ar rcu
 #CFLAGS=-std=c99 -Wall -Werror -g 
 CFLAGS=-Wall -g -fno-strict-aliasing -O0 -export-dynamic -Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64 
-LDFLAGS= -L ./lib
+LDFLAGS= -L ./lib -L ./third_party/lib
 
 all:lib
 
@@ -26,7 +26,7 @@ lib:$(OBJS)
 	$(AR) $(LIB_DIR)/$(LIB) $(OBJS)
 
 test:$(TEST_OBJS)
-	$(CC) $(TEST_OBJS) -o test/all_test -lgtest -lprotobuf $(LIB_DIR)/$(LIB)
+	$(CC) $(TEST_OBJS) -o test/all_test -lgtest -lprotobuf $(LIB_DIR)/$(LIB) -L ./third_party/lib
 
 $(TEST_DIR)/%.o:$(TEST_DIR)/%.$(EXTENSION)
 	$(CC) $< -o $@ -c $(CFLAGS) $(INCLUDE)

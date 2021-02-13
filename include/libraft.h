@@ -5,7 +5,7 @@
 #include <climits>
 #include <string>
 #include <vector>
-#include "../src/raft.pb.h"
+#include "proto/raft.pb.h"
 
 using namespace std;
 using namespace raftpb;
