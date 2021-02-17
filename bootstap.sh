@@ -4,7 +4,8 @@
 
 pwd=`pwd`
 third_party=${pwd}/third_party
-rm -fr ${third_party}/*
+rm -fr ${third_party}
+mkdir -p ${third_party}
 
 protobuf=protobuf-3.14.0
 gtest=googletest-release-1.8.0
