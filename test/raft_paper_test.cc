@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
 #include <math.h>
 #include "libraft.h"
-#include "util.h"
-#include "raft.h"
-#include "memory_storage.h"
-#include "default_logger.h"
-#include "progress.h"
 #include "raft_test_util.h"
-#include "read_only.h"
+#include "base/default_logger.h"
+#include "base/util.h"
+#include "core/raft.h"
+#include "core/progress.h"
+#include "core/read_only.h"
+#include "storage/memory_storage.h"
 
 extern stateMachine *nopStepper;
 
@@ -29,7 +29,7 @@ bool isDeepEqualMsgs(const vector<Message*>& msgs1, const vector<Message*>& msgs
     kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
 		return false;
 	}
-	int i;
+	size_t i;
 	for (i = 0; i < msgs1.size(); ++i) {
 		Message *m1 = msgs1[i];
 		Message *m2 = msgs2[i];
@@ -92,7 +92,7 @@ void commitNoopEntry(raft *r, Storage *s) {
   vector<Message*> msgs;
   r->readMessages(&msgs);
 
-  int i;
+  size_t i;
   for (i = 0; i < msgs.size(); ++i) {
     Message *msg = msgs[i];
     EXPECT_FALSE(msg->type() != MsgApp || msg->entries_size() != 1 || msg->entries(0).has_data());
@@ -131,6 +131,8 @@ void testUpdateTermFromMessage(StateType state) {
 		r->becomeCandidate();
 		r->becomeLeader();
 		break;
+  default:
+    break;
 	}
 
   {
@@ -141,7 +143,7 @@ void testUpdateTermFromMessage(StateType state) {
     r->step(msg);
   }
 
-	EXPECT_EQ(r->term_, 2);
+	EXPECT_EQ((int)r->term_, 2);
 	EXPECT_EQ(r->state_, StateFollower);
 }
 
@@ -194,7 +196,7 @@ TEST(raftPaperTests, TestLeaderBcastBeat) {
 	r->becomeLeader();
 
   EntryVec entries;
-  int i;
+  size_t i;
   for (i = 0; i < 10; ++i) {
     Entry entry;
     entry.set_index(i + 1);
@@ -255,12 +257,14 @@ void testNonleaderStartElection(StateType state) {
 	case StateCandidate:
 		r->becomeCandidate();
 		break;
+  default:
+    break;
 	}
-	int i;
+	size_t i;
   for (i = 0; i < 2*et; ++i) {
 		r->tick();
 	}
-	EXPECT_EQ(r->term_, 2);
+	EXPECT_EQ((int)r->term_, 2);
 	EXPECT_EQ(r->state_, StateCandidate);
 	EXPECT_TRUE(r->votes_[r->id_]);
   vector<Message*> msgs;
@@ -390,7 +394,7 @@ TEST(raftPaperTests, TestLeaderElectionInOneRoundRPC) {
 		tests.push_back(tmp(5, votes, StateCandidate));
 	}
 
-	int i;
+	size_t i;
 	for (i = 0; i < tests.size(); ++i) {
 		tmp &t = tests[i];
 
@@ -417,7 +421,7 @@ TEST(raftPaperTests, TestLeaderElectionInOneRoundRPC) {
 		}
 
 		EXPECT_EQ(r->state_, t.state) << "i: " << i;
-		EXPECT_EQ(r->term_, 1);
+		EXPECT_EQ((int)r->term_, 1);
 	}
 }
 
@@ -442,7 +446,7 @@ TEST(raftPaperTests, TestFollowerVote) {
   tests.push_back(tmp(1, 2, true));
   tests.push_back(tmp(2, 1, true));
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
     
@@ -507,7 +511,7 @@ TEST(raftPaperTests, TestCandidateFallback) {
     msg.set_type(MsgApp);
     tests.push_back(msg);
   }
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     Message& msg = tests[i];
     
@@ -518,11 +522,11 @@ TEST(raftPaperTests, TestCandidateFallback) {
     Storage *s = new MemoryStorage(&kDefaultLogger);
     raft *r = newTestRaft(1, peers, 10, 1, s);
 		{
-			Message msg;
-			msg.set_from(1);
-			msg.set_to(1);
-			msg.set_type(MsgHup);
-			r->step(msg);
+			Message tmp_msg;
+			tmp_msg.set_from(1);
+			tmp_msg.set_to(1);
+			tmp_msg.set_type(MsgHup);
+			r->step(tmp_msg);
 		}
     EXPECT_EQ(r->state_, StateCandidate);
     r->step(msg);
@@ -544,7 +548,7 @@ void testNonleaderElectionTimeoutRandomized(StateType state) {
   peers.push_back(3);
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, et, 1, s);
-  int i;
+  size_t i;
   map<int, bool> timeouts;
   for (i = 0; i < 50 * et; ++i) {
     switch (state) {
@@ -553,6 +557,8 @@ void testNonleaderElectionTimeoutRandomized(StateType state) {
       break;
     case StateCandidate:
       r->becomeCandidate();
+      break;
+    default:
       break;
     }
 
@@ -590,7 +596,7 @@ void testNonleadersElectionTimeoutNonconflict(StateType state) {
   vector<raft*> rs;
   vector<uint64_t> peers;
   idsBySize(size, &peers);
-  int i;
+  size_t i;
   for (i = 0; i < peers.size(); ++i) {
     Storage *s = new MemoryStorage(&kDefaultLogger);
     raft *r = newTestRaft(peers[i], peers, et, 1, s);
@@ -598,7 +604,7 @@ void testNonleadersElectionTimeoutNonconflict(StateType state) {
   }
   int conflicts = 0;
   for (i = 0; i < 1000; ++i) {
-    int j;
+    size_t j;
     for (j = 0; j < rs.size(); ++j) {
       raft *r = rs[j];
       switch (state) {
@@ -608,6 +614,8 @@ void testNonleadersElectionTimeoutNonconflict(StateType state) {
       case StateCandidate:
         r->becomeCandidate();
         break;
+      default:
+        break;        
       }
     }
 
@@ -748,7 +756,7 @@ TEST(raftPaperTests, TestLeaderCommitEntry) {
 
   vector<Message*> msgs;
   r->readMessages(&msgs);
-  int i;
+  size_t i;
   for (i = 0; i < msgs.size(); ++i) {
     Message *msg = msgs[i];
     r->step(acceptAndReply(msg));
@@ -836,7 +844,7 @@ TEST(raftPaperTests, TestLeaderAcknowledgeCommit) {
     acceptors[5] = true;
     tests.push_back(tmp(5, acceptors, true));
   }
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
     vector<uint64_t> peers;
@@ -860,7 +868,7 @@ TEST(raftPaperTests, TestLeaderAcknowledgeCommit) {
     }
     vector<Message*> msgs;
     r->readMessages(&msgs);
-    int j;
+    size_t j;
     for (j = 0; j < msgs.size(); ++j) {
       Message *msg = msgs[j];
       if (t.acceptors[msg->to()]) {
@@ -912,7 +920,7 @@ TEST(raftPaperTests, TestLeaderCommitPrecedingEntries) {
 
     tests.push_back(entries);
   }
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     EntryVec &t = tests[i];
     vector<uint64_t> peers;
@@ -942,7 +950,7 @@ TEST(raftPaperTests, TestLeaderCommitPrecedingEntries) {
 
     vector<Message*> msgs;
     r->readMessages(&msgs);
-    int j;
+    size_t j;
     for (j = 0; j < msgs.size(); ++j) {
       Message *msg = msgs[j];
       r->step(acceptAndReply(msg));
@@ -1042,7 +1050,7 @@ TEST(raftPaperTests, TestFollowerCommitEntry) {
     tests.push_back(tmp(entries, 1));
   }
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
 
@@ -1061,7 +1069,7 @@ TEST(raftPaperTests, TestFollowerCommitEntry) {
       msg.set_term(1);
       msg.set_type(MsgApp);
       msg.set_commit(t.commit);
-      int j;
+      size_t j;
       for (j = 0; j < t.entries.size(); ++j) {
         *(msg.add_entries()) = t.entries[j];
       }
@@ -1120,7 +1128,7 @@ TEST(raftPaperTests, TestFollowerCheckMsgApp) {
   // unexisting entry
   tests.push_back(tmp(entries[1].term() + 1, entries[1].index() + 1, entries[1].index() + 1, true, 2));
   
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
 
@@ -1261,7 +1269,7 @@ TEST(raftPaperTests, TestFollowerAppendEntries) {
 		tests.push_back(tmp(0, 0, ents, wents, wunstable));
 	}
 
-	int i;
+	size_t i;
 	for (i = 0; i < tests.size(); ++i) {
 		tmp& t = tests[i];
 		vector<uint64_t> peers;
@@ -1290,7 +1298,7 @@ TEST(raftPaperTests, TestFollowerAppendEntries) {
       msg.set_term(2);
       msg.set_logterm(t.term);
       msg.set_index(t.index);
-			int j;
+			size_t j;
 			for (j = 0; j < t.ents.size(); ++j) {
 				*(msg.add_entries()) = t.ents[j];
 			}
@@ -1336,128 +1344,128 @@ TEST(raftPaperTests, TestLeaderSyncFollowerLog) {
 	vector<EntryVec> tests;
 	{
 		Entry entry;
-		EntryVec ents;
+		EntryVec tmp_ents;
 		
-		ents.push_back(entry);
+		tmp_ents.push_back(entry);
 
-		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
 
-		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
-		entry.set_term(4); entry.set_index(5); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(4); tmp_ents.push_back(entry);
+		entry.set_term(4); entry.set_index(5); tmp_ents.push_back(entry);
 
-		entry.set_term(5); entry.set_index(6); ents.push_back(entry);
-		entry.set_term(5); entry.set_index(7); ents.push_back(entry);
+		entry.set_term(5); entry.set_index(6); tmp_ents.push_back(entry);
+		entry.set_term(5); entry.set_index(7); tmp_ents.push_back(entry);
 
-		entry.set_term(6); entry.set_index(8); ents.push_back(entry);
-		entry.set_term(6); entry.set_index(9); ents.push_back(entry);
+		entry.set_term(6); entry.set_index(8); tmp_ents.push_back(entry);
+		entry.set_term(6); entry.set_index(9); tmp_ents.push_back(entry);
 
-		tests.push_back(ents);
+		tests.push_back(tmp_ents);
 	}
 	{
 		Entry entry;
-		EntryVec ents;
+		EntryVec tmp_ents;
 		
-		ents.push_back(entry);
+		tmp_ents.push_back(entry);
 
-		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
 
-		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(4); tmp_ents.push_back(entry);
 
-		tests.push_back(ents);
+		tests.push_back(tmp_ents);
 	}
 	{
 		Entry entry;
-		EntryVec ents;
+		EntryVec tmp_ents;
 		
-		ents.push_back(entry);
+		tmp_ents.push_back(entry);
 
-		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
 
-		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
-		entry.set_term(4); entry.set_index(5); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(4); tmp_ents.push_back(entry);
+		entry.set_term(4); entry.set_index(5); tmp_ents.push_back(entry);
 
-		entry.set_term(5); entry.set_index(6); ents.push_back(entry);
-		entry.set_term(5); entry.set_index(7); ents.push_back(entry);
+		entry.set_term(5); entry.set_index(6); tmp_ents.push_back(entry);
+		entry.set_term(5); entry.set_index(7); tmp_ents.push_back(entry);
 
-		entry.set_term(6); entry.set_index(8); ents.push_back(entry);
-		entry.set_term(6); entry.set_index(9); ents.push_back(entry);
-		entry.set_term(6); entry.set_index(10); ents.push_back(entry);
-		entry.set_term(6); entry.set_index(11); ents.push_back(entry);
+		entry.set_term(6); entry.set_index(8); tmp_ents.push_back(entry);
+		entry.set_term(6); entry.set_index(9); tmp_ents.push_back(entry);
+		entry.set_term(6); entry.set_index(10); tmp_ents.push_back(entry);
+		entry.set_term(6); entry.set_index(11); tmp_ents.push_back(entry);
 
-		tests.push_back(ents);
+		tests.push_back(tmp_ents);
 	}
 	{
 		Entry entry;
-		EntryVec ents;
+		EntryVec tmp_ents;
 		
-		ents.push_back(entry);
+		tmp_ents.push_back(entry);
 
-		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
 
-		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
-		entry.set_term(4); entry.set_index(5); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(4); tmp_ents.push_back(entry);
+		entry.set_term(4); entry.set_index(5); tmp_ents.push_back(entry);
 
-		entry.set_term(5); entry.set_index(6); ents.push_back(entry);
-		entry.set_term(5); entry.set_index(7); ents.push_back(entry);
+		entry.set_term(5); entry.set_index(6); tmp_ents.push_back(entry);
+		entry.set_term(5); entry.set_index(7); tmp_ents.push_back(entry);
 
-		entry.set_term(6); entry.set_index(8); ents.push_back(entry);
-		entry.set_term(6); entry.set_index(9); ents.push_back(entry);
-		entry.set_term(6); entry.set_index(10); ents.push_back(entry);
+		entry.set_term(6); entry.set_index(8); tmp_ents.push_back(entry);
+		entry.set_term(6); entry.set_index(9); tmp_ents.push_back(entry);
+		entry.set_term(6); entry.set_index(10); tmp_ents.push_back(entry);
 
-		entry.set_term(7); entry.set_index(11); ents.push_back(entry);
-		entry.set_term(7); entry.set_index(12); ents.push_back(entry);
+		entry.set_term(7); entry.set_index(11); tmp_ents.push_back(entry);
+		entry.set_term(7); entry.set_index(12); tmp_ents.push_back(entry);
 
-		tests.push_back(ents);
+		tests.push_back(tmp_ents);
 	}
 	{
 		Entry entry;
-		EntryVec ents;
+		EntryVec tmp_ents;
 		
-		ents.push_back(entry);
+		tmp_ents.push_back(entry);
 
-		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
 
-		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
-		entry.set_term(4); entry.set_index(5); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(4); tmp_ents.push_back(entry);
+		entry.set_term(4); entry.set_index(5); tmp_ents.push_back(entry);
 
-		entry.set_term(4); entry.set_index(6); ents.push_back(entry);
-		entry.set_term(4); entry.set_index(7); ents.push_back(entry);
+		entry.set_term(4); entry.set_index(6); tmp_ents.push_back(entry);
+		entry.set_term(4); entry.set_index(7); tmp_ents.push_back(entry);
 
-		tests.push_back(ents);
+		tests.push_back(tmp_ents);
 	}
 	{
 		Entry entry;
-		EntryVec ents;
+		EntryVec tmp_ents;
 		
-		ents.push_back(entry);
+		tmp_ents.push_back(entry);
 
-		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
+		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
 
-		entry.set_term(2); entry.set_index(4); ents.push_back(entry);
-		entry.set_term(2); entry.set_index(5); ents.push_back(entry);
-		entry.set_term(2); entry.set_index(6); ents.push_back(entry);
+		entry.set_term(2); entry.set_index(4); tmp_ents.push_back(entry);
+		entry.set_term(2); entry.set_index(5); tmp_ents.push_back(entry);
+		entry.set_term(2); entry.set_index(6); tmp_ents.push_back(entry);
 
-		entry.set_term(3); entry.set_index(7); ents.push_back(entry);
-		entry.set_term(3); entry.set_index(8); ents.push_back(entry);
-		entry.set_term(3); entry.set_index(9); ents.push_back(entry);
-		entry.set_term(3); entry.set_index(10); ents.push_back(entry);
-		entry.set_term(3); entry.set_index(11); ents.push_back(entry);
+		entry.set_term(3); entry.set_index(7); tmp_ents.push_back(entry);
+		entry.set_term(3); entry.set_index(8); tmp_ents.push_back(entry);
+		entry.set_term(3); entry.set_index(9); tmp_ents.push_back(entry);
+		entry.set_term(3); entry.set_index(10); tmp_ents.push_back(entry);
+		entry.set_term(3); entry.set_index(11); tmp_ents.push_back(entry);
 
-		tests.push_back(ents);
+		tests.push_back(tmp_ents);
 	}
-	int i;
+	size_t i;
 	for (i = 0; i < tests.size(); ++i) {
 		EntryVec& t = tests[i];
 
@@ -1568,7 +1576,7 @@ TEST(raftPaperTests, TestVoteRequest) {
 
     tests.push_back(tmp(entries, 3));
   }
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp & t = tests[i];
   
@@ -1586,7 +1594,7 @@ TEST(raftPaperTests, TestVoteRequest) {
       msg.set_type(MsgApp);
       msg.set_logterm(0);
       msg.set_index(0);
-      int j;
+      size_t j;
       for (j = 0; j < t.ents.size(); ++j) {
         *(msg.add_entries()) = t.ents[j];
       }
@@ -1596,12 +1604,12 @@ TEST(raftPaperTests, TestVoteRequest) {
     vector<Message*> msgs;
     r->readMessages(&msgs);
     
-    int j;
-    for (j = 0; j < r->electionTimeout_ * 2; ++j) {
+    size_t j;
+    for (j = 0; (int)j < r->electionTimeout_ * 2; ++j) {
       r->tickElection();
     }
     r->readMessages(&msgs);
-    EXPECT_EQ(msgs.size(), 2);
+    EXPECT_EQ((int)msgs.size(), 2);
     
     for (j = 0; j < msgs.size(); ++j) {
       Message *msg = msgs[j];
@@ -1728,7 +1736,7 @@ TEST(raftPaperTests, TestVoter) {
     tests.push_back(tmp(ents, 1, 1, true));
   }
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
     
@@ -1753,7 +1761,7 @@ TEST(raftPaperTests, TestVoter) {
     vector<Message*> msgs;
     r->readMessages(&msgs);
 
-    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ((int)msgs.size(), 1);
     Message *msg = msgs[0];
     
     EXPECT_EQ(msg->type(), MsgVoteResp);
@@ -1791,7 +1799,7 @@ TEST(raftPaperTests, TestLeaderOnlyCommitsLogFromCurrentTerm) {
   // commit log in current term
   tests.push_back(tmp(3, 3));
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
     EntryVec ents = entries;

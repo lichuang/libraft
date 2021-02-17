@@ -1,15 +1,15 @@
 #include <gtest/gtest.h>
 #include "libraft.h"
-#include "util.h"
-#include "progress.h"
-#include "default_logger.h"
+#include "base/default_logger.h"
+#include "base/util.h"
+#include "core/progress.h"
 
 bool deepEqualInflights(const inflights& in1, const inflights& in2) {
   EXPECT_EQ(in1.start_, in2.start_);
   EXPECT_EQ(in1.count_, in2.count_);
   EXPECT_EQ(in1.size_, in2.size_);
   EXPECT_EQ(in1.buffer_.size(), in2.buffer_.size());
-  int i = 0;
+  size_t i = 0;
   for (i = 0; i < in1.buffer_.size(); ++i) {
     EXPECT_EQ(in1.buffer_[i], in2.buffer_[i]) << "i: " << i << ",in1:" << in1.buffer_[i] << ",in2:" << in2.buffer_[i];
   }

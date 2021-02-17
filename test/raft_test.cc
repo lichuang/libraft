@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
 #include <math.h>
 #include "libraft.h"
-#include "util.h"
-#include "raft.h"
-#include "memory_storage.h"
-#include "default_logger.h"
-#include "progress.h"
+#include "base/default_logger.h"
+#include "base/util.h"
+#include "core/raft.h"
+#include "core/progress.h"
+#include "core/read_only.h"
+#include "storage/memory_storage.h"
 #include "raft_test_util.h"
-#include "read_only.h"
 
 stateMachine *nopStepper = new blackHole();
 
@@ -19,7 +19,7 @@ raftStateMachine* entsWithConfig(ConfigFun fun, const vector<uint64_t>& terms) {
   Storage *s = new MemoryStorage(&kDefaultLogger);
 
   vector<Entry> entries;
-  int i;
+  size_t i;
   for (i = 0; i < terms.size(); ++i) {
     Entry entry;
     entry.set_index(i + 1);
@@ -94,7 +94,7 @@ TEST(raftTests, TestProgressBecomeProbe) {
     tests.push_back(tmp(p, 2));
   }
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
     t.p.becomeProbe();
@@ -111,7 +111,7 @@ TEST(raftTests, TestProgressBecomeReplicate) {
 
   p.becomeReplicate();
   EXPECT_EQ(p.state_, ProgressStateReplicate);
-  EXPECT_EQ(p.match_, 1);
+  EXPECT_EQ((int)p.match_, 1);
   EXPECT_EQ(p.next_, p.match_ + 1);
 }
 
@@ -122,8 +122,8 @@ TEST(raftTests, TestProgressBecomeSnapshot) {
 
   p.becomeSnapshot(10);
   EXPECT_EQ(p.state_, ProgressStateSnapshot);
-  EXPECT_EQ(p.match_, 1);
-  EXPECT_EQ(p.pendingSnapshot_, 10);
+  EXPECT_EQ((int)p.match_, 1);
+  EXPECT_EQ((int)p.pendingSnapshot_, 10);
 }
 
 TEST(raftTests, TestProgressUpdate) {
@@ -151,7 +151,7 @@ TEST(raftTests, TestProgressUpdate) {
   // increase match, next
   tests.push_back(tmp(prevM + 2, prevM + 2, prevN + 1, true));
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
     Progress p(prevN, 256, &kDefaultLogger);
@@ -200,7 +200,7 @@ TEST(raftTests, TestProgressMaybeDecr) {
   tests.push_back(tmp(ProgressStateProbe, 0, 10, 9, 2, true, 3));
   // rejected < 1, reset to 1
   tests.push_back(tmp(ProgressStateProbe, 0, 10, 9, 0, true, 1));
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
     Progress p(t.n, 256, &kDefaultLogger);
@@ -231,7 +231,7 @@ TEST(raftTests, TestProgressIsPaused) {
   tests.push_back(tmp(ProgressStateReplicate, true, false));
   tests.push_back(tmp(ProgressStateSnapshot, false, true));
   tests.push_back(tmp(ProgressStateSnapshot, true, true));
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
     Progress p(0, 256, &kDefaultLogger);
@@ -333,7 +333,7 @@ TEST(raftTests, TestProgressPaused) {
 
   vector<Message *> msgs;
   r->readMessages(&msgs);
-  EXPECT_EQ(msgs.size(), 1);
+  EXPECT_EQ((int)msgs.size(), 1);
 
   delete s;
   delete r;
@@ -413,7 +413,7 @@ void testLeaderElection(bool prevote) {
     tmp t(newNetworkWithConfig(fun, peers), StateFollower, 1);
     tests.push_back(t);
   }
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
     Message msg;
@@ -465,7 +465,7 @@ void testLeaderCycle(bool prevote) {
   peers.push_back(NULL);
 
   network *net = newNetworkWithConfig(fun, peers);
-  int i;
+  size_t i;
   for (i = 1; i <= 3; i++) {
     Message msg;
     msg.set_from(i);
@@ -556,7 +556,7 @@ void testLeaderElectionOverwriteNewerLogs(bool preVote) {
   
   raft *r1 = (raft*)net->peers[1]->data();
   EXPECT_EQ(r1->state_, StateFollower);
-  EXPECT_EQ(r1->term_, 2);
+  EXPECT_EQ((int)r1->term_, 2);
 
   // Node 1 campaigns again with a higher term. This time it succeeds.
   {
@@ -569,7 +569,7 @@ void testLeaderElectionOverwriteNewerLogs(bool preVote) {
     net->send(&msgs);
   }
   EXPECT_EQ(r1->state_, StateLeader);
-  EXPECT_EQ(r1->term_, 3);
+  EXPECT_EQ((int)r1->term_, 3);
 
   // Now all nodes agree on a log entry with term 1 at index 1 (and
   // term 3 at index 2).
@@ -578,9 +578,9 @@ void testLeaderElectionOverwriteNewerLogs(bool preVote) {
     raft *r = (raft*)iter->second->data();
     EntryVec entries;
     r->raftLog_->allEntries(&entries);
-    EXPECT_EQ(entries.size(), 2);
-    EXPECT_EQ(entries[0].term(), 1);
-    EXPECT_EQ(entries[1].term(), 3);
+    EXPECT_EQ((int)entries.size(), 2);
+    EXPECT_EQ((int)entries[0].term(), 1);
+    EXPECT_EQ((int)entries[1].term(), 3);
   }
 }
 
@@ -602,7 +602,7 @@ void testVoteFromAnyState(MessageType vt) {
   peers.push_back(2);
   peers.push_back(3);
 
-  int i;
+  size_t i;
   for (i = 0; i < (int)numStates; ++i) {
     raft *r = newTestRaft(1, peers, 10, 1, new MemoryStorage(&kDefaultLogger));
     r->term_ = 1;
@@ -622,6 +622,8 @@ void testVoteFromAnyState(MessageType vt) {
       r->becomeCandidate();
       r->becomeLeader();
       break;
+    default:
+      break;
     }
 
     // Note that setting our state above may have advanced r.Term
@@ -639,7 +641,7 @@ void testVoteFromAnyState(MessageType vt) {
     int err = r->step(msg);
 
     EXPECT_EQ(err, OK);
-    EXPECT_EQ(r->msgs_.size(), 1);
+    EXPECT_EQ((int)r->msgs_.size(), 1);
     Message *resp = r->msgs_[0];
     EXPECT_EQ(resp->type(), voteRespMsgType(vt));
     EXPECT_FALSE(resp->reject());
@@ -648,7 +650,7 @@ void testVoteFromAnyState(MessageType vt) {
       // If this was a real vote, we reset our state and term.
       EXPECT_EQ(r->state_, StateFollower);
       EXPECT_EQ(r->term_, newTerm);
-      EXPECT_EQ(r->vote_, 2);
+      EXPECT_EQ((int)r->vote_, 2);
     } else {
       // In a prevote, nothing changes.
       EXPECT_EQ(r->state_, st);
@@ -736,7 +738,7 @@ TEST(raftTests, TestLogReplication) {
     }
     tests.push_back(tmp(newNetwork(peers), msgs, 4));
   }
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
     Message msg;
@@ -747,11 +749,11 @@ TEST(raftTests, TestLogReplication) {
     msgs.push_back(msg);
     t.net->send(&msgs);
 
-    int j;
+    size_t j;
     for (j = 0; j < t.msgs.size(); ++j) {
-      vector<Message> msgs;
-      msgs.push_back(t.msgs[j]);
-      t.net->send(&msgs);
+      vector<Message> tmp_msgs;
+      tmp_msgs.push_back(t.msgs[j]);
+      t.net->send(&tmp_msgs);
     }
 
     map<uint64_t, stateMachine*>::iterator iter;
@@ -761,7 +763,7 @@ TEST(raftTests, TestLogReplication) {
       
       EntryVec entries, ents;
       nextEnts(r, t.net->storage[iter->first], &entries);
-      int m;
+      size_t m;
       for (m = 0; m < entries.size(); ++m) {
         if (entries[m].has_data()) {
           ents.push_back(entries[m]);
@@ -770,14 +772,14 @@ TEST(raftTests, TestLogReplication) {
 
       vector<Message> props;
       for (m = 0; m < t.msgs.size(); ++m) {
-        const Message& msg = t.msgs[m];
-        if (msg.type() == MsgProp) {
-          props.push_back(msg);
+        const Message& tmp_msgs = t.msgs[m];
+        if (tmp_msgs.type() == MsgProp) {
+          props.push_back(tmp_msgs);
         }
       } 
       for (m = 0; m < props.size(); ++m) {
-        const Message& msg = props[m];
-        EXPECT_EQ(ents[m].data(),  msg.entries(0).data());
+        const Message& tmp_msgs = props[m];
+        EXPECT_EQ(ents[m].data(),  tmp_msgs.entries(0).data());
       }
     }
   }
@@ -821,7 +823,7 @@ TEST(raftTests, TestSingleNodeCommit) {
   }
 
   raft *r = (raft*)net->peers[1]->data();
-  EXPECT_EQ(r->raftLog_->committed_, 3);
+  EXPECT_EQ((int)r->raftLog_->committed_, 3);
 }
 
 // TestCannotCommitWithoutNewTermEntry tests the entries cannot be committed
@@ -875,7 +877,7 @@ TEST(raftTests, TestCannotCommitWithoutNewTermEntry) {
   }
 
   raft *r = (raft*)net->peers[1]->data();
-  EXPECT_EQ(r->raftLog_->committed_, 1);
+  EXPECT_EQ((int)r->raftLog_->committed_, 1);
 
   // network recovery
   net->recover();
@@ -895,7 +897,7 @@ TEST(raftTests, TestCannotCommitWithoutNewTermEntry) {
 
   // no log entries from previous term should be committed
   r = (raft*)net->peers[2]->data();
-  EXPECT_EQ(r->raftLog_->committed_, 1);
+  EXPECT_EQ((int)r->raftLog_->committed_, 1);
 
   net->recover();
   // send heartbeat; reset wait
@@ -920,7 +922,7 @@ TEST(raftTests, TestCannotCommitWithoutNewTermEntry) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(r->raftLog_->committed_, 5);
+  EXPECT_EQ((int)r->raftLog_->committed_, 5);
 }
 
 // TestCommitWithoutNewTermEntry tests the entries could be committed
@@ -973,7 +975,7 @@ TEST(raftTests, TestCommitWithoutNewTermEntry) {
   }
 
   raft *r = (raft*)net->peers[1]->data();
-  EXPECT_EQ(r->raftLog_->committed_, 1);
+  EXPECT_EQ((int)r->raftLog_->committed_, 1);
 
   // network recovery
   net->recover();
@@ -991,7 +993,7 @@ TEST(raftTests, TestCommitWithoutNewTermEntry) {
     net->send(&msgs);
   }
 
-  EXPECT_EQ(r->raftLog_->committed_, 4);
+  EXPECT_EQ((int)r->raftLog_->committed_, 4);
 }
 
 TEST(raftTests, TestDuelingCandidates) {
@@ -1098,7 +1100,7 @@ TEST(raftTests, TestDuelingCandidates) {
   tests.push_back(tmp((raft*)peers[1]->data(), StateFollower, 2, log)); 
   tests.push_back(tmp((raft*)peers[2]->data(), StateFollower, 2, new raftLog(new MemoryStorage(&kDefaultLogger), &kDefaultLogger))); 
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
     EXPECT_EQ(t.r->state_, t.state);
@@ -1106,8 +1108,8 @@ TEST(raftTests, TestDuelingCandidates) {
 
     string base = raftLogString(t.log);
     if (net->peers[i + 1]->type() == raftType) {
-      raft *r = (raft*)net->peers[i + 1]->data();
-      string str = raftLogString(r->raftLog_);
+      raft *tmp_r = (raft*)net->peers[i + 1]->data();
+      string str = raftLogString(tmp_r->raftLog_);
       EXPECT_EQ(base, str) << "i: " << i;
     }
   }
@@ -1220,7 +1222,7 @@ TEST(raftTests, TestDuelingPreCandidates) {
   tests.push_back(tmp((raft*)peers[1]->data(), StateFollower, 1, log)); 
   tests.push_back(tmp((raft*)peers[2]->data(), StateFollower, 1, new raftLog(new MemoryStorage(&kDefaultLogger), &kDefaultLogger))); 
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
     EXPECT_EQ(t.r->state_, t.state);
@@ -1228,8 +1230,8 @@ TEST(raftTests, TestDuelingPreCandidates) {
 
     string base = raftLogString(t.log);
     if (net->peers[i + 1]->type() == raftType) {
-      raft *r = (raft*)net->peers[i + 1]->data();
-      string str = raftLogString(r->raftLog_);
+      raft *tmp_r = (raft*)net->peers[i + 1]->data();
+      string str = raftLogString(tmp_r->raftLog_);
       EXPECT_EQ(base, str) << "i: " << i;
     }
   }
@@ -1304,7 +1306,7 @@ TEST(raftTests, TestCandidateConcede) {
 
   raft *r = (raft*)net->peers[1]->data();
   EXPECT_EQ(r->state_, StateFollower);
-  EXPECT_EQ(r->term_, 1);
+  EXPECT_EQ((int)r->term_, 1);
 
   MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
   EntryVec entries;
@@ -1333,12 +1335,12 @@ TEST(raftTests, TestCandidateConcede) {
 
   map<uint64_t, stateMachine*>::iterator iter;
   for (iter = net->peers.begin(); iter != net->peers.end(); ++iter) {
-    stateMachine *s = iter->second;
-    if (s->type() != raftType) {
+    stateMachine *tmp_s = iter->second;
+    if (tmp_s->type() != raftType) {
       continue;
     }
-    raft *r = (raft*)s->data();
-    string str = raftLogString(r->raftLog_);
+    raft *tmp_r = (raft*)tmp_s->data();
+    string str = raftLogString(tmp_r->raftLog_);
     EXPECT_EQ(str, logStr);
   }
 }
@@ -1486,12 +1488,12 @@ TEST(raftTests, TestOldMessages) {
 
   map<uint64_t, stateMachine*>::iterator iter;
   for (iter = net->peers.begin(); iter != net->peers.end(); ++iter) {
-    stateMachine *s = iter->second;
-    if (s->type() != raftType) {
+    stateMachine *tmp_s = iter->second;
+    if (tmp_s->type() != raftType) {
       continue;
     }
-    raft *r = (raft*)s->data();
-    string str = raftLogString(r->raftLog_);
+    raft *tmp_r = (raft*)tmp_s->data();
+    string str = raftLogString(tmp_r->raftLog_);
     EXPECT_EQ(str, logStr);
   }
 }
@@ -1531,7 +1533,7 @@ TEST(raftTests, TestProposal) {
     peers.push_back(nopStepper);
     peers.push_back(nopStepper);
 
-    network *net = newNetwork(peers);
+    //network *net = newNetwork(peers);
     //tests.push_back(tmp(net, false));
   }
   {
@@ -1541,7 +1543,7 @@ TEST(raftTests, TestProposal) {
     peers.push_back(nopStepper);
     peers.push_back(NULL);
 
-    network *net = newNetwork(peers);
+    //network *net = newNetwork(peers);
     //tests.push_back(tmp(net, false));
   }
   {
@@ -1556,7 +1558,7 @@ TEST(raftTests, TestProposal) {
     tests.push_back(tmp(net, true));
   }
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
     string data = "somedata";
@@ -1645,7 +1647,7 @@ TEST(raftTests, TestProposalByProxy) {
     tests.push_back(net);
   }
 
-  int i;
+  size_t i;
   string data = "somedata";
   for (i = 0; i < tests.size(); ++i) {
     network *net = tests[i];
@@ -1699,15 +1701,15 @@ TEST(raftTests, TestProposalByProxy) {
 
     map<uint64_t, stateMachine*>::iterator iter;
     for (iter = net->peers.begin(); iter != net->peers.end(); ++iter) {
-      stateMachine *s = iter->second;
-      if (s->type() != raftType) {
+      stateMachine *tmp_s = iter->second;
+      if (tmp_s->type() != raftType) {
         continue;
       }
-      raft *r = (raft*)s->data();
-      string str = raftLogString(r->raftLog_);
+      raft *tmp_r = (raft*)tmp_s->data();
+      string str = raftLogString(tmp_r->raftLog_);
       EXPECT_EQ(str, logStr);
     }
-    EXPECT_EQ(((raft*)(net->peers[1]->data()))->term_, 1);
+    EXPECT_EQ((int)((raft*)(net->peers[1]->data()))->term_, 1);
   }
 }
 
@@ -2036,7 +2038,7 @@ TEST(raftTests, TestCommit) {
     }
   }
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
@@ -2046,7 +2048,7 @@ TEST(raftTests, TestCommit) {
     vector<uint64_t> peers;
     peers.push_back(1);
     raft *r = newTestRaft(1, peers, 5, 1, s);
-    int j;
+    size_t j;
     for (j = 0; j < t.matches.size(); ++j) {
       r->setProgress(j + 1, t.matches[j], t.matches[j] + 1);
     }
@@ -2074,7 +2076,7 @@ TEST(raftTests, TestPastElectionTimeout) {
   tests.push_back(tmp(18, 0.9, true));
   tests.push_back(tmp(20, 1, false));
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
 
@@ -2262,7 +2264,7 @@ TEST(raftTests, TestHandleMsgApp) {
 
     tests.push_back(tmp(msg, 2, 2, false));
   }
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
 
@@ -2293,7 +2295,7 @@ TEST(raftTests, TestHandleMsgApp) {
 
     vector<Message*> msgs;
     r->readMessages(&msgs);
-    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ((int)msgs.size(), 1);
     EXPECT_EQ(msgs[0]->reject(), t.reject);
   }
 }
@@ -2330,7 +2332,7 @@ TEST(raftTests, TestHandleHeartbeat) {
     tests.push_back(tmp(m, commit));
   }
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
 
@@ -2367,7 +2369,7 @@ TEST(raftTests, TestHandleHeartbeat) {
     EXPECT_EQ(r->raftLog_->committed_, t.commit);
     vector<Message *> msgs;
     r->readMessages(&msgs);
-    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ((int)msgs.size(), 1);
     EXPECT_EQ(msgs[0]->type(), MsgHeartbeatResp);
   }
 }
@@ -2414,7 +2416,7 @@ TEST(raftTests, TestHandleHeartbeatResp) {
     r->step(m);
 
     r->readMessages(&msgs);
-    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ((int)msgs.size(), 1);
     EXPECT_EQ(msgs[0]->type(), MsgApp);
   }
 
@@ -2426,7 +2428,7 @@ TEST(raftTests, TestHandleHeartbeatResp) {
     r->step(m);
     msgs.clear();
     r->readMessages(&msgs);
-    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ((int)msgs.size(), 1);
     EXPECT_EQ(msgs[0]->type(), MsgApp);
   }
   // Once we have an MsgAppResp, heartbeats no longer send MsgApp.
@@ -2436,9 +2438,9 @@ TEST(raftTests, TestHandleHeartbeatResp) {
     m.set_type(MsgAppResp);
     m.set_index(msgs[0]->index() + uint64_t(msgs[0]->entries_size()));
     r->step(m);
-    vector<Message*> msgs;
+    vector<Message*> tmp_msgs;
     // Consume the message sent in response to MsgAppResp
-    r->readMessages(&msgs);
+    r->readMessages(&tmp_msgs);
   }
 
   {
@@ -2448,7 +2450,7 @@ TEST(raftTests, TestHandleHeartbeatResp) {
     r->step(m);
     msgs.clear();
     r->readMessages(&msgs);
-    EXPECT_EQ(msgs.size(), 0);
+    EXPECT_EQ((int)msgs.size(), 0);
   }
 }
 
@@ -2481,11 +2483,11 @@ TEST(raftTests, TestRaftFreesReadOnlyMem) {
     r->step(m);
 
     r->readMessages(&msgs);
-    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ((int)msgs.size(), 1);
     EXPECT_EQ(msgs[0]->type(), MsgHeartbeat);
     EXPECT_EQ(msgs[0]->context(), ctx);
-    EXPECT_EQ(r->readOnly_->readIndexQueue_.size(), 1);
-    EXPECT_EQ(r->readOnly_->pendingReadIndex_.size(), 1);
+    EXPECT_EQ((int)r->readOnly_->readIndexQueue_.size(), 1);
+    EXPECT_EQ((int)r->readOnly_->pendingReadIndex_.size(), 1);
     EXPECT_NE(r->readOnly_->pendingReadIndex_.find(ctx), r->readOnly_->pendingReadIndex_.end());
   }
   // heartbeat responses from majority of followers (1 in this case)
@@ -2498,8 +2500,8 @@ TEST(raftTests, TestRaftFreesReadOnlyMem) {
     m.set_context(ctx);
     r->step(m);
 
-    EXPECT_EQ(r->readOnly_->readIndexQueue_.size(), 0);
-    EXPECT_EQ(r->readOnly_->pendingReadIndex_.size(), 0);
+    EXPECT_EQ((int)r->readOnly_->readIndexQueue_.size(), 0);
+    EXPECT_EQ((int)r->readOnly_->pendingReadIndex_.size(), 0);
     EXPECT_EQ(r->readOnly_->pendingReadIndex_.find(ctx), r->readOnly_->pendingReadIndex_.end());
   }
 }
@@ -2532,7 +2534,7 @@ TEST(raftTests, TestMsgAppRespWaitReset) {
     msg.set_index(1);
     r->step(msg);
   }
-  EXPECT_EQ(r->raftLog_->committed_, 1);
+  EXPECT_EQ((int)r->raftLog_->committed_, 1);
 
   // Also consume the MsgApp messages that update Commit on the followers.
   r->readMessages(&msgs);
@@ -2542,7 +2544,8 @@ TEST(raftTests, TestMsgAppRespWaitReset) {
     Message msg;
     msg.set_from(1);
     msg.set_type(MsgProp);
-    Entry *entry = msg.add_entries();
+    //Entry *entry = msg.add_entries();
+    msg.add_entries();
     r->step(msg);
   }
 
@@ -2550,22 +2553,22 @@ TEST(raftTests, TestMsgAppRespWaitReset) {
   // Node 2 left the wait state due to its MsgAppResp, but node 3 is still waiting.
   msgs.clear();
   r->readMessages(&msgs);
-  EXPECT_EQ(msgs.size(), 1);
+  EXPECT_EQ((int)msgs.size(), 1);
   Message *msg = msgs[0];
   EXPECT_FALSE(msg->type() != MsgApp || msg->to() != 2);
   EXPECT_FALSE(msg->entries_size() != 1 || msg->entries(0).index() != 2);
 
   // Now Node 3 acks the first entry. This releases the wait and entry 2 is sent.
   {
-    Message msg;
-    msg.set_from(3);
-    msg.set_type(MsgAppResp);
-    msg.set_index(1);
-    r->step(msg);
+    Message tmp_msg;
+    tmp_msg.set_from(3);
+    tmp_msg.set_type(MsgAppResp);
+    tmp_msg.set_index(1);
+    r->step(tmp_msg);
   }
   msgs.clear();
   r->readMessages(&msgs);
-  EXPECT_EQ(msgs.size(), 1);
+  EXPECT_EQ((int)msgs.size(), 1);
   msg = msgs[0];
   EXPECT_FALSE(msg->type() != MsgApp || msg->to() != 3);
   EXPECT_FALSE(msg->entries_size() != 1 || msg->entries(0).index() != 2);
@@ -2611,7 +2614,7 @@ void testRecvMsgVote(MessageType type) {
   tests.push_back(tmp(StatePreCandidate, 3, 3, 1, true));
   tests.push_back(tmp(StateCandidate, 3, 3, 1, true));
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
@@ -2629,6 +2632,8 @@ void testRecvMsgVote(MessageType type) {
       break;
     case StateLeader:
       r->stateStep = stepLeader;
+      break;
+    default:
       break;
     }
     r->vote_ = t.voteFor;  
@@ -2666,7 +2671,7 @@ void testRecvMsgVote(MessageType type) {
     vector<Message*> msgs;
     r->readMessages(&msgs);
 
-    EXPECT_EQ(msgs.size(), 1);
+    EXPECT_EQ((int)msgs.size(), 1);
     EXPECT_EQ(msgs[0]->type(), voteRespMsgType(type));
     EXPECT_EQ(msgs[0]->reject(), t.reject) << "i: " << i;
   }
@@ -2703,7 +2708,7 @@ TEST(raftTests, TestAllServerStepdown) {
   types.push_back(MsgApp);
   uint64_t term = 3;
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
@@ -2727,9 +2732,11 @@ TEST(raftTests, TestAllServerStepdown) {
       r->becomeCandidate();
       r->becomeLeader();
       break;
+    default:
+      break;      
     }
 
-    int j;
+    size_t j;
     for (j = 0; j < types.size(); ++j) {
       MessageType type = types[j];
       Message msg;
@@ -2808,29 +2815,29 @@ TEST(raftTests, TestLeaderSupersedingWithCheckQuorum) {
 
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    a = newTestRaft(1, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    a = newTestRaft(1, tmp_peers, 10, 1, s);
     a->checkQuorum_ = true;
   }
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    b = newTestRaft(2, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    b = newTestRaft(2, tmp_peers, 10, 1, s);
     b->checkQuorum_ = true;
   }
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    c = newTestRaft(3, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    c = newTestRaft(3, tmp_peers, 10, 1, s);
     c->checkQuorum_ = true;
   }
   peers.push_back(new raftStateMachine(a));
@@ -2893,29 +2900,29 @@ TEST(raftTests, TestLeaderElectionWithCheckQuorum) {
 
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    a = newTestRaft(1, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    a = newTestRaft(1, tmp_peers, 10, 1, s);
     a->checkQuorum_ = true;
   }
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    b = newTestRaft(2, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    b = newTestRaft(2, tmp_peers, 10, 1, s);
     b->checkQuorum_ = true;
   }
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    c = newTestRaft(3, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    c = newTestRaft(3, tmp_peers, 10, 1, s);
     c->checkQuorum_ = true;
   }
   peers.push_back(new raftStateMachine(a));
@@ -2975,29 +2982,29 @@ TEST(raftTests, TestFreeStuckCandidateWithCheckQuorum) {
 
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    a = newTestRaft(1, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    a = newTestRaft(1, tmp_peers, 10, 1, s);
     a->checkQuorum_ = true;
   }
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    b = newTestRaft(2, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    b = newTestRaft(2, tmp_peers, 10, 1, s);
     b->checkQuorum_ = true;
   }
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    c = newTestRaft(3, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    c = newTestRaft(3, tmp_peers, 10, 1, s);
     c->checkQuorum_ = true;
   }
   peers.push_back(new raftStateMachine(a));
@@ -3070,17 +3077,17 @@ TEST(raftTests, TestNonPromotableVoterWithCheckQuorum) {
 
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    a = newTestRaft(1, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    a = newTestRaft(1, tmp_peers, 10, 1, s);
     a->checkQuorum_ = true;
   }
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    b = newTestRaft(2, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    b = newTestRaft(2, tmp_peers, 10, 1, s);
     b->checkQuorum_ = true;
   }
   peers.push_back(new raftStateMachine(a));
@@ -3107,7 +3114,7 @@ TEST(raftTests, TestNonPromotableVoterWithCheckQuorum) {
 
   EXPECT_EQ(a->state_, StateLeader);
   EXPECT_EQ(b->state_, StateFollower);
-  EXPECT_EQ(b->leader_, 1);
+  EXPECT_EQ((int)b->leader_, 1);
 }
 
 TEST(raftTests, TestReadOnlyOptionSafe) {
@@ -3116,29 +3123,29 @@ TEST(raftTests, TestReadOnlyOptionSafe) {
 
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    a = newTestRaft(1, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    a = newTestRaft(1, tmp_peers, 10, 1, s);
     a->checkQuorum_ = true;
   }
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    b = newTestRaft(2, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    b = newTestRaft(2, tmp_peers, 10, 1, s);
     b->checkQuorum_ = true;
   }
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
-    c = newTestRaft(3, peers, 10, 1, s);
+    vector<uint64_t> tmp_peers;
+    tmp_peers.push_back(1);
+    tmp_peers.push_back(2);
+    tmp_peers.push_back(3);
+    c = newTestRaft(3, tmp_peers, 10, 1, s);
     c->checkQuorum_ = true;
   }
   peers.push_back(new raftStateMachine(a));
@@ -3180,7 +3187,7 @@ TEST(raftTests, TestReadOnlyOptionSafe) {
   tests.push_back(tmp(b, 10, 51, "ctx5"));
   tests.push_back(tmp(c, 10, 61, "ctx6"));
 
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < (int)tests.size(); ++i) {
     tmp& t = tests[i];
     int j;
     for (j = 0; j < t.proposals; ++j) {
@@ -3284,7 +3291,7 @@ TEST(raftTests, TestReadOnlyOptionLease) {
   tests.push_back(tmp(b, 10, 51, "ctx5"));
   tests.push_back(tmp(c, 10, 61, "ctx6"));
 
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < (int)tests.size(); ++i) {
     tmp &t = tests[i];
     int j;
     for (j = 0; j < t.proposals; ++j) {
@@ -3406,9 +3413,9 @@ TEST(raftTests, TestReadOnlyForNewLeader) {
     s->hardState_.set_commit(1);
     s->hardState_.set_term(1);
 
-    Config *c = newTestConfig(1, peers, 10, 1, s);
-    c->applied = 1;
-    a = newRaft(c);
+    Config *tmp_c = newTestConfig(1, peers, 10, 1, s);
+    tmp_c->applied = 1;
+    a = newRaft(tmp_c);
     sts.push_back(new raftStateMachine(a));
   }
   {
@@ -3429,9 +3436,9 @@ TEST(raftTests, TestReadOnlyForNewLeader) {
     s->hardState_.set_commit(2);
     s->hardState_.set_term(1);
 
-    Config *c = newTestConfig(2, peers, 10, 1, s);
-    c->applied = 2;
-    b = newRaft(c);
+    Config *tmp_c = newTestConfig(2, peers, 10, 1, s);
+    tmp_c->applied = 2;
+    b = newRaft(tmp_c);
     sts.push_back(new raftStateMachine(b));
   }
   {
@@ -3489,7 +3496,7 @@ TEST(raftTests, TestReadOnlyForNewLeader) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(a->readStates_.size(), 0);
+  EXPECT_EQ((int)a->readStates_.size(), 0);
 
   net->recover();
 
@@ -3509,7 +3516,7 @@ TEST(raftTests, TestReadOnlyForNewLeader) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(a->raftLog_->committed_, 4);
+  EXPECT_EQ((int)a->raftLog_->committed_, 4);
 
   uint64_t term;
   int err = a->raftLog_->term(a->raftLog_->committed_, &term);
@@ -3527,7 +3534,7 @@ TEST(raftTests, TestReadOnlyForNewLeader) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(a->readStates_.size(), 1);
+  EXPECT_EQ((int)a->readStates_.size(), 1);
   ReadState *rs = a->readStates_[0];
   EXPECT_EQ(rs->index_, index);
   EXPECT_EQ(rs->requestCtx_, ctx);
@@ -3561,7 +3568,7 @@ TEST(raftTests, TestLeaderAppResp) {
   // ignore heartbeat replies
   tests.push_back(tmp(0, false, 0, 3, 0, 0, 0));
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
  		// sm term is 1 after it becomes the leader.
 		// thus the last log term must be 1 to be committed.
@@ -3574,7 +3581,7 @@ TEST(raftTests, TestLeaderAppResp) {
     raft* r = newTestRaft(1, peers, 10, 1, s);
 
     {
-      MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+      MemoryStorage *tmp_s = new MemoryStorage(&kDefaultLogger);
       EntryVec entries;
       entries.push_back(Entry());
 
@@ -3587,7 +3594,7 @@ TEST(raftTests, TestLeaderAppResp) {
       entry.set_term(1);
       entries.push_back(entry);
       s->entries_ = entries;
-      r->raftLog_ = newLog(s, &kDefaultLogger);
+      r->raftLog_ = newLog(tmp_s, &kDefaultLogger);
       r->raftLog_->unstable_.offset_ = 3;
     }
 
@@ -3613,8 +3620,8 @@ TEST(raftTests, TestLeaderAppResp) {
 
     r->readMessages(&msgs);
 
-    EXPECT_EQ(msgs.size(), t.msgNum);
-    int j;
+    EXPECT_EQ((int)msgs.size(), t.msgNum);
+    size_t j;
     for (j = 0; j < msgs.size(); ++j) {
       Message *msg = msgs[j];
       EXPECT_EQ(msg->index(), t.windex);
@@ -3644,7 +3651,7 @@ TEST(raftTests, TestBcastBeat) {
   r->becomeLeader();
 
   EntryVec entries;
-  int i;
+  size_t i;
   for (i = 0; i < 10; ++i) {
     Entry entry;
     entry.set_index(i + 1);
@@ -3667,7 +3674,7 @@ TEST(raftTests, TestBcastBeat) {
   vector<Message*> msgs;
   r->readMessages(&msgs);
   
-  EXPECT_EQ(msgs.size(), 2);
+  EXPECT_EQ((int)msgs.size(), 2);
   map<uint64_t, uint64_t> wantCommitMap;
   wantCommitMap[2] = min(r->raftLog_->committed_, r->prs_[2]->match_);
   wantCommitMap[3] = min(r->raftLog_->committed_, r->prs_[3]->match_);
@@ -3675,11 +3682,11 @@ TEST(raftTests, TestBcastBeat) {
   for (i = 0; i < msgs.size(); ++i) {
     Message *msg = msgs[i];
     EXPECT_EQ(msg->type(), MsgHeartbeat);
-    EXPECT_EQ(msg->index(), 0);
-    EXPECT_EQ(msg->logterm(), 0);
-    EXPECT_NE(wantCommitMap[msg->to()], 0);
+    EXPECT_EQ((int)msg->index(), 0);
+    EXPECT_EQ((int)msg->logterm(), 0);
+    EXPECT_NE((int)wantCommitMap[msg->to()], 0);
     EXPECT_EQ(msg->commit(), wantCommitMap[msg->to()]);
-    EXPECT_EQ(msg->entries_size(), 0);
+    EXPECT_EQ((int)msg->entries_size(), 0);
   }
 }
 
@@ -3700,7 +3707,7 @@ TEST(raftTests, TestRecvMsgBeat) {
   tests.push_back(tmp(StateCandidate, 0));
   tests.push_back(tmp(StateFollower, 0));
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
@@ -3735,6 +3742,8 @@ TEST(raftTests, TestRecvMsgBeat) {
     case StateLeader:
       r->stateStep = stepLeader;
       break;
+    default:
+      break;
     }
 
     Message msg;
@@ -3746,9 +3755,9 @@ TEST(raftTests, TestRecvMsgBeat) {
     vector<Message*> msgs;
     r->readMessages(&msgs);
 
-    EXPECT_EQ(msgs.size(), t.msg) << "i: " << i;
+    EXPECT_EQ((int)msgs.size(), t.msg) << "i: " << i;
 
-    int j;
+    size_t j;
     for (j = 0; j < msgs.size(); ++j) {
       EXPECT_EQ(msgs[j]->type(), MsgHeartbeat);
     }
@@ -3786,7 +3795,7 @@ TEST(raftTests, TestLeaderIncreaseNext) {
 	// state probe, not optimistically increase next
   tests.push_back(tmp(ProgressStateProbe, 2, 2));
 
-	int i;
+	size_t i;
 	for (i = 0; i < tests.size(); ++i) {
 		tmp& t = tests[i];
 
@@ -3826,7 +3835,7 @@ TEST(raftTests, TestSendAppendForProgressProbe) {
 	r->prs_[2]->becomeProbe();
 
 	// each round is a heartbeat
-	int i;
+	size_t i;
 	for (i = 0; i < 3; ++i) {
 		if (i == 0) {
 			// we expect that raft will only send out one msgAPP on the first
@@ -3839,8 +3848,8 @@ TEST(raftTests, TestSendAppendForProgressProbe) {
 			r->appendEntry(&entries);
 			r->sendAppend(2);
 			r->readMessages(&msgs);
-			EXPECT_EQ(msgs.size(), 1);
-			EXPECT_EQ(msgs[0]->index(), 0);
+			EXPECT_EQ((int)msgs.size(), 1);
+			EXPECT_EQ((int)msgs[0]->index(), 0);
 		}
 
 		EXPECT_TRUE(r->prs_[2]->paused_);
@@ -3857,10 +3866,10 @@ TEST(raftTests, TestSendAppendForProgressProbe) {
 		EXPECT_TRUE(r->prs_[2]->paused_);
 
 		// consume the heartbeat
-		vector<Message*> msgs;
-		r->readMessages(&msgs);
-		EXPECT_EQ(msgs.size(), 1);
-		EXPECT_EQ(msgs[0]->type(), MsgHeartbeat);
+		vector<Message*> tmp_msgs;
+		r->readMessages(&tmp_msgs);
+		EXPECT_EQ((int)tmp_msgs.size(), 1);
+		EXPECT_EQ(tmp_msgs[0]->type(), MsgHeartbeat);
 
 		// a heartbeat response will allow another message to be sent
 		{
@@ -3871,8 +3880,8 @@ TEST(raftTests, TestSendAppendForProgressProbe) {
 			r->step(msg);
 		}
 		r->readMessages(&msgs);
-		EXPECT_EQ(msgs.size(), 1);
-		EXPECT_EQ(msgs[0]->index(), 0);
+		EXPECT_EQ((int)msgs.size(), 1);
+		EXPECT_EQ((int)msgs[0]->index(), 0);
 		EXPECT_TRUE(r->prs_[2]->paused_);
 	}
 }
@@ -3890,7 +3899,7 @@ TEST(raftTests, TestSendAppendForProgressReplicate) {
 	r->readMessages(&msgs);
 	r->prs_[2]->becomeReplicate();
 
-	int i;
+	size_t i;
 	for (i = 0; i < 10; ++i) {
 		EntryVec entries;
 		Entry entry;
@@ -3899,7 +3908,7 @@ TEST(raftTests, TestSendAppendForProgressReplicate) {
 		r->appendEntry(&entries);
 		r->sendAppend(2);
 		r->readMessages(&msgs);
-		EXPECT_EQ(msgs.size(), 1);
+		EXPECT_EQ((int)msgs.size(), 1);
 	}
 }
 
@@ -3916,7 +3925,7 @@ TEST(raftTests, TestSendAppendForProgressSnapshot) {
 	r->readMessages(&msgs);
 	r->prs_[2]->becomeSnapshot(10);
 
-	int i;
+	size_t i;
 	for (i = 0; i < 10; ++i) {
 		EntryVec entries;
 		Entry entry;
@@ -3925,7 +3934,7 @@ TEST(raftTests, TestSendAppendForProgressSnapshot) {
 		r->appendEntry(&entries);
 		r->sendAppend(2);
 		r->readMessages(&msgs);
-		EXPECT_EQ(msgs.size(), 0);
+		EXPECT_EQ((int)msgs.size(), 0);
 	}
 }
 
@@ -4071,7 +4080,7 @@ TEST(raftTests, TestProvideSnap) {
 
   vector<Message*> msgs;
   r->readMessages(&msgs);
-  EXPECT_EQ(msgs.size(), 1);
+  EXPECT_EQ((int)msgs.size(), 1);
   EXPECT_EQ(msgs[0]->type(), MsgSnap);
 }
 
@@ -4108,7 +4117,7 @@ TEST(raftTests, TestIgnoreProvidingSnap) {
 
   vector<Message*> msgs;
   r->readMessages(&msgs);
-  EXPECT_EQ(msgs.size(), 0);
+  EXPECT_EQ((int)msgs.size(), 0);
 }
 
 TEST(raftTests, TestRestoreFromSnapMsg) {
@@ -4132,7 +4141,7 @@ TEST(raftTests, TestSlowNodeRestore) {
   }
 
   net->isolate(3);
-  int i;
+  size_t i;
   for (i = 0; i <= 100; ++i) {
       vector<Message> msgs;
       Message msg;
@@ -4150,7 +4159,7 @@ TEST(raftTests, TestSlowNodeRestore) {
   ConfState cs;
   vector<uint64_t> nodes;
   leader->nodes(&nodes);
-  int j;
+  size_t j;
   for (j = 0; j < nodes.size(); ++j) {
     cs.add_nodes(nodes[j]);
   }
@@ -4283,7 +4292,7 @@ TEST(raftTests, TestRecoverPendingConfig) {
   vector<tmp> tests;
   tests.push_back(tmp(EntryNormal, false));
   tests.push_back(tmp(EntryConfChange, true));
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
@@ -4377,7 +4386,7 @@ TEST(raftTests, TestPromotable) {
     peers.push_back(3);
     tests.push_back(tmp(peers, false));
   }
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
 
@@ -4412,7 +4421,7 @@ TEST(raftTests, TestRaftNodes) {
     wps.push_back(3);
     tests.push_back(tmp(peers, wps));
   }
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
 
@@ -4496,7 +4505,7 @@ TEST(raftTests, TestCommitAfterRemoveNode) {
 
   EntryVec entries;
   nextEnts(r, s, &entries);
-  EXPECT_EQ(entries.size(), 0);
+  EXPECT_EQ((int)entries.size(), 0);
 
   uint64_t ccIndex = r->raftLog_->lastIndex();
 
@@ -4520,7 +4529,7 @@ TEST(raftTests, TestCommitAfterRemoveNode) {
   }
 
   nextEnts(r, s, &entries);
-  EXPECT_EQ(entries.size(), 2);
+  EXPECT_EQ((int)entries.size(), 2);
   EXPECT_FALSE(entries[0].type() != EntryNormal || entries[0].has_data());
   EXPECT_FALSE(entries[1].type() != EntryConfChange);
 
@@ -4556,7 +4565,7 @@ TEST(raftTests, TestLeaderTransferToUpToDateNode) {
   }
 
   raft *leader = (raft*)net->peers[1]->data();
-  EXPECT_EQ(leader->leader_, 1);
+  EXPECT_EQ((int)leader->leader_, 1);
 
   // Transfer leadership to 2.
   {
@@ -4616,7 +4625,7 @@ TEST(raftTests, TestLeaderTransferToUpToDateNodeFromFollower) {
   }
 
   raft *leader = (raft*)net->peers[1]->data();
-  EXPECT_EQ(leader->leader_, 1);
+  EXPECT_EQ((int)leader->leader_, 1);
 
   // Transfer leadership to 2.
   {
@@ -4685,7 +4694,7 @@ TEST(raftTests, TestLeaderTransferWithCheckQuorum) {
   }
 
   raft *leader = (raft*)net->peers[1]->data();
-  EXPECT_EQ(leader->leader_, 1);
+  EXPECT_EQ((int)leader->leader_, 1);
 
   // Transfer leadership to 2.
   {
@@ -4755,7 +4764,7 @@ TEST(raftTests, TestLeaderTransferToSlowFollower) {
 
   net->recover();
   raft *leader = (raft*)net->peers[1]->data();
-  EXPECT_EQ(leader->prs_[3]->match_, 1);
+  EXPECT_EQ((int)leader->prs_[3]->match_, 1);
 
   // Transfer leadership to 3 when node 3 is lack of log.
   {
@@ -4807,7 +4816,7 @@ TEST(raftTests, TestLeaderTransferAfterSnapshot) {
   ConfState cs;
   vector<uint64_t> nodes;
   leader->nodes(&nodes);
-  int j;
+  size_t j;
   for (j = 0; j < nodes.size(); ++j) {
     cs.add_nodes(nodes[j]);
   }
@@ -4815,7 +4824,7 @@ TEST(raftTests, TestLeaderTransferAfterSnapshot) {
   net->storage[1]->Compact(leader->raftLog_->applied_);
 
   net->recover();
-  EXPECT_EQ(leader->prs_[3]->match_, 1);
+  EXPECT_EQ((int)leader->prs_[3]->match_, 1);
 
   // Transfer leadership to 3 when node 3 is lack of log.
   {
@@ -4937,12 +4946,13 @@ TEST(raftTests, TestLeaderTransferTimeout) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(leader->leadTransferee_, 3);
+
+  EXPECT_EQ((int)leader->leadTransferee_, 3);
   int i;
   for (i = 0; i < leader->heartbeatTimeout_; ++i) {
     leader->tick();
   }
-  EXPECT_EQ(leader->leadTransferee_, 3);
+  EXPECT_EQ((int)leader->leadTransferee_, 3);
   for (i = 0; i < leader->electionTimeout_ - leader->heartbeatTimeout_; ++i) {
     leader->tick();
   }
@@ -4980,7 +4990,7 @@ TEST(raftTests, TestLeaderTransferIgnoreProposal) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(leader->leadTransferee_, 3);
+  EXPECT_EQ((int)leader->leadTransferee_, 3);
 
   {
     Message msg;
@@ -4992,7 +5002,7 @@ TEST(raftTests, TestLeaderTransferIgnoreProposal) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(leader->prs_[1]->match_, 1);
+  EXPECT_EQ((int)leader->prs_[1]->match_, 1);
 }
 
 TEST(raftTests, TestLeaderTransferReceiveHigherTermVote) {
@@ -5026,7 +5036,7 @@ TEST(raftTests, TestLeaderTransferReceiveHigherTermVote) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(leader->leadTransferee_, 3);
+  EXPECT_EQ((int)leader->leadTransferee_, 3);
 
   {
     Message msg;
@@ -5073,7 +5083,7 @@ TEST(raftTests, TestLeaderTransferRemoveNode) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(leader->leadTransferee_, 3);
+  EXPECT_EQ((int)leader->leadTransferee_, 3);
 
   leader->removeNode(3);
   checkLeaderTransferState(leader, StateLeader, 1);
@@ -5111,7 +5121,7 @@ TEST(raftTests, TestLeaderTransferBack) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(leader->leadTransferee_, 3);
+  EXPECT_EQ((int)leader->leadTransferee_, 3);
 
   // Transfer leadership back to self.
   {
@@ -5159,7 +5169,7 @@ TEST(raftTests, TestLeaderTransferSecondTransferToAnotherNode) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(leader->leadTransferee_, 3);
+  EXPECT_EQ((int)leader->leadTransferee_, 3);
 
   // Transfer leadership to another node.
   {
@@ -5207,7 +5217,7 @@ TEST(raftTests, TestLeaderTransferSecondTransferToSameNode) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ(leader->leadTransferee_, 3);
+  EXPECT_EQ((int)leader->leadTransferee_, 3);
 
   int i;
   for (i = 0; i < leader->heartbeatTimeout_; ++i) {
