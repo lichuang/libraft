@@ -4,7 +4,9 @@
 
 pwd=`pwd`
 third_party=${pwd}/third_party
-protobuf=protobuf-cpp-3.5.0
+rm -fr ${third_party}/*
+
+protobuf=protobuf-3.14.0
 gtest=googletest-release-1.8.0
 gflags=gflags-2.2.2
 libevent=libevent-2.1.12-stable
@@ -44,7 +46,7 @@ cd $pwd/deps
 echo "compile ${protobuf}..."
 rm -fr ${protobuf}
 tar xvf ${protobuf}.tar.gz
-cd protobuf-3.5.0
+cd ${protobuf}
 ./autogen.sh
 ./configure --prefix=${third_party}
 make -j6
