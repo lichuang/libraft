@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include "raft_test_util.h"
-#include "raft.h"
-#include "default_logger.h"
-#include "util.h"
+#include "base/default_logger.h"
+#include "base/util.h"
+#include "core/raft.h"
 
 // nextEnts returns the appliable entries and updates the applied index
 void nextEnts(raft *r, Storage *s, EntryVec *entries) {
@@ -34,7 +34,7 @@ string raftLogString(raftLog *log) {
   snprintf(buf, sizeof(buf), "entries size: %lu\n", entries.size());
   str += buf;
 
-  int i;
+  size_t i;
   for (i = 0; i < entries.size(); ++i) {
     str += entryString(entries[i]);
   }
@@ -156,7 +156,7 @@ void network::cut(uint64_t one, uint64_t other) {
 }
 
 void network::isolate(uint64_t id) {
-  int i;
+  size_t i;
   for (i = 0; i < peers.size(); ++i) {
     uint64_t nid = i + 1;
     if (nid != id) {
@@ -176,7 +176,7 @@ void network::recover() {
 }
 
 void network::filter(const vector<Message *>& msgs, vector<Message> *out) {
-  int i;
+  size_t i;
   for (i = 0; i < msgs.size(); ++i) {
     Message *msg = msgs[i];
     if (ignorem[msg->type()]) {

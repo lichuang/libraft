@@ -8,10 +8,10 @@ struct inflights {
   int start_;
 
   // number of inflights in the buffer
-  int count_;
+  uint32_t count_;
 
   // the size of the buffer
-  int size_;
+  uint32_t size_;
 
   // buffer contains the index of the last entry
   // inside one message.

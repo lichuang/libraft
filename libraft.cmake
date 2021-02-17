@@ -5,6 +5,11 @@ set(libraft_files
   src/base/mutex.cc
   src/base/util.cc 
 
+  src/core/node.cc 
+  src/core/progress.cc 
+  src/core/raft.cc 
+  src/core/read_only.cc 
+
   src/storage/log.cc    
   src/storage/memory_storage.cc      
   src/storage/unstable_log.cc  

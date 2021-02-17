@@ -93,7 +93,7 @@ raft* newRaft(const Config *config) {
       logger->Fatalf(__FILE__, __LINE__, "cannot specify both newRaft(peers) and ConfState.Nodes)");
     }
     peers.clear();
-    for (i = 0; i < cs.nodes_size(); ++i) {
+    for (i = 0; (int)i < cs.nodes_size(); ++i) {
       peers.push_back(cs.nodes(i));
     }
   }
@@ -790,7 +790,7 @@ void stepLeader(raft *r, const Message& msg) {
       return;
     }
     n = cloneMessage(msg);
-    for (i = 0; i < n->entries_size(); ++i) {
+    for (i = 0; (int)i < n->entries_size(); ++i) {
       Entry *entry = n->mutable_entries(i);
       if (entry->type() != EntryConfChange) {
         continue;
@@ -1035,7 +1035,7 @@ void stepCandidate(raft* r, const Message& msg) {
         r->becomeLeader();
         r->bcastAppend();
       }
-    } else if (r->quorum() == r->votes_.size() - granted) {
+    } else if (r->quorum() == (int)r->votes_.size() - granted) {
       r->becomeFollower(r->term_, None);
     }
     return;

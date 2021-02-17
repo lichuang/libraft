@@ -168,7 +168,7 @@ void inflights::add(uint64_t infight) {
 // instead of preallocating to inflights.size to handle systems which have
 // thousands of Raft groups per process.
 void inflights::growBuf() {
-  uint64_t newSize = buffer_.size() * 2;
+  uint32_t newSize = buffer_.size() * 2;
   if (newSize == 0) {
     newSize = 1;
   } else if (newSize > size_) {

@@ -92,7 +92,7 @@ void NodeImpl::Advance() {
     havePrevLastUnstableIndex_ = false;
   }
   raft_->raftLog_->stableSnapTo(prevSnapshotIndex_);
-  int i;
+  size_t i;
   for (i = 0; i < ready_.messages.size(); ++i) {
     delete ready_.messages[i];
   }
@@ -229,7 +229,7 @@ void NodeImpl::handleConfChange() {
 addnodes:  
   vector<uint64_t> nodes;
   raft_->nodes(&nodes);
-  int j;
+  size_t j;
   for (j = 0; j < nodes.size(); ++j) {
     confState_->add_nodes(nodes[j]);
   }
@@ -325,7 +325,7 @@ Node* StartNode(const Config* config, const vector<Peer>& peers) {
 	// entries of term 1
   r->becomeFollower(1, None);
 
-  int i;
+  size_t i;
   for (i = 0; i < peers.size(); ++i) {
     const Peer& peer = peers[i];
 

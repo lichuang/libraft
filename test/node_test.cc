@@ -1,14 +1,14 @@
 #include <gtest/gtest.h>
 #include <math.h>
 #include "libraft.h"
-#include "util.h"
-#include "raft.h"
-#include "memory_storage.h"
-#include "default_logger.h"
-#include "progress.h"
+#include "base/util.h"
+#include "base/default_logger.h"
+#include "core/raft.h"
+#include "core/progress.h"
+#include "storage/memory_storage.h"
+#include "core/read_only.h"
+#include "core/node.h"
 #include "raft_test_util.h"
-#include "read_only.h"
-#include "node.h"
 
 vector<Message> msgs;
 
@@ -59,7 +59,7 @@ TEST(nodeTests, TestNodePropose) {
   string wrequestCtx = "somedata2";
   n->ReadIndex(wrequestCtx, &ready);
 
-  EXPECT_EQ(msgs.size(), 1);
+  EXPECT_EQ((int)msgs.size(), 1);
   EXPECT_EQ(msgs[0].type(), MsgReadIndex);
   EXPECT_EQ(msgs[0].entries(0).data(), wrequestCtx);
 }
@@ -97,13 +97,13 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
 
   // elect a as leader
   {
-    vector<Message> msgs;
+    vector<Message> tmp_msgs;
     Message msg;
     msg.set_from(1);
     msg.set_to(1);
     msg.set_type(MsgHup);
-    msgs.push_back(msg);
-    net->send(&msgs);
+    tmp_msgs.push_back(msg);
+    net->send(&tmp_msgs);
   }
 
   EntryVec testEntries;
@@ -124,7 +124,7 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
   }
 
   // verify b(follower) forwards this message to r1(leader) with term not set
-  EXPECT_EQ(b->msgs_.size(), 1);
+  EXPECT_EQ((int)b->msgs_.size(), 1);
 
   Message readIndexMsg1;
   readIndexMsg1.set_from(2);
@@ -145,7 +145,7 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
   }
 
   // verify c(follower) forwards this message to r1(leader) with term not set
-  EXPECT_EQ(c->msgs_.size(), 1);
+  EXPECT_EQ((int)c->msgs_.size(), 1);
   Message readIndexMsg2;
   readIndexMsg2.set_from(3);
   readIndexMsg2.set_to(1);
@@ -155,12 +155,12 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
 
   // now elect c as leader
   {
-    vector<Message> msgs;
+    vector<Message> tmp_msgs;
     Message msg;
     msg.set_from(3);
     msg.set_to(3);
     msg.set_type(MsgHup);
-    msgs.push_back(msg);
+    tmp_msgs.push_back(msg);
     net->send(&msgs);
   }
 
@@ -169,7 +169,7 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
   a->step(readIndexMsg2);
 
   // verify a(follower) forwards these messages again to c(new leader)
-  EXPECT_EQ(a->msgs_.size(), 2);
+  EXPECT_EQ((int)a->msgs_.size(), 2);
 
   Message readIndexMsg3;
   readIndexMsg3.set_from(1);
@@ -217,7 +217,7 @@ TEST(nodeTests, TestNodeProposeConfig) {
   n->ProposeConfChange(cc, &ready);
   n->Stop();
 
-  EXPECT_EQ(msgs.size(), 1);
+  EXPECT_EQ((int)msgs.size(), 1);
   EXPECT_EQ(msgs[0].type(), MsgProp);
   EXPECT_EQ(msgs[0].entries(0).data(), ccdata);
 }
@@ -229,7 +229,7 @@ void applyReadyEntries(Ready* ready, EntryVec* readyEntries, Storage *s, NodeImp
     n->Advance();
     return;
   }
-  int i;
+  size_t i;
   s->Append(ready->entries);
   Ready *nready;
   for (i = 0; i < ready->entries.size(); ++i) {
@@ -281,7 +281,7 @@ TEST(nodeTests, TestNodeProposeAddDuplicateNode) {
   n->ProposeConfChange(cc2, &ready);
   applyReadyEntries(ready, &readyEntries, s, n);
 
-  EXPECT_EQ(readyEntries.size(), 4);
+  EXPECT_EQ((int)readyEntries.size(), 4);
   EXPECT_EQ(readyEntries[1].data(), ccdata1);
   EXPECT_EQ(readyEntries[3].data(), ccdata2);
 }

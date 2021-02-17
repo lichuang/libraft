@@ -2,8 +2,8 @@
 #define __RAFT_TEST_UTIL_H__
 
 #include "libraft.h"
-#include "raft.h"
-#include "memory_storage.h"
+#include "core/raft.h"
+#include "storage/memory_storage.h"
 
 enum stateMachineType {
   raftType = 0,
