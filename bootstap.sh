@@ -12,8 +12,9 @@ gtest=googletest-release-1.8.0
 gflags=gflags-2.2.2
 libevent=libevent-2.1.12-stable
 
-mkdir ${third_party}/include -p
-mkdir ${third_party}/lib -p
+mkdir -p ${third_party}/include
+mkdir -p ${third_party}/lib
+mkdir -p ${third_party}/bin
 
 cd $pwd/deps
 echo "compile ${gflags}..."

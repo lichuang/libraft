@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 #include "libraft.h"
-#include "util.h"
-#include "log.h"
-#include "memory_storage.h"
-#include "default_logger.h"
+#include "base/util.h"
+#include "storage/log.h"
+#include "storage/memory_storage.h"
+#include "base/default_logger.h"
 
 TEST(logTests, TestFindConflict) {
   EntryVec entries;
@@ -216,7 +216,7 @@ TEST(logTests, TestFindConflict) {
     tests.push_back(t);
   }
 
-  int i = 0;
+  size_t i = 0;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &test = tests[i];
     MemoryStorage s(&kDefaultLogger);
@@ -276,7 +276,7 @@ TEST(logTests, TestIsUpToDate) {
   tests.push_back(tmp(log->lastIndex() - 1, 3, false));
   tests.push_back(tmp(log->lastIndex()    , 3, true));
   tests.push_back(tmp(log->lastIndex() + 1, 3, true));
-  int i = 0;
+  size_t i = 0;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &test = tests[i];
     bool isuptodate = log->isUpToDate(test.lastindex, test.term);
@@ -382,7 +382,7 @@ TEST(logTests, TestAppend) {
     t.wentries.push_back(entry);
     tests.push_back(t);
   }
-  int i = 0;
+  size_t i = 0;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &test = tests[i];
     MemoryStorage s(&kDefaultLogger);
@@ -393,10 +393,10 @@ TEST(logTests, TestAppend) {
 
     EXPECT_EQ(index, test.windex);
 
-    EntryVec entries;
-    int err = log->entries(1, noLimit, &entries);
+    EntryVec ret_entries;
+    int err = log->entries(1, noLimit, &ret_entries);
     EXPECT_EQ(err, OK);
-    EXPECT_TRUE(isDeepEqualEntries(entries, test.wentries));
+    EXPECT_TRUE(isDeepEqualEntries(ret_entries, test.wentries));
     EXPECT_EQ(log->unstable_.offset_, test.wunstable);
     delete log;
   }
@@ -585,7 +585,7 @@ TEST(logTests, TestLogMaybeAppend) {
     t.entries.push_back(entry);
     tests.push_back(t);
   }
-  int i = 0;
+  size_t i = 0;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &test = tests[i];
     MemoryStorage s(&kDefaultLogger);
@@ -601,10 +601,10 @@ TEST(logTests, TestLogMaybeAppend) {
     EXPECT_EQ(ok, test.wappend) << "i: " << i;
     EXPECT_EQ(gcommit, test.wcommit);
     if (glasti > 0 && test.entries.size() != 0) {
-      EntryVec entries;
-      int err = log->slice(log->lastIndex() - test.entries.size() + 1, log->lastIndex() + 1, noLimit, &entries);
+      EntryVec ret_entries;
+      int err = log->slice(log->lastIndex() - test.entries.size() + 1, log->lastIndex() + 1, noLimit, &ret_entries);
       EXPECT_EQ(err, OK);
-      EXPECT_TRUE(isDeepEqualEntries(test.entries, entries));
+      EXPECT_TRUE(isDeepEqualEntries(test.entries, ret_entries));
     }
     delete log;
   }
@@ -618,7 +618,7 @@ TEST(logTests, TestCompactionSideEffects) {
   uint64_t unstableIndex = 750;
   uint64_t lastTerm = lastIndex;
   MemoryStorage s(&kDefaultLogger);
-  int i;
+  size_t i;
   
   for (i = 1; i <= unstableIndex; ++i) {
     EntryVec entries;
@@ -666,8 +666,8 @@ TEST(logTests, TestCompactionSideEffects) {
 
   EntryVec unstableEntries;
   log->unstableEntries(&unstableEntries);
-  EXPECT_EQ(unstableEntries.size(), 250);
-  EXPECT_EQ(unstableEntries[0].index(), 751);
+  EXPECT_EQ((int)unstableEntries.size(), 250);
+  EXPECT_EQ((int)unstableEntries[0].index(), 751);
 
   uint64_t prev = log->lastIndex();
   {
@@ -686,7 +686,7 @@ TEST(logTests, TestCompactionSideEffects) {
     EntryVec entries;
     int err = log->entries(log->lastIndex(), noLimit, &entries);
     EXPECT_EQ(err, OK);
-    EXPECT_EQ(entries.size(), 1);
+    EXPECT_EQ((int)entries.size(), 1);
   }
 
   delete log;
@@ -727,7 +727,7 @@ TEST(logTests, TestHasNextEnts) {
   tests.push_back(tmp(4, true));
   tests.push_back(tmp(5, false));
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     MemoryStorage s(&kDefaultLogger);
     s.ApplySnapshot(sn);
@@ -793,7 +793,7 @@ TEST(logTests, TestNextEnts) {
     tests.push_back(t);
   }
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     MemoryStorage s(&kDefaultLogger);
     s.ApplySnapshot(sn);
@@ -846,7 +846,7 @@ TEST(logTests, TestUnstableEnts) {
     tests.push_back(t);
   }
 
-  int i = 0;
+  size_t i = 0;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &t = tests[i];
 
@@ -914,7 +914,7 @@ TEST(logTests, TestCommitTo) {
   tests.push_back(tmp(1,2,false));  // never decrease
   //tests.push_back(tmp(4,0,true));   // commit out of range -> panic
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &t = tests[i];
 
@@ -956,7 +956,7 @@ TEST(logTests, TestStableTo) {
   tests.push_back(tmp(2,1,1));  // bad term
   tests.push_back(tmp(3,1,1));  // bad index
 
-  int i;
+  size_t i;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &t = tests[i];
 
@@ -1055,7 +1055,7 @@ TEST(logTests, TestStableToWithSnap) {
     tests.push_back(t);
   }
 
-  int i = 0;
+  size_t i = 0;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &t = tests[i];
 
@@ -1110,10 +1110,10 @@ TEST(logTests, TestCompaction) {
     tests.push_back(t);
   }
 
-  int i = 0;
+  size_t i = 0;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &t = tests[i];
-    int j = 0;
+    size_t j = 0;
 
     MemoryStorage s(&kDefaultLogger);
     EntryVec entries;
@@ -1136,7 +1136,7 @@ TEST(logTests, TestCompaction) {
       }
       EntryVec all;
       log->allEntries(&all);
-      EXPECT_EQ(t.wleft[j], all.size());
+      EXPECT_EQ(t.wleft[j], (int)all.size());
     }
     delete log;
   }
@@ -1182,7 +1182,7 @@ TEST(logTests, TestIsOutOfBounds) {
 
   raftLog *log = newLog(&s, &kDefaultLogger);
 
-  int i = 0;
+  size_t i = 0;
   EntryVec entries;
   for (i = 1; i <= num; ++i) {
     Entry entry;
@@ -1235,7 +1235,7 @@ TEST(logTests, TestTerm) {
 
   raftLog *log = newLog(&s, &kDefaultLogger);
 
-  int i = 0;
+  size_t i = 0;
   EntryVec entries;
   for (i = 1; i < num; ++i) {
     Entry entry;
@@ -1283,13 +1283,13 @@ TEST(logTests, TestTermWithUnstableSnapshot) {
 
   raftLog *log = newLog(&s, &kDefaultLogger);
   {
-    Snapshot sn;
-    sn.mutable_metadata()->set_index(unstablesnapi);
-    sn.mutable_metadata()->set_term(1);
+    Snapshot tmp_sn;
+    tmp_sn.mutable_metadata()->set_index(unstablesnapi);
+    tmp_sn.mutable_metadata()->set_term(1);
 
-    log->restore(sn);
+    log->restore(tmp_sn);
   }
-  int i = 0;
+  size_t i = 0;
 
   struct tmp {
     uint64_t index, w;
@@ -1336,7 +1336,7 @@ TEST(logTests, TestSlice) {
 
   raftLog *log = newLog(&s, &kDefaultLogger);
 
-  int i = 0;
+  size_t i = 0;
   EntryVec entries;
   for (i = 1; i < num; ++i) {
     Entry entry;
@@ -1411,7 +1411,7 @@ TEST(logTests, TestSlice) {
     tests.push_back(t);
   }
   {
-    tmp t(half - 1, half + 1, halfe.ByteSize() + 1, false);
+    tmp t(half - 1, half + 1, halfe.ByteSizeLong() + 1, false);
     Entry entry;
 
     entry.set_index(half - 1);
@@ -1421,7 +1421,7 @@ TEST(logTests, TestSlice) {
     tests.push_back(t);
   }
   {
-    tmp t(half - 2, half + 1, halfe.ByteSize() + 1, false);
+    tmp t(half - 2, half + 1, halfe.ByteSizeLong() + 1, false);
     Entry entry;
 
     entry.set_index(half - 2);
@@ -1431,7 +1431,7 @@ TEST(logTests, TestSlice) {
     tests.push_back(t);
   }
   {
-    tmp t(half - 1, half + 1, halfe.ByteSize() * 2, false);
+    tmp t(half - 1, half + 1, halfe.ByteSizeLong() * 2, false);
     Entry entry;
 
     entry.set_index(half - 1);
@@ -1444,7 +1444,7 @@ TEST(logTests, TestSlice) {
     tests.push_back(t);
   }
   {
-    tmp t(half - 1, half + 2, halfe.ByteSize() * 3, false);
+    tmp t(half - 1, half + 2, halfe.ByteSizeLong() * 3, false);
     Entry entry;
 
     entry.set_index(half - 1);
@@ -1462,7 +1462,7 @@ TEST(logTests, TestSlice) {
     tests.push_back(t);
   }
   {
-    tmp t(half, half + 2, halfe.ByteSize(), false);
+    tmp t(half, half + 2, halfe.ByteSizeLong(), false);
     Entry entry;
 
     entry.set_index(half);
@@ -1471,7 +1471,7 @@ TEST(logTests, TestSlice) {
     tests.push_back(t);
   }
   {
-    tmp t(half, half + 2, halfe.ByteSize() * 2, false);
+    tmp t(half, half + 2, halfe.ByteSizeLong() * 2, false);
     Entry entry;
 
     entry.set_index(half);

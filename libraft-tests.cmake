@@ -1,9 +1,7 @@
 
-target_link_libraries (server_test PRIVATE raft gtest event pthread protobuf gflags)
-
-add_executable ( rpc_test
-  test/rpc_test.cc
-  test/echo.pb.cc
+add_executable ( libraft_test
+  test/log_test.cc
+  test/main.cc
 )
 
-target_link_libraries (rpc_test PRIVATE raft gtest event pthread protobuf gflags)
+target_link_libraries (libraft_test PRIVATE raft gtest pthread protobuf gflags)
