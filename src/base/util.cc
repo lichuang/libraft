@@ -1,6 +1,6 @@
 #include <string>
-#include "util.h"
-#include "default_logger.h"
+#include "base/util.h"
+#include "base/default_logger.h"
 
 using namespace std;
 
@@ -46,7 +46,7 @@ bool isDeepEqualEntries(const EntryVec& ents1, const EntryVec& ents2) {
   if (ents1.size() != ents2.size()) {
     return false;
   }
-  int i;
+  size_t i;
   for (i = 0; i < ents1.size(); ++i) {
     if (!isDeepEqualEntry(ents1[i], ents2[i])) {
       return false;
@@ -59,7 +59,7 @@ bool isDeepEqualNodes(const vector<uint64_t>& ns1, const vector<uint64_t>& ns2) 
   if (ns1.size() != ns2.size()) {
     return false;
   }
-  int i;
+  size_t i;
   for (i = 0; i < ns1.size(); ++i) {
     if (ns1[i] != ns2[i]) {
       return false;
@@ -75,9 +75,9 @@ void limitSize(uint64_t maxSize, EntryVec *entries) {
 
   int limit;
   int num = entries->size();
-  uint64_t size = (*entries)[0].ByteSize();
+  uint64_t size = (*entries)[0].ByteSizeLong();
   for (limit = 1; limit < num; ++limit) {
-    size += (*entries)[limit].ByteSize();
+    size += (*entries)[limit].ByteSizeLong();
     if (size > maxSize) {
       break;
     }
@@ -127,7 +127,7 @@ bool isDeepEqualReadStates(const vector<ReadState*>& rs1, const vector<ReadState
   if (rs1.size() != rs2.size()) {
     return false;
   }
-  int i;
+  size_t i;
   for (i = 0; i < rs1.size(); ++i) {
     ReadState* r1 = rs1[i];
     ReadState* r2 = rs2[i];

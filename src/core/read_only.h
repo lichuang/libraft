@@ -1,7 +1,7 @@
 #ifndef __READ_ONLY_H__
 #define __READ_ONLY_H__
 
-#include "raft.h"
+#include "core/raft.h"
 #include <map>
 #include <string>
 

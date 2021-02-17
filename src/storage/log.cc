@@ -1,5 +1,5 @@
-#include "log.h"
-#include "util.h"
+#include "storage/log.h"
+#include "base/util.h"
 
 // newLog returns log using the given storage. It recovers the log to the state
 // that it just commits and applies the latest snapshot.
@@ -186,7 +186,7 @@ uint64_t raftLog::append(const EntryVec& entries) {
 // The first entry MUST have an index equal to the argument 'from'.
 // The index of the given entries MUST be continuously increasing.
 uint64_t raftLog::findConflict(const EntryVec& entries) {
-  int i;
+  size_t i;
   for (i = 0; i < entries.size(); ++i) {
     if (!matchTerm(entries[i].index(), entries[i].term())) {
       const Entry& entry = entries[i];
@@ -209,7 +209,7 @@ uint64_t raftLog::findConflict(const EntryVec& entries) {
 
 void raftLog::unstableEntries(EntryVec *entries) {
   entries->clear();
-  int i;
+  size_t i;
   for (i = 0; i < unstable_.entries_.size(); ++i) {
     entries->push_back(unstable_.entries_[i]);
   }

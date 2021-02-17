@@ -3,8 +3,8 @@
 
 #include <map>
 #include "libraft.h"
-#include "log.h"
-#include "progress.h"
+#include "storage/log.h"
+#include "core/progress.h"
 
 using namespace std;
 

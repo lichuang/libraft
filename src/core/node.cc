@@ -1,7 +1,7 @@
-#include "node.h"
-#include "raft.h"
-#include "util.h"
 #include <unistd.h>
+#include "core/node.h"
+#include "core/raft.h"
+#include "base/util.h"
 
 const static HardState kEmptyHardState;
 const static SoftState kEmptySoftState;

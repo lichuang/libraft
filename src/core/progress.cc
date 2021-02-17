@@ -1,4 +1,4 @@
-#include "progress.h"
+#include "core/progress.h"
 
 Progress::Progress(uint64_t next, int maxInfilght, Logger *logger)
   : match_(0),

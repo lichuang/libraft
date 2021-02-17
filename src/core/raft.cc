@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include <algorithm>
-#include "raft.h"
-#include "util.h"
-#include "read_only.h"
+#include "core/raft.h"
+#include "base/util.h"
+#include "core/read_only.h"
 
 HardState kEmptyState;
 const static string kCampaignPreElection = "CampaignPreElection";

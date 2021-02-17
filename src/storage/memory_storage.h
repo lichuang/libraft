@@ -2,7 +2,7 @@
 #define __MEMORY_STORAGE_H__
 
 #include "libraft.h"
-#include "mutex.h"
+#include "base/mutex.h"
 
 class MemoryStorage : public Storage {
 public:
