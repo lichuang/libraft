@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
 #include <math.h>
 #include "libraft.h"
-#include "util.h"
-#include "raft.h"
-#include "memory_storage.h"
-#include "default_logger.h"
-#include "progress.h"
+#include "base/default_logger.h"
+#include "base/util.h"
+#include "core/progress.h"
+#include "core/raft.h"
+#include "core/read_only.h"
+#include "storage/memory_storage.h"
 #include "raft_test_util.h"
-#include "read_only.h"
 
 Snapshot testingSnap() {
   Snapshot ts;
@@ -43,7 +43,7 @@ TEST(raftPaperTests, TestSendingSnapshotSetPendingSnapshot) {
     r->step(msg);
   }
 
-  EXPECT_EQ(r->prs_[2]->pendingSnapshot_, 11);
+  EXPECT_EQ((int)r->prs_[2]->pendingSnapshot_, 11);
 }
 
 TEST(raftPaperTests, TestPendingSnapshotPauseReplication) {
@@ -72,7 +72,7 @@ TEST(raftPaperTests, TestPendingSnapshotPauseReplication) {
 
   vector<Message*> msgs;
   r->readMessages(&msgs);
-  EXPECT_EQ(msgs.size(), 0);
+  EXPECT_EQ((int)msgs.size(), 0);
 }
 
 TEST(raftPaperTests, TestSnapshotFailure) {
@@ -98,8 +98,8 @@ TEST(raftPaperTests, TestSnapshotFailure) {
     r->step(msg);
   }
 
-  EXPECT_EQ(r->prs_[2]->pendingSnapshot_, 0);
-  EXPECT_EQ(r->prs_[2]->next_, 1);
+  EXPECT_EQ((int)r->prs_[2]->pendingSnapshot_, 0);
+  EXPECT_EQ((int)r->prs_[2]->next_, 1);
   EXPECT_TRUE(r->prs_[2]->paused_);
 }
 
@@ -126,8 +126,8 @@ TEST(raftPaperTests, TestSnapshotSucceed) {
     r->step(msg);
   }
 
-  EXPECT_EQ(r->prs_[2]->pendingSnapshot_, 0);
-  EXPECT_EQ(r->prs_[2]->next_, 12);
+  EXPECT_EQ((int)r->prs_[2]->pendingSnapshot_, 0);
+  EXPECT_EQ((int)r->prs_[2]->next_, 12);
   EXPECT_TRUE(r->prs_[2]->paused_);
 }
 
@@ -156,6 +156,6 @@ TEST(raftPaperTests, TestSnapshotAbort) {
     r->step(msg);
   }
 
-  EXPECT_EQ(r->prs_[2]->pendingSnapshot_, 0);
-  EXPECT_EQ(r->prs_[2]->next_, 12);
+  EXPECT_EQ((int)r->prs_[2]->pendingSnapshot_, 0);
+  EXPECT_EQ((int)r->prs_[2]->next_, 12);
 }

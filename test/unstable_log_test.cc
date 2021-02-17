@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include "libraft.h"
-#include "util.h"
-#include "unstable_log.h"
-#include "default_logger.h"
+#include "base/default_logger.h"
+#include "base/util.h"
+#include "storage/unstable_log.h"
 
 TEST(unstableLogTests, TestUnstableMaybeFirstIndex) {
   struct tmp {
@@ -62,7 +62,7 @@ TEST(unstableLogTests, TestUnstableMaybeFirstIndex) {
     tests.push_back(t);
   }
 
-  int i;
+  size_t i;
   for (i = 0;i < tests.size(); ++i) {
     unstableLog unstable;
     unstable.entries_ = tests[i].entries;
@@ -135,7 +135,7 @@ TEST(unstableLogTests, TestMaybeLastIndex) {
     tests.push_back(t);
   }
 
-  int i;
+  size_t i;
   for (i = 0;i < tests.size(); ++i) {
     unstableLog unstable;
     unstable.entries_ = tests[i].entries;
@@ -279,7 +279,7 @@ TEST(unstableLogTests, TestUnstableMaybeTerm) {
     tests.push_back(t);
   }
 
-  int i;
+  size_t i;
   for (i = 0;i < tests.size(); ++i) {
     unstableLog unstable;
     unstable.entries_ = tests[i].entries;
@@ -313,15 +313,15 @@ TEST(unstableLogTests, TestUnstableRestore) {
 
   Snapshot s;
   {
-    SnapshotMetadata *meta = s.mutable_metadata();
-    meta->set_index(6);
-    meta->set_term(2);
+    SnapshotMetadata *tmp_meta = s.mutable_metadata();
+    tmp_meta->set_index(6);
+    tmp_meta->set_term(2);
     unstable.restore(s);
   }
 
   EXPECT_EQ(unstable.offset_, s.metadata().index() + 1);
-  EXPECT_EQ(unstable.entries_.size(), 0);
-  EXPECT_EQ(true, isDeepEqualSnapshot(unstable.snapshot_, &s));
+  EXPECT_EQ((int)unstable.entries_.size(), 0);
+  EXPECT_TRUE(isDeepEqualSnapshot(unstable.snapshot_, &s));
 }
 
 TEST(unstableLogTests, TestUnstableStableTo) {
@@ -483,7 +483,7 @@ TEST(unstableLogTests, TestUnstableStableTo) {
 
     tests.push_back(t);
   }
-  int i;
+  size_t i;
   for (i = 0;i < tests.size(); ++i) {
     unstableLog unstable;
     unstable.entries_ = tests[i].entries;
@@ -493,7 +493,7 @@ TEST(unstableLogTests, TestUnstableStableTo) {
 
     unstable.stableTo(tests[i].index, tests[i].term);
     EXPECT_EQ(unstable.offset_, tests[i].woffset) << "i: " << i << ", woffset: " << tests[i].woffset;
-    EXPECT_EQ(unstable.entries_.size(), tests[i].wlen);
+    EXPECT_EQ((int)unstable.entries_.size(), tests[i].wlen);
   }
 }
 
@@ -669,7 +669,7 @@ TEST(unstableLogTests, TestUnstableTruncateAndAppend) {
     tests.push_back(t);
   }
 
-  int i;
+  size_t i;
   for (i = 0;i < tests.size(); ++i) {
     unstableLog unstable;
     unstable.entries_ = tests[i].entries;
@@ -679,6 +679,6 @@ TEST(unstableLogTests, TestUnstableTruncateAndAppend) {
 
     unstable.truncateAndAppend(tests[i].toappend);
     EXPECT_EQ(unstable.offset_, tests[i].woffset) << "i: " << i << ", woffset: " << tests[i].woffset;
-    EXPECT_EQ(true, isDeepEqualEntries(unstable.entries_, tests[i].wentries)) << "i: " << i;
+    EXPECT_TRUE(isDeepEqualEntries(unstable.entries_, tests[i].wentries)) << "i: " << i;
   }
 }
