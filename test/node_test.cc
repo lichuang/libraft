@@ -161,7 +161,7 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
     msg.set_to(3);
     msg.set_type(MsgHup);
     tmp_msgs.push_back(msg);
-    net->send(&msgs);
+    net->send(&tmp_msgs);
   }
 
   // let a steps the two messages previously we got from b, c

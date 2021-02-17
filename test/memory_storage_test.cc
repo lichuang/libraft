@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include "libraft.h"
-#include "util.h"
-#include "memory_storage.h"
-#include "default_logger.h"
+#include "base/default_logger.h"
+#include "base/util.h"
+#include "storage/memory_storage.h"
 
 TEST(memoryStorageTests, TestStorageTerm) {
   EntryVec entries;
@@ -37,7 +37,7 @@ TEST(memoryStorageTests, TestStorageTerm) {
   tests.push_back(tmp(4, OK, 4));
   tests.push_back(tmp(5, OK, 5));
   tests.push_back(tmp(6, ErrUnavailable, 0));
-  int i = 0;
+  size_t i = 0;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &test = tests[i];
     MemoryStorage s(&kDefaultLogger);
@@ -147,7 +147,7 @@ TEST(memoryStorageTests, TestStorageEntries) {
     {
       Entry entry;
 
-      int size = entries[1].ByteSize() + entries[2].ByteSize();
+      int size = entries[1].ByteSizeLong() + entries[2].ByteSizeLong();
       tmp t(4, 7, size, OK);
 
       entry.set_index(4);
@@ -164,7 +164,7 @@ TEST(memoryStorageTests, TestStorageEntries) {
     {
       Entry entry;
 
-      int size = entries[1].ByteSize() + entries[2].ByteSize() + entries[3].ByteSize() / 2;
+      int size = entries[1].ByteSizeLong() + entries[2].ByteSizeLong() + entries[3].ByteSizeLong() / 2;
       tmp t(4, 7, size, OK);
 
       entry.set_index(4);
@@ -180,7 +180,7 @@ TEST(memoryStorageTests, TestStorageEntries) {
     {
       Entry entry;
 
-      int size = entries[1].ByteSize() + entries[2].ByteSize() + entries[3].ByteSize() - 1;
+      int size = entries[1].ByteSizeLong() + entries[2].ByteSizeLong() + entries[3].ByteSizeLong() - 1;
       tmp t(4, 7, size, OK);
 
       entry.set_index(4);
@@ -197,7 +197,7 @@ TEST(memoryStorageTests, TestStorageEntries) {
     {
       Entry entry;
 
-      int size = entries[1].ByteSize() + entries[2].ByteSize() + entries[3].ByteSize();
+      int size = entries[1].ByteSizeLong() + entries[2].ByteSizeLong() + entries[3].ByteSizeLong();
       tmp t(4, 7, size, OK);
 
       entry.set_index(4);
@@ -215,7 +215,7 @@ TEST(memoryStorageTests, TestStorageEntries) {
       tests.push_back(t); 
     }
   }
-  int i = 0;
+  size_t i = 0;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &test = tests[i];
     MemoryStorage s(&kDefaultLogger);
@@ -253,21 +253,21 @@ TEST(memoryStorageTests, TestStorageLastIndex) {
   uint64_t last;
   int err = s.LastIndex(&last);
   EXPECT_EQ(OK, err);
-  EXPECT_EQ(5, last);
+  EXPECT_EQ((int)last, 5);
 
   {
-    EntryVec entries;
+    EntryVec tmp_entries;
     Entry entry;
 
     entry.set_index(6);
     entry.set_term(5);
-    entries.push_back(entry);
-    s.Append(entries);
+    tmp_entries.push_back(entry);
+    s.Append(tmp_entries);
   }
 
   err = s.LastIndex(&last);
   EXPECT_EQ(OK, err);
-  EXPECT_EQ(6, last);
+  EXPECT_EQ((int)last, 6);
 }
 
 TEST(memoryStorageTests, TestStorageFirstIndex) {
@@ -297,7 +297,7 @@ TEST(memoryStorageTests, TestStorageFirstIndex) {
     int err = s.FirstIndex(&first);
 
     EXPECT_EQ(OK, err);
-    EXPECT_EQ(4, first);
+    EXPECT_EQ((int)first, 4);
   }
 
   s.Compact(4);
@@ -307,7 +307,7 @@ TEST(memoryStorageTests, TestStorageFirstIndex) {
     int err = s.FirstIndex(&first);
 
     EXPECT_EQ(OK, err);
-    EXPECT_EQ(5, first);
+    EXPECT_EQ((int)first, 5);
   }
 }
 
@@ -348,17 +348,17 @@ TEST(memoryStorageTests, TestStorageCompact) {
   tests.push_back(tmp(3, ErrCompacted, 3, 3, 3));
   tests.push_back(tmp(4, OK, 4, 4, 2));
   tests.push_back(tmp(5, OK, 5, 5, 1));
-  int i = 0;
+  size_t i = 0;
   for (i = 0; i < tests.size(); ++i) {
     const tmp &test = tests[i];
-    MemoryStorage s(&kDefaultLogger);
-    s.entries_ = entries;
+    MemoryStorage tmp_s(&kDefaultLogger);
+    tmp_s.entries_ = entries;
     
-    int err = s.Compact(test.i);
+    int err = tmp_s.Compact(test.i);
     EXPECT_EQ(err, test.werr);
-    EXPECT_EQ(s.entries_[0].index(), test.windex);
-    EXPECT_EQ(s.entries_[0].term(), test.wterm);
-    EXPECT_EQ(s.entries_.size(), test.wlen);
+    EXPECT_EQ(tmp_s.entries_[0].index(), test.windex);
+    EXPECT_EQ(tmp_s.entries_[0].term(), test.wterm);
+    EXPECT_EQ((int)tmp_s.entries_.size(), test.wlen);
   }
 }
 
