@@ -16,28 +16,28 @@ const static string kCampaignPreElection = "CampaignPreElection";
 const static string kCampaignElection = "CampaignElection";
 const static string kCampaignTransfer = "CampaignTransfer";
 
-static const char* msgTypeString(int t) {
-  if (t == MsgHup) return "MsgHup";
-  if (t == MsgBeat) return "MsgBeat";
-  if (t == MsgProp) return "MsgProp";
-  if (t == MsgApp) return "MsgApp";
-  if (t == MsgAppResp) return "MsgAppResp";
-  if (t == MsgVote) return "MsgVote";
-  if (t == MsgVoteResp) return "MsgVoteResp";
-  if (t == MsgSnap) return "MsgSnap";
-  if (t == MsgHeartbeat) return "MsgHeartbeat";
-  if (t == MsgHeartbeatResp) return "MsgHeartbeatResp";
-  if (t == MsgUnreachable) return "MsgUnreachable";
-  if (t == MsgSnapStatus) return "MsgSnapStatus";
-  if (t == MsgCheckQuorum) return "MsgCheckQuorum";
-  if (t == MsgTransferLeader) return "MsgTransferLeader";
-  if (t == MsgTimeoutNow) return "MsgTimeoutNow";
-  if (t == MsgReadIndex) return "MsgReadIndex";
-  if (t == MsgReadIndexResp) return "MsgReadIndexResp";
-  if (t == MsgPreVote) return "MsgPreVote";
-  if (t == MsgPreVoteResp) return "MsgPreVoteResp";
-  return "unknown msg";
-}
+static const char* 
+kMsgString[] = {
+  "MsgHup",
+  "MsgBeat",
+  "MsgProp",
+  "MsgApp",
+  "MsgAppResp",
+  "MsgVote",
+  "MsgVoteResp",
+  "MsgSnap",
+  "MsgHeartbeat",
+  "MsgHeartbeatResp",
+  "MsgUnreachable",
+  "MsgSnapStatus",
+  "MsgCheckQuorum",
+  "MsgTransferLeader",
+  "MsgTimeoutNow",
+  "MsgReadIndex",
+  "MsgReadIndexResp",
+  "MsgPreVote",
+  "MsgPreVoteResp",
+};
 
 string entryString(const Entry& entry) {
   char tmp[100];
@@ -222,11 +222,11 @@ void raft::send(Message *msg) {
     if (msg->term() == 0) {
       // PreVote RPCs are sent at a term other than our actual term, so the code
       // that sends these messages is responsible for setting the term.
-      logger_->Fatalf(__FILE__, __LINE__, "term should be set when sending %s", msgTypeString(type));
+      logger_->Fatalf(__FILE__, __LINE__, "term should be set when sending %s", kMsgString[type]);
     }
   } else {
     if (msg->term() != 0) { 
-      logger_->Fatalf(__FILE__, __LINE__, "term should not be set when sending %s (was %llu)", msgTypeString(type), msg->term());
+      logger_->Fatalf(__FILE__, __LINE__, "term should not be set when sending %s (was %llu)", kMsgString[type], msg->term());
     }
     // do not attach term to MsgProp, MsgReadIndex
     // proposals are a way to forward to the leader and
@@ -614,9 +614,9 @@ void raft::campaign(CampaignType t) {
 
 int raft::poll(uint64_t id, MessageType t, bool v) {
   if (v) {
-    logger_->Infof(__FILE__, __LINE__, "%x received %s from %x at term %llu", id_, msgTypeString(t), id, term_);
+    logger_->Infof(__FILE__, __LINE__, "%x received %s from %x at term %llu", id_, kMsgString[t], id, term_);
   } else {
-    logger_->Infof(__FILE__, __LINE__, "%x received %s rejection from %x at term %llu", id_, msgTypeString(t), id, term_);
+    logger_->Infof(__FILE__, __LINE__, "%x received %s rejection from %x at term %llu", id_, kMsgString[t], id, term_);
   }
   if (votes_.find(id) == votes_.end()) {
     votes_[id] = v;
@@ -633,7 +633,7 @@ int raft::poll(uint64_t id, MessageType t, bool v) {
 
 int raft::step(const Message& msg) {
   logger_->Debugf(__FILE__, __LINE__, "msg %s %llu -> %llu, term:%llu",
-                  msgTypeString(msg.type()), msg.from(), msg.to(), term_);
+                  kMsgString[msg.type()], msg.from(), msg.to(), term_);
   // Handle the message term, which may result in our stepping down to a follower.
   Message *respMsg;
   uint64_t term = msg.term();
@@ -650,7 +650,7 @@ int raft::step(const Message& msg) {
         // If a server receives a RequestVote request within the minimum election timeout
         // of hearing from a current leader, it does not update its term or grant its vote
         logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] ignored %s from %x [logterm: %llu, index: %llu] at term %llu: lease is not expired (remaining ticks: %d)",
-          id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from,
+          id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, kMsgString[type], from,
           msg.logterm(), msg.index(), term, electionTimeout_ - electionElapsed_);
         return OK;
       }
@@ -666,7 +666,7 @@ int raft::step(const Message& msg) {
       // term.
     } else {
       logger_->Infof(__FILE__, __LINE__, "%x [term: %llu] received a %s message with higher term from %x [term: %llu]",
-        id_, term_, msgTypeString(type), from, term);
+        id_, term_, kMsgString[type], from, term);
       becomeFollower(term, leader);
     }
   } else if (term < term_) {
@@ -691,7 +691,7 @@ int raft::step(const Message& msg) {
     } else {
       // ignore other cases
       logger_->Infof(__FILE__, __LINE__, "%x [term: %llu] ignored a %s message with lower term from %x [term: %llu]",
-        id_, term_, msgTypeString(type), from, term);
+        id_, term_, kMsgString[type], from, term);
     }
     return OK;
   }
@@ -729,7 +729,7 @@ int raft::step(const Message& msg) {
     // always equal r.Term.
     if ((vote_ == kNone || term > term_ || vote_ == from) && raftLog_->isUpToDate(msg.index(), msg.logterm())) {
       logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] cast %s for %x [logterm: %llu, index: %llu] at term %llu",
-        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from, msg.logterm(), msg.index(), term_);
+        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, kMsgString[type], from, msg.logterm(), msg.index(), term_);
       respMsg = new Message();
       respMsg->set_to(from);      
       respMsg->set_type(voteRespMsgType(type));
@@ -741,7 +741,7 @@ int raft::step(const Message& msg) {
     } else {
       logger_->Infof(__FILE__, __LINE__,
         "%x [logterm: %llu, index: %llu, vote: %x] rejected %s from %x [logterm: %llu, index: %llu] at term %llu",
-        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from, msg.logterm(), msg.index(), term_);
+        id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, kMsgString[type], from, msg.logterm(), msg.index(), term_);
       respMsg = new Message();
       respMsg->set_to(from);      
       respMsg->set_reject(true);      
@@ -1033,7 +1033,7 @@ void stepCandidate(raft* r, const Message& msg) {
   if (type == voteRespType) {
     granted = r->poll(msg.from(), msg.type(), !msg.reject());
     logger->Infof(__FILE__, __LINE__, "%x [quorum:%llu] has received %d %s votes and %llu vote rejections",
-      r->id_, r->quorum(), granted, msgTypeString(type), r->votes_.size() - granted);
+      r->id_, r->quorum(), granted, kMsgString[type], r->votes_.size() - granted);
     if (granted == r->quorum()) {
       if (r->state_ == StatePreCandidate) {
         r->campaign(campaignPreElection);
