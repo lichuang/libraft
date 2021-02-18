@@ -120,7 +120,7 @@ network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*>& peers)
       rf = (raft *)p->data();
       rf->id_ = id;
       for (j = 0; j < size; ++j) {
-        rf->prs_[peerAddrs[j]] = new Progress(0, 256, &kDefaultLogger);
+        rf->progressMap_[peerAddrs[j]] = new Progress(0, 256, &kDefaultLogger);
       }
       rf->reset(rf->term_);
       net->peers[id] = p;

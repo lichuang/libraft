@@ -36,20 +36,20 @@ TEST(raftPaperTests, TestSendingSnapshotSetPendingSnapshot) {
 
  	// force set the next of node 1, so that
 	// node 1 needs a snapshot
-  r->prs_[2]->next_ = r->raftLog_->firstIndex();
+  r->progressMap_[2]->next_ = r->raftLog_->firstIndex();
 
   {
     Message msg;
     msg.set_from(2);
     msg.set_to(1);
-    msg.set_index(r->prs_[2]->next_ - 1);
+    msg.set_index(r->progressMap_[2]->next_ - 1);
     msg.set_reject(true);
     msg.set_type(MsgAppResp);
 
     r->step(msg);
   }
 
-  EXPECT_EQ((int)r->prs_[2]->pendingSnapshot_, 11);
+  EXPECT_EQ((int)r->progressMap_[2]->pendingSnapshot_, 11);
 }
 
 TEST(raftPaperTests, TestPendingSnapshotPauseReplication) {
@@ -62,7 +62,7 @@ TEST(raftPaperTests, TestPendingSnapshotPauseReplication) {
   r->becomeCandidate();
   r->becomeLeader();
 
-  r->prs_[2]->becomeSnapshot(11);
+  r->progressMap_[2]->becomeSnapshot(11);
 
   {
     Message msg;
@@ -91,8 +91,8 @@ TEST(raftPaperTests, TestSnapshotFailure) {
   r->becomeCandidate();
   r->becomeLeader();
 
-  r->prs_[2]->next_ = 1;
-  r->prs_[2]->becomeSnapshot(11);
+  r->progressMap_[2]->next_ = 1;
+  r->progressMap_[2]->becomeSnapshot(11);
 
   {
     Message msg;
@@ -104,9 +104,9 @@ TEST(raftPaperTests, TestSnapshotFailure) {
     r->step(msg);
   }
 
-  EXPECT_EQ((int)r->prs_[2]->pendingSnapshot_, 0);
-  EXPECT_EQ((int)r->prs_[2]->next_, 1);
-  EXPECT_TRUE(r->prs_[2]->paused_);
+  EXPECT_EQ((int)r->progressMap_[2]->pendingSnapshot_, 0);
+  EXPECT_EQ((int)r->progressMap_[2]->next_, 1);
+  EXPECT_TRUE(r->progressMap_[2]->paused_);
 }
 
 TEST(raftPaperTests, TestSnapshotSucceed) {
@@ -119,8 +119,8 @@ TEST(raftPaperTests, TestSnapshotSucceed) {
   r->becomeCandidate();
   r->becomeLeader();
 
-  r->prs_[2]->next_ = 1;
-  r->prs_[2]->becomeSnapshot(11);
+  r->progressMap_[2]->next_ = 1;
+  r->progressMap_[2]->becomeSnapshot(11);
 
   {
     Message msg;
@@ -132,9 +132,9 @@ TEST(raftPaperTests, TestSnapshotSucceed) {
     r->step(msg);
   }
 
-  EXPECT_EQ((int)r->prs_[2]->pendingSnapshot_, 0);
-  EXPECT_EQ((int)r->prs_[2]->next_, 12);
-  EXPECT_TRUE(r->prs_[2]->paused_);
+  EXPECT_EQ((int)r->progressMap_[2]->pendingSnapshot_, 0);
+  EXPECT_EQ((int)r->progressMap_[2]->next_, 12);
+  EXPECT_TRUE(r->progressMap_[2]->paused_);
 }
 
 TEST(raftPaperTests, TestSnapshotAbort) {
@@ -147,8 +147,8 @@ TEST(raftPaperTests, TestSnapshotAbort) {
   r->becomeCandidate();
   r->becomeLeader();
 
-  r->prs_[2]->next_ = 1;
-  r->prs_[2]->becomeSnapshot(11);
+  r->progressMap_[2]->next_ = 1;
+  r->progressMap_[2]->becomeSnapshot(11);
 
 	// A successful msgAppResp that has a higher/equal index than the
 	// pending snapshot should abort the pending snapshot.
@@ -162,6 +162,6 @@ TEST(raftPaperTests, TestSnapshotAbort) {
     r->step(msg);
   }
 
-  EXPECT_EQ((int)r->prs_[2]->pendingSnapshot_, 0);
-  EXPECT_EQ((int)r->prs_[2]->next_, 12);
+  EXPECT_EQ((int)r->progressMap_[2]->pendingSnapshot_, 0);
+  EXPECT_EQ((int)r->progressMap_[2]->next_, 12);
 }

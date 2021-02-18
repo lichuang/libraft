@@ -26,7 +26,7 @@ TEST(raftFlowController, TestMsgAppFlowControlFull) {
   raft *r = newTestRaft(1, peers, 5, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
-  Progress *pr2 = r->prs_[2];
+  Progress *pr2 = r->progressMap_[2];
 
   // force the progress to be in replicate state
   pr2->becomeReplicate();
@@ -83,7 +83,7 @@ TEST(raftFlowController, TestMsgAppFlowControlMoveForward) {
   raft *r = newTestRaft(1, peers, 5, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
-  Progress *pr2 = r->prs_[2];
+  Progress *pr2 = r->progressMap_[2];
 
   // force the progress to be in replicate state
   pr2->becomeReplicate();
@@ -166,7 +166,7 @@ TEST(raftFlowController, TestMsgAppFlowControlRecvHeartbeat) {
   raft *r = newTestRaft(1, peers, 5, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
-  Progress *pr2 = r->prs_[2];
+  Progress *pr2 = r->progressMap_[2];
 
   // force the progress to be in replicate state
   pr2->becomeReplicate();

@@ -130,7 +130,7 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
   }
 
   // verify b(follower) forwards this message to r1(leader) with term not set
-  EXPECT_EQ((int)b->msgs_.size(), 1);
+  EXPECT_EQ((int)b->outMsgs_.size(), 1);
 
   Message readIndexMsg1;
   readIndexMsg1.set_from(2);
@@ -138,7 +138,7 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
   readIndexMsg1.set_type(MsgReadIndex);
   *(readIndexMsg1.add_entries()) = testEntries[0];
 
-  EXPECT_TRUE(isDeepEqualMessage(*b->msgs_[0], readIndexMsg1));
+  EXPECT_TRUE(isDeepEqualMessage(*b->outMsgs_[0], readIndexMsg1));
 
   // send readindex request to c(follower)
   {
@@ -151,13 +151,13 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
   }
 
   // verify c(follower) forwards this message to r1(leader) with term not set
-  EXPECT_EQ((int)c->msgs_.size(), 1);
+  EXPECT_EQ((int)c->outMsgs_.size(), 1);
   Message readIndexMsg2;
   readIndexMsg2.set_from(3);
   readIndexMsg2.set_to(1);
   readIndexMsg2.set_type(MsgReadIndex);
   *(readIndexMsg2.add_entries()) = testEntries[0];
-  EXPECT_TRUE(isDeepEqualMessage(*c->msgs_[0], readIndexMsg2));
+  EXPECT_TRUE(isDeepEqualMessage(*c->outMsgs_[0], readIndexMsg2));
 
   // now elect c as leader
   {
@@ -175,15 +175,15 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
   a->step(readIndexMsg2);
 
   // verify a(follower) forwards these messages again to c(new leader)
-  EXPECT_EQ((int)a->msgs_.size(), 2);
+  EXPECT_EQ((int)a->outMsgs_.size(), 2);
 
   Message readIndexMsg3;
   readIndexMsg3.set_from(1);
   readIndexMsg3.set_to(3);
   readIndexMsg3.set_type(MsgReadIndex);
   *(readIndexMsg3.add_entries()) = testEntries[0];
-  EXPECT_TRUE(isDeepEqualMessage(*a->msgs_[0], readIndexMsg3));
-  EXPECT_TRUE(isDeepEqualMessage(*a->msgs_[1], readIndexMsg3));
+  EXPECT_TRUE(isDeepEqualMessage(*a->outMsgs_[0], readIndexMsg3));
+  EXPECT_TRUE(isDeepEqualMessage(*a->outMsgs_[1], readIndexMsg3));
 }
 
 // TestNodeProposeConfig ensures that node.ProposeConfChange sends the given configuration proposal

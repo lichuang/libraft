@@ -57,6 +57,11 @@ copyEntries(const Message& msg, EntryVec *entries) {
   }
 }
 
+static Message*
+cloneMessage(const Message& msg) {
+  return new Message(msg);
+}
+
 raft::raft(const Config *config, raftLog *log)
   : id_(config->id),
     term_(0),
@@ -76,7 +81,8 @@ raft::raft(const Config *config, raftLog *log)
   srand((unsigned)time(NULL));
 }
 
-void raft::tick() {
+void
+raft::tick() {
   switch (state_) {
   case StateFollower:
   case StateCandidate:
@@ -92,11 +98,6 @@ void raft::tick() {
   }
 }
 
-Message* 
-cloneMessage(const Message& msg) {
-  return new Message(msg);
-}
-
 // checkQuorumActive returns true if the quorum is active from
 // the view of the local raft state machine. Otherwise, it returns
 // false.
@@ -106,43 +107,44 @@ raft::checkQuorumActive() {
   int act = 0;
 
   map<uint64_t, Progress*>::const_iterator iter;
-  for (iter = prs_.begin(); iter != prs_.end(); ++iter) {
+  for (iter = progressMap_.begin(); iter != progressMap_.end(); ++iter) {
     if (iter->first == id_) { // self is always active
       act++;
       continue;
     }
-    if (iter->second->recentActive_) {
-      act++;
+    if (!iter->second->recentActive_) {
+      continue;
     }
-    iter->second->recentActive_ = false;
+    act++;
+    iter->second->recentActive_ = false;     
   }
 
   return act >= quorum();
 }
 
-bool 
+bool
 raft::hasLeader() {
   return leader_ != kNone;
 }
 
-void 
+void
 raft::softState(SoftState *ss) {
   ss->leader = leader_;
   ss->state  = state_;
 }
 
-void 
+void
 raft::hardState(HardState *hs) {
   hs->set_term(term_);
   hs->set_vote(vote_);
   hs->set_commit(raftLog_->committed_);
 }
 
-void 
+void
 raft::nodes(vector<uint64_t> *nodes) {
   nodes->clear();
-  map<uint64_t, Progress*>::const_iterator iter = prs_.begin();
-  while (iter != prs_.end()) {
+  map<uint64_t, Progress*>::const_iterator iter = progressMap_.begin();
+  while (iter != progressMap_.end()) {
     nodes->push_back(iter->first);
     ++iter;
   }
@@ -150,6 +152,7 @@ raft::nodes(vector<uint64_t> *nodes) {
 
 void
 raft::loadState(const HardState &hs) {
+  // validity check
   if (hs.commit() < raftLog_->committed_ || hs.commit() > raftLog_->lastIndex()) {
     logger_->Fatalf(__FILE__, __LINE__, 
       "%x state.commit %llu is out of range [%llu, %llu]", id_, hs.commit(), raftLog_->committed_, raftLog_->lastIndex());
@@ -162,7 +165,7 @@ raft::loadState(const HardState &hs) {
 
 int
 raft::quorum() {
-  return (prs_.size() / 2) + 1;
+  return (progressMap_.size() / 2) + 1;
 }
 
 // send persists state to stable storage and then sends to its mailbox.
@@ -190,13 +193,14 @@ raft::send(Message *msg) {
     }
   }
 
-  msgs_.push_back(msg);
+  // save every out msg in outMsgs_,then msgs will be moved to `Ready' struct
+  outMsgs_.push_back(msg);
 }
 
 // sendAppend sends RPC, with entries to the given peer.
 void
 raft::sendAppend(uint64_t to) {
-  Progress *pr = prs_[to];
+  Progress *pr = progressMap_[to];
   if (pr == NULL || pr->isPaused()) {
     logger_->Infof(__FILE__, __LINE__, "node %x paused", to);
     return;
@@ -210,9 +214,11 @@ raft::sendAppend(uint64_t to) {
   EntryVec entries;
   Snapshot *snapshot;
 
+  // try to get term and entities
   errt = raftLog_->term(pr->next_ - 1, &term);
   erre = raftLog_->entries(pr->next_, maxMsgSize_, &entries);
-  if (!SUCCESS(errt) || !SUCCESS(erre)) {  // send snapshot if we failed to get term or entries
+  if (!SUCCESS(errt) || !SUCCESS(erre)) {
+    // send snapshot if we failed to get term or entries
     if (!pr->recentActive_) {
       logger_->Debugf(__FILE__, __LINE__, "ignore sending snapshot to %llu since it is not recently active", to);
       return;
@@ -239,9 +245,11 @@ raft::sendAppend(uint64_t to) {
     uint64_t sterm = snapshot->metadata().term();
     logger_->Debugf(__FILE__, __LINE__, "%x [firstindex: %llu, commit: %llu] sent snapshot[index: %llu, term: %llu] to %x [%s]",
       id_, raftLog_->firstIndex(), raftLog_->committed_, sindex, sterm, to, pr->string().c_str());
+    // change to snapshot state
     pr->becomeSnapshot(sindex);
     logger_->Debugf(__FILE__, __LINE__, "%x paused sending replication messages to %x [%s]", id_, to, pr->string().c_str());
   } else {
+    // else,send Append Msg
     msg->set_type(MsgApp);
     msg->set_index(pr->next_ - 1);
     msg->set_logterm(term);
@@ -282,7 +290,7 @@ raft::sendHeartbeat(uint64_t to, const string &ctx) {
   // or it might not have all the committed entries.
   // The leader MUST NOT forward the follower's commit to
   // an unmatched index.
-  uint64_t commit = min(prs_[to]->match_, raftLog_->committed_);
+  uint64_t commit = min(progressMap_[to]->match_, raftLog_->committed_);
   Message *msg = new Message();
   msg->set_to(to);
   msg->set_type(MsgHeartbeat);
@@ -295,8 +303,8 @@ raft::sendHeartbeat(uint64_t to, const string &ctx) {
 // according to the progress recorded in r.prs.
 void
 raft::bcastAppend() {
-  map<uint64_t, Progress*>::const_iterator iter = prs_.begin();
-  for (;iter != prs_.end();++iter) {
+  map<uint64_t, Progress*>::const_iterator iter = progressMap_.begin();
+  for (;iter != progressMap_.end();++iter) {
     if (iter->first == id_) {
       continue;
     }
@@ -313,8 +321,8 @@ raft::bcastHeartbeat() {
 
 void
 raft::bcastHeartbeatWithCtx(const string &ctx) {
-  map<uint64_t, Progress*>::const_iterator iter = prs_.begin();
-  for (;iter != prs_.end();++iter) {
+  map<uint64_t, Progress*>::const_iterator iter = progressMap_.begin();
+  for (;iter != progressMap_.end();++iter) {
     if (iter->first == id_) {
       continue;
     }
@@ -322,7 +330,7 @@ raft::bcastHeartbeatWithCtx(const string &ctx) {
   }
 }
 
-template <typename T>  
+template <typename T>
 struct reverseCompartor {  
   bool operator()(const T &x, const T &y)  {
     return y < x;
@@ -332,11 +340,11 @@ struct reverseCompartor {
 // maybeCommit attempts to advance the commit index. Returns true if
 // the commit index changed (in which case the caller should 
 // call r.bcastAppend).
-bool 
+bool
 raft::maybeCommit() {
   map<uint64_t, Progress*>::const_iterator iter;
   vector<uint64_t> mis;
-  for (iter = prs_.begin(); iter != prs_.end(); ++iter) {
+  for (iter = progressMap_.begin(); iter != progressMap_.end(); ++iter) {
     mis.push_back(iter->second->match_);
   }
   sort(mis.begin(), mis.end(), reverseCompartor<uint64_t>());
@@ -357,14 +365,14 @@ raft::reset(uint64_t term) {
 
   abortLeaderTransfer();
   votes_.clear();
-  map<uint64_t, Progress*>::iterator iter = prs_.begin();
-  for (; iter != prs_.end(); ++iter) {
+  map<uint64_t, Progress*>::iterator iter = progressMap_.begin();
+  for (; iter != progressMap_.end(); ++iter) {
     uint64_t id = iter->first;
-    Progress *pr = prs_[id];
+    Progress *pr = progressMap_[id];
     delete pr;
-    prs_[id] = new Progress(raftLog_->lastIndex() + 1, maxInfilght_, logger_);
+    progressMap_[id] = new Progress(raftLog_->lastIndex() + 1, maxInfilght_, logger_);
     if (id == id_) {
-      pr = prs_[id];
+      pr = progressMap_[id];
       pr->match_ = raftLog_->lastIndex();
     }
   }
@@ -383,7 +391,7 @@ raft::appendEntry(EntryVec* entries) {
     (*entries)[i].set_index(li + 1 + i);
   }
   raftLog_->append(*entries);
-  prs_[id_]->maybeUpdate(raftLog_->lastIndex());
+  progressMap_[id_]->maybeUpdate(raftLog_->lastIndex());
   // Regardless of maybeCommit's return, our caller will call bcastAppend.
   maybeCommit();
 }
@@ -410,7 +418,7 @@ raft::tickHeartbeat() {
 
   if (electionElapsed_ >= electionTimeout_) {
     electionElapsed_ = 0;
-    if (checkQuorum_) {
+    if (checkQuorum_) { // send MsgCheckQuorum
       Message msg;
       msg.set_from(id_);
       msg.set_type(MsgCheckQuorum);
@@ -426,6 +434,7 @@ raft::tickHeartbeat() {
     return;
   }
 
+  // if heartbeat timeout,send MsgBeat
   if (heartbeatElapsed_ >= heartbeatTimeout_) {
     heartbeatElapsed_ = 0;
 
@@ -440,10 +449,10 @@ raft::tickHeartbeat() {
 // which is true when its own id is in progress list.
 bool
 raft::promotable() {
-  return prs_.find(id_) != prs_.end();
+  return progressMap_.find(id_) != progressMap_.end();
 }
 
-// pastElectionTimeout returns true iff r.electionElapsed is greater
+// pastElectionTimeout returns true if r.electionElapsed is greater
 // than or equal to the randomized election timeout in
 // [electiontimeout, 2 * electiontimeout - 1].
 bool
@@ -485,6 +494,7 @@ raft::becomeCandidate() {
     logger_->Fatalf(__FILE__, __LINE__, "invalid transition [leader -> candidate]");
   }
 
+  // add term + 1 in candidate state
   reset(term_ + 1);
   vote_ = id_;
   state_ = StateCandidate;
@@ -505,14 +515,17 @@ raft::becomeLeader() {
 
   EntryVec entries;
   int err = raftLog_->entries(raftLog_->committed_ + 1, kNoLimit, &entries);
+  // fatal if leader get committed entries fail
   if (!SUCCESS(err)) {
     logger_->Fatalf(__FILE__, __LINE__, "unexpected error getting uncommitted entries (%s)", GetErrorString(err));
   }
 
   int n = numOfPendingConf(entries);
+  // fatal if leader has pending config > 1
   if (n > 1) {
     logger_->Fatalf(__FILE__, __LINE__, "unexpected multiple uncommitted config entry");
   }
+
   if (n == 1) {
     pendingConf_ = true;
   }
@@ -548,8 +561,8 @@ raft::campaign(CampaignType t) {
     }
   }
 
-  map<uint64_t, Progress*>::const_iterator iter = prs_.begin();
-  for (; iter != prs_.end(); ++iter) {
+  map<uint64_t, Progress*>::const_iterator iter = progressMap_.begin();
+  for (; iter != progressMap_.end(); ++iter) {
     uint64_t id = iter->first;
     if (id_ == id) {
       continue;
@@ -746,7 +759,7 @@ stepLeader(raft *r, const Message& msg) {
     if (msg.entries_size() == 0) {
       logger->Fatalf(__FILE__, __LINE__, "%x stepped empty MsgProp", r->id_);
     }
-    if (r->prs_.find(r->id_) == r->prs_.end()) {
+    if (r->progressMap_.find(r->id_) == r->progressMap_.end()) {
       // If we are not currently a member of the range (i.e. this node
       // was removed from the configuration while serving as leader),
       // drop any new proposals.
@@ -824,8 +837,8 @@ stepLeader(raft *r, const Message& msg) {
   bool oldPaused;
   vector<readIndexStatus*> rss;
   Message *req, *respMsg;
-  map<uint64_t, Progress*>::iterator iter = r->prs_.find(from);
-  if (iter == r->prs_.end()) {
+  map<uint64_t, Progress*>::iterator iter = r->progressMap_.find(from);
+  if (iter == r->progressMap_.end()) {
     logger->Debugf(__FILE__, __LINE__, "%x no progress available for %x", r->id_, from);
     return;
   }
@@ -1126,7 +1139,7 @@ raft::restore(const Snapshot& snapshot) {
     id_, raftLog_->committed_, raftLog_->lastIndex(), raftLog_->lastTerm(),
     snapshot.metadata().index(), snapshot.metadata().term());
   raftLog_->restore(snapshot);
-  prs_.clear();
+  progressMap_.clear();
   int i;
   for (i = 0; i < snapshot.metadata().conf_state().nodes_size(); ++i) {
     uint64_t node = snapshot.metadata().conf_state().nodes(i);
@@ -1136,7 +1149,7 @@ raft::restore(const Snapshot& snapshot) {
       match = next - 1;
     }
     setProgress(node, match, next);
-    logger_->Infof(__FILE__, __LINE__, "%x restored progress of %x [%s]", id_, node, prs_[node]->string().c_str());
+    logger_->Infof(__FILE__, __LINE__, "%x restored progress of %x [%s]", id_, node, progressMap_[node]->string().c_str());
   }
   return true;
 }
@@ -1210,17 +1223,17 @@ raft::handleAppendEntries(const Message& msg) {
 
 void
 raft::setProgress(uint64_t id, uint64_t match, uint64_t next) {
-  if (prs_[id] != NULL)  {
-    delete prs_[id];
+  if (progressMap_[id] != NULL)  {
+    delete progressMap_[id];
   }
-  prs_[id] = new Progress(next, maxInfilght_, logger_);
-  prs_[id]->match_ = match;
+  progressMap_[id] = new Progress(next, maxInfilght_, logger_);
+  progressMap_[id]->match_ = match;
 }
 
 void
 raft::delProgress(uint64_t id) {
-  delete prs_[id];
-  prs_.erase(id);
+  delete progressMap_[id];
+  progressMap_.erase(id);
 }
 
 void
@@ -1231,7 +1244,7 @@ raft::abortLeaderTransfer() {
 void
 raft::addNode(uint64_t id) {
   pendingConf_ = false;
-  if (prs_.find(id) != prs_.end()) {
+  if (progressMap_.find(id) != progressMap_.end()) {
     return;
   }
   setProgress(id, 0, raftLog_->lastIndex() + 1);
@@ -1243,7 +1256,7 @@ raft::removeNode(uint64_t id) {
   pendingConf_ = false;
 
   // do not try to commit or abort transferring if there is no nodes in the cluster.
-  if (prs_.empty()) {
+  if (progressMap_.empty()) {
     return;
   }
 
@@ -1261,8 +1274,8 @@ raft::removeNode(uint64_t id) {
 
 void
 raft::readMessages(MessageVec *msgs) {
-  *msgs = msgs_;
-  msgs_.clear();
+  *msgs = outMsgs_;
+  outMsgs_.clear();
 }
 
 void
@@ -1312,7 +1325,7 @@ newRaft(const Config *config) {
 
   raft *r = new raft(config, rl);
   for (i = 0; i < peers.size(); ++i) {
-    r->prs_[peers[i]] = new Progress(1, r->maxInfilght_, logger);
+    r->progressMap_[peers[i]] = new Progress(1, r->maxInfilght_, logger);
   }
 
   if (!isHardStateEqual(hs, kEmptyHardState)) {
@@ -1326,7 +1339,7 @@ newRaft(const Config *config) {
   vector<string> peerStrs;
   map<uint64_t, Progress*>::const_iterator iter;
   char tmp[32];
-  for (iter = r->prs_.begin(); iter != r->prs_.end(); ++iter) {
+  for (iter = r->progressMap_.begin(); iter != r->progressMap_.end(); ++iter) {
     snprintf(tmp, sizeof(tmp), "%llu", iter->first);
     peerStrs.push_back(tmp);
   }

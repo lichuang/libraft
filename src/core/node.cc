@@ -258,7 +258,7 @@ NodeImpl::reset() {
 
 bool 
 NodeImpl::isMessageFromClusterNode(const Message& msg) {
-  return (raft_->prs_.find(msg.from()) != raft_->prs_.end());
+  return (raft_->progressMap_.find(msg.from()) != raft_->progressMap_.end());
 }
 
 Ready* 
@@ -275,7 +275,7 @@ NodeImpl::newReady() {
   // 2) return the new ready state data in ready
   raft_->raftLog_->unstableEntries(&ready_.entries);
   raft_->raftLog_->nextEntries(&ready_.committedEntries);
-  ready_.messages = raft_->msgs_;
+  ready_.messages = raft_->outMsgs_;
 
   SoftState ss;
   raft_->softState(&ss);
@@ -312,7 +312,7 @@ NodeImpl::newReady() {
     prevSnapshotIndex_ = ready_.snapshot->metadata().index();
   }
 
-  raft_->msgs_.clear();
+  raft_->outMsgs_.clear();
   raft_->readStates_.clear();
 
   return &ready_;

@@ -272,7 +272,7 @@ TEST(raftTests, TestProgressResumeByHeartbeatResp) {
   raft *r = newTestRaft(1, peers, 5, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
-  r->prs_[2]->paused_ = true;
+  r->progressMap_[2]->paused_ = true;
 
   {
     Message msg;
@@ -281,10 +281,10 @@ TEST(raftTests, TestProgressResumeByHeartbeatResp) {
     msg.set_type(MsgBeat);
 
     r->step(msg);
-    EXPECT_TRUE(r->prs_[2]->paused_);
+    EXPECT_TRUE(r->progressMap_[2]->paused_);
   }
 
-  r->prs_[2]->becomeReplicate();
+  r->progressMap_[2]->becomeReplicate();
   {
     Message msg;
     msg.set_from(2);
@@ -292,7 +292,7 @@ TEST(raftTests, TestProgressResumeByHeartbeatResp) {
     msg.set_type(MsgHeartbeatResp);
 
     r->step(msg);
-    EXPECT_FALSE(r->prs_[2]->paused_);
+    EXPECT_FALSE(r->progressMap_[2]->paused_);
   }
 
   delete s;
@@ -647,8 +647,8 @@ void testVoteFromAnyState(MessageType vt) {
     int err = r->step(msg);
 
     EXPECT_EQ(err, OK);
-    EXPECT_EQ((int)r->msgs_.size(), 1);
-    Message *resp = r->msgs_[0];
+    EXPECT_EQ((int)r->outMsgs_.size(), 1);
+    Message *resp = r->outMsgs_[0];
     EXPECT_EQ(resp->type(), voteRespMsgType(vt));
     EXPECT_FALSE(resp->reject());
 
@@ -3620,7 +3620,7 @@ TEST(raftTests, TestLeaderAppResp) {
       r->step(msg);
     }
 
-    Progress *p = r->prs_[2];
+    Progress *p = r->progressMap_[2];
     EXPECT_EQ(p->match_, t.match);
     EXPECT_EQ(p->next_, t.next);
 
@@ -3665,11 +3665,11 @@ TEST(raftTests, TestBcastBeat) {
   }
   r->appendEntry(&entries);
   // slow follower
-  r->prs_[2]->match_ = 5;
-  r->prs_[2]->next_ = 6;
+  r->progressMap_[2]->match_ = 5;
+  r->progressMap_[2]->next_ = 6;
   // normal follower
-  r->prs_[3]->match_ = r->raftLog_->lastIndex();
-  r->prs_[3]->next_ = r->raftLog_->lastIndex() + 1;
+  r->progressMap_[3]->match_ = r->raftLog_->lastIndex();
+  r->progressMap_[3]->next_ = r->raftLog_->lastIndex() + 1;
 
   {
     Message msg;
@@ -3682,8 +3682,8 @@ TEST(raftTests, TestBcastBeat) {
   
   EXPECT_EQ((int)msgs.size(), 2);
   map<uint64_t, uint64_t> wantCommitMap;
-  wantCommitMap[2] = min(r->raftLog_->committed_, r->prs_[2]->match_);
-  wantCommitMap[3] = min(r->raftLog_->committed_, r->prs_[3]->match_);
+  wantCommitMap[2] = min(r->raftLog_->committed_, r->progressMap_[2]->match_);
+  wantCommitMap[3] = min(r->raftLog_->committed_, r->progressMap_[3]->match_);
 
   for (i = 0; i < msgs.size(); ++i) {
     Message *msg = msgs[i];
@@ -3813,8 +3813,8 @@ TEST(raftTests, TestLeaderIncreaseNext) {
 		r->raftLog_->append(prevEntries);
 		r->becomeCandidate();
 		r->becomeLeader();
-		r->prs_[2]->state_ = t.state;
-		r->prs_[2]->next_ = t.next;
+		r->progressMap_[2]->state_ = t.state;
+		r->progressMap_[2]->next_ = t.next;
 
 		Message msg;
 		msg.set_from(1);
@@ -3823,7 +3823,7 @@ TEST(raftTests, TestLeaderIncreaseNext) {
 		msg.add_entries()->set_data("somedata");
 		r->step(msg);
 
-		EXPECT_EQ(r->prs_[2]->next_, t.wnext);
+		EXPECT_EQ(r->progressMap_[2]->next_, t.wnext);
 	}
 }
 
@@ -3838,7 +3838,7 @@ TEST(raftTests, TestSendAppendForProgressProbe) {
 
 	MessageVec msgs;
 	r->readMessages(&msgs);
-	r->prs_[2]->becomeProbe();
+	r->progressMap_[2]->becomeProbe();
 
 	// each round is a heartbeat
 	size_t i;
@@ -3858,7 +3858,7 @@ TEST(raftTests, TestSendAppendForProgressProbe) {
 			EXPECT_EQ((int)msgs[0]->index(), 0);
 		}
 
-		EXPECT_TRUE(r->prs_[2]->paused_);
+		EXPECT_TRUE(r->progressMap_[2]->paused_);
 
 		int j;
 		// do a heartbeat
@@ -3869,7 +3869,7 @@ TEST(raftTests, TestSendAppendForProgressProbe) {
 			msg.set_type(MsgBeat);
 			r->step(msg);
 		}
-		EXPECT_TRUE(r->prs_[2]->paused_);
+		EXPECT_TRUE(r->progressMap_[2]->paused_);
 
 		// consume the heartbeat
 		MessageVec tmp_msgs;
@@ -3888,7 +3888,7 @@ TEST(raftTests, TestSendAppendForProgressProbe) {
 		r->readMessages(&msgs);
 		EXPECT_EQ((int)msgs.size(), 1);
 		EXPECT_EQ((int)msgs[0]->index(), 0);
-		EXPECT_TRUE(r->prs_[2]->paused_);
+		EXPECT_TRUE(r->progressMap_[2]->paused_);
 	}
 }
 
@@ -3903,7 +3903,7 @@ TEST(raftTests, TestSendAppendForProgressReplicate) {
 
 	MessageVec msgs;
 	r->readMessages(&msgs);
-	r->prs_[2]->becomeReplicate();
+	r->progressMap_[2]->becomeReplicate();
 
 	size_t i;
 	for (i = 0; i < 10; ++i) {
@@ -3929,7 +3929,7 @@ TEST(raftTests, TestSendAppendForProgressSnapshot) {
 
 	MessageVec msgs;
 	r->readMessages(&msgs);
-	r->prs_[2]->becomeSnapshot(10);
+	r->progressMap_[2]->becomeSnapshot(10);
 
 	size_t i;
 	for (i = 0; i < 10; ++i) {
@@ -3971,9 +3971,9 @@ TEST(raftTests, TestRecvMsgUnreachable) {
 	r->becomeLeader();
 
 	// set node 2 to state replicate
-	r->prs_[2]->match_ = 3;
-	r->prs_[2]->becomeReplicate();
-	r->prs_[2]->optimisticUpdate(5);
+	r->progressMap_[2]->match_ = 3;
+	r->progressMap_[2]->becomeReplicate();
+	r->progressMap_[2]->optimisticUpdate(5);
 
 	{
 		Message msg;
@@ -3983,8 +3983,8 @@ TEST(raftTests, TestRecvMsgUnreachable) {
 		r->step(msg);
 	}
 
-	EXPECT_EQ(r->prs_[2]->state_, ProgressStateProbe);
-	EXPECT_EQ(r->prs_[2]->next_, r->prs_[2]->match_ + 1);
+	EXPECT_EQ(r->progressMap_[2]->state_, ProgressStateProbe);
+	EXPECT_EQ(r->progressMap_[2]->next_, r->progressMap_[2]->match_ + 1);
 }
 
 TEST(raftTests, TestRestore) {
@@ -4073,13 +4073,13 @@ TEST(raftTests, TestProvideSnap) {
   r->becomeLeader();
 
   // force set the next of node 2, so that node 2 needs a snapshot
-  r->prs_[2]->next_ = r->raftLog_->firstIndex();
+  r->progressMap_[2]->next_ = r->raftLog_->firstIndex();
   {
     Message msg;
     msg.set_from(2);
     msg.set_to(2);
     msg.set_type(MsgAppResp);
-    msg.set_index(r->prs_[2]->next_ - 1);
+    msg.set_index(r->progressMap_[2]->next_ - 1);
     msg.set_reject(true);
     r->step(msg);
   }
@@ -4110,8 +4110,8 @@ TEST(raftTests, TestIgnoreProvidingSnap) {
 
 	// force set the next of node 2, so that node 2 needs a snapshot
 	// change node 2 to be inactive, expect node 1 ignore sending snapshot to 2
-  r->prs_[2]->next_ = r->raftLog_->firstIndex() - 1;
-  r->prs_[2]->recentActive_ = false;
+  r->progressMap_[2]->next_ = r->raftLog_->firstIndex() - 1;
+  r->progressMap_[2]->recentActive_ = false;
   {
     Message msg;
     msg.set_from(1);
@@ -4183,7 +4183,7 @@ TEST(raftTests, TestSlowNodeRestore) {
     vector<Message> msgs;
     msgs.push_back(msg);
     net->send(&msgs);
-  } while (leader->prs_[3]->recentActive_ == false);
+  } while (leader->progressMap_[3]->recentActive_ == false);
 
   // trigger a snapshot
   {
@@ -4770,7 +4770,7 @@ TEST(raftTests, TestLeaderTransferToSlowFollower) {
 
   net->recover();
   raft *leader = (raft*)net->peers[1]->data();
-  EXPECT_EQ((int)leader->prs_[3]->match_, 1);
+  EXPECT_EQ((int)leader->progressMap_[3]->match_, 1);
 
   // Transfer leadership to 3 when node 3 is lack of log.
   {
@@ -4830,7 +4830,7 @@ TEST(raftTests, TestLeaderTransferAfterSnapshot) {
   net->storage[1]->Compact(leader->raftLog_->applied_);
 
   net->recover();
-  EXPECT_EQ((int)leader->prs_[3]->match_, 1);
+  EXPECT_EQ((int)leader->progressMap_[3]->match_, 1);
 
   // Transfer leadership to 3 when node 3 is lack of log.
   {
@@ -5008,7 +5008,7 @@ TEST(raftTests, TestLeaderTransferIgnoreProposal) {
     msgs.push_back(msg);
     net->send(&msgs);
   }
-  EXPECT_EQ((int)leader->prs_[1]->match_, 1);
+  EXPECT_EQ((int)leader->progressMap_[1]->match_, 1);
 }
 
 TEST(raftTests, TestLeaderTransferReceiveHigherTermVote) {
