@@ -3,7 +3,7 @@
 #include "base/default_logger.h"
 
 using namespace std;
-
+namespace libraft {
 const char* GetErrorString(int err) {
   return "";
 }
@@ -197,3 +197,4 @@ string joinStrings(const vector<string>& strs, const string &sep) {
 
   return ret;
 }
+}; // namespace libraft

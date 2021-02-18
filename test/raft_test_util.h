@@ -5,6 +5,8 @@
 #include "core/raft.h"
 #include "storage/memory_storage.h"
 
+using namespace libraft;
+
 enum stateMachineType {
   raftType = 0,
   blackHoleType = 1
@@ -14,7 +16,7 @@ struct stateMachine {
   virtual ~stateMachine() {}
 
   virtual int step(const Message& ) = 0;
-  virtual void readMessages(vector<Message*> *) = 0;
+  virtual void readMessages(MessageVec *) = 0;
 
   virtual int type() = 0;
   virtual void* data() = 0;
@@ -57,7 +59,7 @@ struct raftStateMachine : public stateMachine {
   virtual ~raftStateMachine();
 
   virtual int step(const Message& );
-  virtual void readMessages(vector<Message*> *);
+  virtual void readMessages(MessageVec *);
 
   virtual int type() { return raftType; }
   virtual void* data() { return raft; }
@@ -70,7 +72,7 @@ struct blackHole : public stateMachine {
   virtual ~blackHole() {}
 
   int step(const Message& ) { return OK; }
-  void readMessages(vector<Message*> *) {}
+  void readMessages(MessageVec *) {}
 
   int type() { return blackHoleType; }
   void* data() { return NULL; } 

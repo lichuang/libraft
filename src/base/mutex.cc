@@ -1,5 +1,5 @@
 #include "base/mutex.h"
-
+namespace libraft {
 struct LockerImpl {
   LockerImpl() {
   }
@@ -27,3 +27,4 @@ int Locker::Lock() {
 int Locker::UnLock() {
   return impl_->UnLock();
 }
+}; // namespace libraft

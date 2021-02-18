@@ -1,6 +1,7 @@
 #include "storage/memory_storage.h"
 #include "base/util.h"
 
+namespace libraft {
 MemoryStorage::MemoryStorage(Logger *logger) 
   : snapShot_(new Snapshot())
   , logger_(logger) {
@@ -206,3 +207,4 @@ int MemoryStorage::CreateSnapshot(uint64_t i, ConfState *cs, const string& data,
 
   return OK;
 }
+}; // namespace libraft

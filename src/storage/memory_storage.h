@@ -3,7 +3,7 @@
 
 #include "libraft.h"
 #include "base/mutex.h"
-
+namespace libraft {
 class MemoryStorage : public Storage {
 public:
   MemoryStorage(Logger *logger);
@@ -35,5 +35,5 @@ public:
   Locker locker_;
   Logger *logger_;
 };
-
+}; // namespace libraft
 #endif  // __MEMORY_STORAGE_H__

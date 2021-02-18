@@ -5,6 +5,8 @@
 #include "storage/memory_storage.h"
 #include "base/default_logger.h"
 
+using namespace libraft;
+
 TEST(logTests, TestFindConflict) {
   EntryVec entries;
 
@@ -394,7 +396,7 @@ TEST(logTests, TestAppend) {
     EXPECT_EQ(index, test.windex);
 
     EntryVec ret_entries;
-    int err = log->entries(1, noLimit, &ret_entries);
+    int err = log->entries(1, kNoLimit, &ret_entries);
     EXPECT_EQ(err, OK);
     EXPECT_TRUE(isDeepEqualEntries(ret_entries, test.wentries));
     EXPECT_EQ(log->unstable_.offset_, test.wunstable);
@@ -602,7 +604,7 @@ TEST(logTests, TestLogMaybeAppend) {
     EXPECT_EQ(gcommit, test.wcommit);
     if (glasti > 0 && test.entries.size() != 0) {
       EntryVec ret_entries;
-      int err = log->slice(log->lastIndex() - test.entries.size() + 1, log->lastIndex() + 1, noLimit, &ret_entries);
+      int err = log->slice(log->lastIndex() - test.entries.size() + 1, log->lastIndex() + 1, kNoLimit, &ret_entries);
       EXPECT_EQ(err, OK);
       EXPECT_TRUE(isDeepEqualEntries(test.entries, ret_entries));
     }
@@ -684,7 +686,7 @@ TEST(logTests, TestCompactionSideEffects) {
 
   {
     EntryVec entries;
-    int err = log->entries(log->lastIndex(), noLimit, &entries);
+    int err = log->entries(log->lastIndex(), kNoLimit, &entries);
     EXPECT_EQ(err, OK);
     EXPECT_EQ((int)entries.size(), 1);
   }
@@ -1358,15 +1360,15 @@ TEST(logTests, TestSlice) {
   vector<tmp> tests;
   // test no limit
   {
-    tmp t(offset - 1, offset + 1, noLimit, false);
+    tmp t(offset - 1, offset + 1, kNoLimit, false);
     tests.push_back(t);
   }
   {
-    tmp t(offset, offset + 1, noLimit, false);
+    tmp t(offset, offset + 1, kNoLimit, false);
     tests.push_back(t);
   }
   {
-    tmp t(half - 1, half + 1, noLimit, false);
+    tmp t(half - 1, half + 1, kNoLimit, false);
     Entry entry;
 
     entry.set_index(half - 1);
@@ -1380,7 +1382,7 @@ TEST(logTests, TestSlice) {
     tests.push_back(t);
   }
   {
-    tmp t(half, half + 1, noLimit, false);
+    tmp t(half, half + 1, kNoLimit, false);
     Entry entry;
 
     entry.set_index(half);
@@ -1390,7 +1392,7 @@ TEST(logTests, TestSlice) {
     tests.push_back(t);
   }
   {
-    tmp t(last - 1, last, noLimit, false);
+    tmp t(last - 1, last, kNoLimit, false);
     Entry entry;
 
     entry.set_index(last - 1);

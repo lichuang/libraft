@@ -7,7 +7,7 @@
 #include "core/progress.h"
 
 using namespace std;
-
+namespace libraft {
 struct readOnly;
 struct ReadState;
 
@@ -38,7 +38,7 @@ struct raft {
   map<uint64_t, Progress*> prs_;
   StateType state_;
   map<uint64_t, bool> votes_;
-  vector<Message*> msgs_;
+  MessageVec msgs_;
 
   uint64_t leader_;
   // leadTransferee is id of the leader transfer target when its value is not zero.
@@ -113,7 +113,7 @@ struct raft {
   void setProgress(uint64_t id, uint64_t match, uint64_t next);
   void abortLeaderTransfer();
   void proxyMessage(const Message& msg);
-  void readMessages(vector<Message*> *);
+  void readMessages(MessageVec *);
   bool checkQuorumActive();
   void sendTimeoutNow(uint64_t to);
   void resetPendingConf();
@@ -125,5 +125,6 @@ string entryString(const Entry& entry);
 void stepLeader(raft *r, const Message& msg);
 void stepCandidate(raft* r, const Message& msg);
 void stepFollower(raft* r, const Message& msg);
+}; // namespace libraft
 
 #endif  // __RAFT_H__

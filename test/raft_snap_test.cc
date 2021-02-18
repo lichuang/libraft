@@ -9,6 +9,8 @@
 #include "storage/memory_storage.h"
 #include "raft_test_util.h"
 
+using namespace libraft;
+
 Snapshot testingSnap() {
   Snapshot ts;
   ts.mutable_metadata()->set_index(11);
@@ -70,7 +72,7 @@ TEST(raftPaperTests, TestPendingSnapshotPauseReplication) {
     r->step(msg);
   }
 
-  vector<Message*> msgs;
+  MessageVec msgs;
   r->readMessages(&msgs);
   EXPECT_EQ((int)msgs.size(), 0);
 }

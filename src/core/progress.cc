@@ -1,5 +1,5 @@
 #include "core/progress.h"
-
+namespace libraft {
 Progress::Progress(uint64_t next, int maxInfilght, Logger *logger)
   : match_(0),
     next_(next),
@@ -220,3 +220,4 @@ void inflights::reset() {
   count_ = 0;
   start_ = 0;
 }
+}; // namespace libraft

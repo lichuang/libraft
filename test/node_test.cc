@@ -10,6 +10,8 @@
 #include "core/node.h"
 #include "raft_test_util.h"
 
+using namespace libraft;
+
 vector<Message> msgs;
 
 static void appendStep(raft *, const Message &msg) {

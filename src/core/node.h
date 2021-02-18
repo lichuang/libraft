@@ -2,7 +2,7 @@
 #define __NODE_H__
 
 #include "libraft.h"
-
+namespace libraft {
 enum NodeMessageType {
   ProposeMessage    = 0,
   RecvMessage       = 1,
@@ -63,5 +63,5 @@ public:
   ConfChange confChange_;
   ConfState*  confState_;
 };
-
+}; // namespace libraft
 #endif  // __NODE_H__

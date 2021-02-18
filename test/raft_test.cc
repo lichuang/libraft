@@ -9,6 +9,8 @@
 #include "storage/memory_storage.h"
 #include "raft_test_util.h"
 
+using namespace libraft;
+
 stateMachine *nopStepper = new blackHole();
 
 void preVoteConfig(Config *c) {
@@ -657,7 +659,7 @@ void testVoteFromAnyState(MessageType vt) {
       EXPECT_EQ(r->term_, origTerm);
       // if st == StateFollower or StatePreCandidate, r hasn't voted yet.
       // In StateCandidate or StateLeader, it's voted for itself.
-      EXPECT_FALSE(r->vote_ != None && r->vote_ != 1);
+      EXPECT_FALSE(r->vote_ != kNone && r->vote_ != 1);
     }
   }
 }
@@ -2293,7 +2295,7 @@ TEST(raftTests, TestHandleMsgApp) {
     EXPECT_EQ(r->raftLog_->lastIndex(), t.index) << "i: " << i;
     EXPECT_EQ(r->raftLog_->committed_, t.commit);
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
     EXPECT_EQ((int)msgs.size(), 1);
     EXPECT_EQ(msgs[0]->reject(), t.reject);
@@ -2407,7 +2409,7 @@ TEST(raftTests, TestHandleHeartbeatResp) {
 
   r->raftLog_->commitTo(r->raftLog_->lastIndex());
 
-  vector<Message*> msgs;
+  MessageVec msgs;
   // A heartbeat response from a node that is behind; re-send MsgApp
   {
     Message m;
@@ -2438,7 +2440,7 @@ TEST(raftTests, TestHandleHeartbeatResp) {
     m.set_type(MsgAppResp);
     m.set_index(msgs[0]->index() + uint64_t(msgs[0]->entries_size()));
     r->step(m);
-    vector<Message*> tmp_msgs;
+    MessageVec tmp_msgs;
     // Consume the message sent in response to MsgAppResp
     r->readMessages(&tmp_msgs);
   }
@@ -2470,7 +2472,7 @@ TEST(raftTests, TestRaftFreesReadOnlyMem) {
   r->raftLog_->commitTo(r->raftLog_->lastIndex());
 
   string ctx = "ctx";
-  vector<Message*> msgs;
+  MessageVec msgs;
 
   // leader starts linearizable read request.
   // more info: raft dissertation 6.4, step 2.
@@ -2519,7 +2521,7 @@ TEST(raftTests, TestMsgAppRespWaitReset) {
   r->becomeCandidate();
   r->becomeLeader();
 
-  vector<Message*> msgs;
+  MessageVec msgs;
 
   // The new leader has just emitted a new Term 4 entry; consume those messages
   // from the outgoing queue.
@@ -2587,25 +2589,25 @@ void testRecvMsgVote(MessageType type) {
 
   vector<tmp> tests;
   
-  tests.push_back(tmp(StateFollower, 0, 0, None, true));
-  tests.push_back(tmp(StateFollower, 0, 1, None, true));
-  tests.push_back(tmp(StateFollower, 0, 2, None, true));
-  tests.push_back(tmp(StateFollower, 0, 3, None, false));
+  tests.push_back(tmp(StateFollower, 0, 0, kNone, true));
+  tests.push_back(tmp(StateFollower, 0, 1, kNone, true));
+  tests.push_back(tmp(StateFollower, 0, 2, kNone, true));
+  tests.push_back(tmp(StateFollower, 0, 3, kNone, false));
 
-  tests.push_back(tmp(StateFollower, 1, 0, None, true));
-  tests.push_back(tmp(StateFollower, 1, 1, None, true));
-  tests.push_back(tmp(StateFollower, 1, 2, None, true));
-  tests.push_back(tmp(StateFollower, 1, 3, None, false));
+  tests.push_back(tmp(StateFollower, 1, 0, kNone, true));
+  tests.push_back(tmp(StateFollower, 1, 1, kNone, true));
+  tests.push_back(tmp(StateFollower, 1, 2, kNone, true));
+  tests.push_back(tmp(StateFollower, 1, 3, kNone, false));
 
-  tests.push_back(tmp(StateFollower, 2, 0, None, true));
-  tests.push_back(tmp(StateFollower, 2, 1, None, true));
-  tests.push_back(tmp(StateFollower, 2, 2, None, false));
-  tests.push_back(tmp(StateFollower, 2, 3, None, false));
+  tests.push_back(tmp(StateFollower, 2, 0, kNone, true));
+  tests.push_back(tmp(StateFollower, 2, 1, kNone, true));
+  tests.push_back(tmp(StateFollower, 2, 2, kNone, false));
+  tests.push_back(tmp(StateFollower, 2, 3, kNone, false));
 
-  tests.push_back(tmp(StateFollower, 3, 0, None, true));
-  tests.push_back(tmp(StateFollower, 3, 1, None, true));
-  tests.push_back(tmp(StateFollower, 3, 2, None, false));
-  tests.push_back(tmp(StateFollower, 3, 3, None, false));
+  tests.push_back(tmp(StateFollower, 3, 0, kNone, true));
+  tests.push_back(tmp(StateFollower, 3, 1, kNone, true));
+  tests.push_back(tmp(StateFollower, 3, 2, kNone, false));
+  tests.push_back(tmp(StateFollower, 3, 3, kNone, false));
 
   tests.push_back(tmp(StateFollower, 3, 2, 2, false));
   tests.push_back(tmp(StateFollower, 3, 2, 1, true));
@@ -2668,7 +2670,7 @@ void testRecvMsgVote(MessageType type) {
       r->step(msg);
     }
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
 
     EXPECT_EQ((int)msgs.size(), 1);
@@ -2720,7 +2722,7 @@ TEST(raftTests, TestAllServerStepdown) {
 
     switch (t.state) {
     case StateFollower:
-      r->becomeFollower(1, None);
+      r->becomeFollower(1, kNone);
       break;
     case StatePreCandidate:
       r->becomePreCandidate();
@@ -2755,7 +2757,7 @@ TEST(raftTests, TestAllServerStepdown) {
 
       uint64_t leader = 2;
       if (type == MsgVote) {
-        leader = None;
+        leader = kNone;
       }
       EXPECT_EQ(r->leader_, leader);
     }
@@ -3378,7 +3380,7 @@ TEST(raftTests, TestReadOnlyOptionLeaseWithoutCheckQuorum) {
     net->send(&msgs);
   }
   ReadState *s = b->readStates_[0];
-  EXPECT_EQ(s->index_, None);
+  EXPECT_EQ(s->index_, kNone);
   EXPECT_EQ(s->requestCtx_, ctx);
 }
 
@@ -3600,7 +3602,7 @@ TEST(raftTests, TestLeaderAppResp) {
 
     r->becomeCandidate();
     r->becomeLeader();
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
 
     {
@@ -3671,7 +3673,7 @@ TEST(raftTests, TestBcastBeat) {
     r->step(msg);
   }
 
-  vector<Message*> msgs;
+  MessageVec msgs;
   r->readMessages(&msgs);
   
   EXPECT_EQ((int)msgs.size(), 2);
@@ -3752,7 +3754,7 @@ TEST(raftTests, TestRecvMsgBeat) {
     msg.set_type(MsgBeat);
     r->step(msg);
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
 
     EXPECT_EQ((int)msgs.size(), t.msg) << "i: " << i;
@@ -3830,7 +3832,7 @@ TEST(raftTests, TestSendAppendForProgressProbe) {
 	r->becomeCandidate();
 	r->becomeLeader();
 
-	vector<Message*> msgs;
+	MessageVec msgs;
 	r->readMessages(&msgs);
 	r->prs_[2]->becomeProbe();
 
@@ -3866,7 +3868,7 @@ TEST(raftTests, TestSendAppendForProgressProbe) {
 		EXPECT_TRUE(r->prs_[2]->paused_);
 
 		// consume the heartbeat
-		vector<Message*> tmp_msgs;
+		MessageVec tmp_msgs;
 		r->readMessages(&tmp_msgs);
 		EXPECT_EQ((int)tmp_msgs.size(), 1);
 		EXPECT_EQ(tmp_msgs[0]->type(), MsgHeartbeat);
@@ -3895,7 +3897,7 @@ TEST(raftTests, TestSendAppendForProgressReplicate) {
 	r->becomeCandidate();
 	r->becomeLeader();
 
-	vector<Message*> msgs;
+	MessageVec msgs;
 	r->readMessages(&msgs);
 	r->prs_[2]->becomeReplicate();
 
@@ -3921,7 +3923,7 @@ TEST(raftTests, TestSendAppendForProgressSnapshot) {
 	r->becomeCandidate();
 	r->becomeLeader();
 
-	vector<Message*> msgs;
+	MessageVec msgs;
 	r->readMessages(&msgs);
 	r->prs_[2]->becomeSnapshot(10);
 
@@ -4078,7 +4080,7 @@ TEST(raftTests, TestProvideSnap) {
     r->step(msg);
   }
 
-  vector<Message*> msgs;
+  MessageVec msgs;
   r->readMessages(&msgs);
   EXPECT_EQ((int)msgs.size(), 1);
   EXPECT_EQ(msgs[0]->type(), MsgSnap);
@@ -4115,7 +4117,7 @@ TEST(raftTests, TestIgnoreProvidingSnap) {
     r->step(msg);
   }
 
-  vector<Message*> msgs;
+  MessageVec msgs;
   r->readMessages(&msgs);
   EXPECT_EQ((int)msgs.size(), 0);
 }
@@ -4271,7 +4273,7 @@ TEST(raftTests, TestStepIgnoreConfig) {
     entry.set_index(3);
     wents.push_back(entry);
   }
-  int err = r->raftLog_->entries(index + 1, noLimit, &ents);
+  int err = r->raftLog_->entries(index + 1, kNoLimit, &ents);
 
   EXPECT_EQ(err, OK);
   EXPECT_TRUE(isDeepEqualEntries(wents, ents));
@@ -4542,7 +4544,7 @@ TEST(raftTests, TestCommitAfterRemoveNode) {
 
 void checkLeaderTransferState(raft *r, StateType state, uint64_t leader) {
   EXPECT_FALSE(r->state_ != state || r->leader_ != leader);
-  EXPECT_EQ(r->leadTransferee_, None);
+  EXPECT_EQ(r->leadTransferee_, kNone);
 }
 
 // TestLeaderTransferToUpToDateNode verifies transferring should succeed

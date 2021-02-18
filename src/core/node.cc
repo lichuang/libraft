@@ -3,6 +3,7 @@
 #include "core/raft.h"
 #include "base/util.h"
 
+namespace libraft {
 const static HardState kEmptyHardState;
 const static SoftState kEmptySoftState;
 const static Snapshot  kEmptySnapshot;
@@ -20,7 +21,7 @@ NodeImpl::NodeImpl()
   : stopped_(false)
   , raft_(NULL)
   , logger_(NULL)
-  , leader_(None)
+  , leader_(kNone)
   , prevSoftState_(kEmptySoftState)
   , prevHardState_(kEmptyHardState)
   , waitAdvanced_(false)
@@ -147,7 +148,7 @@ int NodeImpl::stateMachine(const Message& msg, Ready **ready) {
   }
   if (leader_ != raft_->leader_) {
     if (raft_->hasLeader()) {
-      if (leader_ == None) {
+      if (leader_ == kNone) {
         logger_->Infof(__FILE__, __LINE__, "raft.node: %x elected leader %x at term %llu",
           raft_->id_, raft_->leader_, raft_->term_);
       } else {
@@ -202,7 +203,7 @@ int NodeImpl::stateMachine(const Message& msg, Ready **ready) {
 }
 
 void NodeImpl::handleConfChange() {
-  if (confChange_.nodeid() == None) {
+  if (confChange_.nodeid() == kNone) {
     raft_->resetPendingConf();
     goto addnodes;
   }
@@ -323,7 +324,7 @@ Node* StartNode(const Config* config, const vector<Peer>& peers) {
   
 	// become the follower at term 1 and apply initial configuration
 	// entries of term 1
-  r->becomeFollower(1, None);
+  r->becomeFollower(1, kNone);
 
   size_t i;
   for (i = 0; i < peers.size(); ++i) {
@@ -383,3 +384,4 @@ Node* RestartNode(const Config *config) {
 
   return node;
 }
+}; // namespace libraft

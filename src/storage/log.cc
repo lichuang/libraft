@@ -1,6 +1,7 @@
 #include "storage/log.h"
 #include "base/util.h"
 
+namespace libraft {
 // newLog returns log using the given storage. It recovers the log to the state
 // that it just commits and applies the latest snapshot.
 raftLog* newLog(Storage *storage, Logger *logger) {
@@ -125,7 +126,7 @@ int raftLog::entries(uint64_t i, uint64_t maxSize, EntryVec *entries) {
 
 // allEntries returns all entries in the log.
 void raftLog::allEntries(EntryVec *entries) {
-  int err = this->entries(firstIndex(), noLimit, entries);
+  int err = this->entries(firstIndex(), kNoLimit, entries);
   if (SUCCESS(err)) {
     return;
   }
@@ -222,7 +223,7 @@ void raftLog::nextEntries(EntryVec* entries) {
   entries->clear();
   uint64_t offset = max(applied_ + 1, firstIndex());
   if (committed_ + 1 > offset) {
-    int err = slice(offset, committed_ + 1, noLimit, entries);  
+    int err = slice(offset, committed_ + 1, kNoLimit, entries);  
     if (!SUCCESS(err)) {
       logger_->Fatalf(__FILE__, __LINE__, "unexpected error when getting unapplied entries (%s)", GetErrorString(err));
     }
@@ -399,3 +400,4 @@ int raftLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
 
   return OK;
 }
+}; // namespace libraft

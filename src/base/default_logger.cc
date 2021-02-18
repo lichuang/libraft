@@ -1,5 +1,6 @@
 #include "base/default_logger.h"
 
+namespace libraft {
 void DefaultLogger::log(const char *level, const char *file, int line, const char *fmt, va_list args) {
   int n;
   char buf[kMaxLogBufSize] = {'\0'};
@@ -14,3 +15,4 @@ void DefaultLogger::log(const char *level, const char *file, int line, const cha
 }
 
 DefaultLogger kDefaultLogger;
+}; // namespace libraft

@@ -5,6 +5,8 @@
 #include "base/util.h"
 #include "core/raft.h"
 
+using namespace libraft;
+
 // nextEnts returns the appliable entries and updates the applied index
 void nextEnts(raft *r, Storage *s, EntryVec *entries) {
   entries->clear();
@@ -68,7 +70,7 @@ int raftStateMachine::step(const Message& msg) {
   return raft->step(msg);
 }
 
-void raftStateMachine::readMessages(vector<Message*> *msgs) {
+void raftStateMachine::readMessages(MessageVec *msgs) {
   raft->readMessages(msgs);
 }
 
@@ -138,7 +140,7 @@ void network::send(vector<Message> *msgs) {
     stateMachine *sm = peers[msg.to()]; 
     sm->step(msg);
     vector<Message> out;
-    vector<Message*> readMsgs;
+    MessageVec readMsgs;
     msgs->erase(msgs->begin(), msgs->begin() + 1);
     sm->readMessages(&readMsgs);
     filter(readMsgs, &out);
@@ -209,7 +211,7 @@ Config* newTestConfig(uint64_t id, const vector<uint64_t>& peers, int election, 
   c->electionTick = election;
   c->heartbeatTick = hb;
   c->storage = s;
-  c->maxSizePerMsg = noLimit;
+  c->maxSizePerMsg = kNoLimit;
   c->maxInflightMsgs = 256;
   c->logger = &kDefaultLogger;
   c->readOnlyOption = ReadOnlySafe;

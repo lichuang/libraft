@@ -4,6 +4,8 @@
 #include "base/util.h"
 #include "core/progress.h"
 
+using namespace libraft;
+
 bool deepEqualInflights(const inflights& in1, const inflights& in2) {
   EXPECT_EQ(in1.start_, in2.start_);
   EXPECT_EQ(in1.count_, in2.count_);

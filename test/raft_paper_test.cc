@@ -9,6 +9,8 @@
 #include "core/read_only.h"
 #include "storage/memory_storage.h"
 
+using namespace libraft;
+
 extern stateMachine *nopStepper;
 
 /*
@@ -24,7 +26,7 @@ Test part uses Step function to generate the scenario. Check part checks
 outgoing messages and state.
 */
 
-bool isDeepEqualMsgs(const vector<Message*>& msgs1, const vector<Message*>& msgs2) {
+bool isDeepEqualMsgs(const MessageVec& msgs1, const MessageVec& msgs2) {
 	if (msgs1.size() != msgs2.size()) {
     kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
 		return false;
@@ -89,7 +91,7 @@ void commitNoopEntry(raft *r, Storage *s) {
   EXPECT_EQ(r->state_, StateLeader);
   r->bcastAppend();
   // simulate the response of MsgApp
-  vector<Message*> msgs;
+  MessageVec msgs;
   r->readMessages(&msgs);
 
   size_t i;
@@ -207,10 +209,10 @@ TEST(raftPaperTests, TestLeaderBcastBeat) {
   for (i = 0; i < hi; ++i) {
 		r->tick();
 	}
-  vector<Message*> msgs;
+  MessageVec msgs;
   r->readMessages(&msgs);
 
-	vector<Message*> wmsgs;
+	MessageVec wmsgs;
 	{
 		Message *msg = new Message();
 		msg->set_from(1);
@@ -267,10 +269,10 @@ void testNonleaderStartElection(StateType state) {
 	EXPECT_EQ((int)r->term_, 2);
 	EXPECT_EQ(r->state_, StateCandidate);
 	EXPECT_TRUE(r->votes_[r->id_]);
-  vector<Message*> msgs;
+  MessageVec msgs;
   r->readMessages(&msgs);
 
-	vector<Message*> wmsgs;
+	MessageVec wmsgs;
 	{
 		Message *msg = new Message();
 		msg->set_from(1);
@@ -439,8 +441,8 @@ TEST(raftPaperTests, TestFollowerVote) {
 	};
 
 	vector<tmp> tests;
-  tests.push_back(tmp(None, 1, false));
-  tests.push_back(tmp(None, 2, false));
+  tests.push_back(tmp(kNone, 1, false));
+  tests.push_back(tmp(kNone, 2, false));
   tests.push_back(tmp(1, 1, false));
   tests.push_back(tmp(2, 2, false));
   tests.push_back(tmp(1, 2, true));
@@ -470,10 +472,10 @@ TEST(raftPaperTests, TestFollowerVote) {
 			r->step(msg);
 		}
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
 
-    vector<Message*> wmsgs;
+    MessageVec wmsgs;
     {
       Message *msg = new Message();
       msg->set_from(1);
@@ -563,7 +565,7 @@ void testNonleaderElectionTimeoutRandomized(StateType state) {
     }
 
     uint64_t time = 0;
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
     while (msgs.size() == 0) {
       r->tick();
@@ -609,7 +611,7 @@ void testNonleadersElectionTimeoutNonconflict(StateType state) {
       raft *r = rs[j];
       switch (state) {
       case StateFollower:
-        r->becomeFollower(r->term_ + 1,None);
+        r->becomeFollower(r->term_ + 1,kNone);
         break;
       case StateCandidate:
         r->becomeCandidate();
@@ -624,7 +626,7 @@ void testNonleadersElectionTimeoutNonconflict(StateType state) {
       for (j = 0; j < rs.size(); ++j) {
         raft *r = rs[j];
         r->tick();
-        vector<Message*> msgs;
+        MessageVec msgs;
         r->readMessages(&msgs);
         if (msgs.size() > 0) {
           ++timeoutNum;
@@ -685,7 +687,7 @@ TEST(raftPaperTests, TestLeaderStartReplication) {
   EXPECT_EQ(r->raftLog_->lastIndex(), li + 1);
   EXPECT_EQ(r->raftLog_->committed_, li);
 
-  vector<Message*> msgs, wmsgs;
+  MessageVec msgs, wmsgs;
   r->readMessages(&msgs);
 
   Entry entry;
@@ -754,7 +756,7 @@ TEST(raftPaperTests, TestLeaderCommitEntry) {
     r->step(msg);
   }
 
-  vector<Message*> msgs;
+  MessageVec msgs;
   r->readMessages(&msgs);
   size_t i;
   for (i = 0; i < msgs.size(); ++i) {
@@ -866,7 +868,7 @@ TEST(raftPaperTests, TestLeaderAcknowledgeCommit) {
       *(msg.add_entries()) = entry;
       r->step(msg);
     }
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
     size_t j;
     for (j = 0; j < msgs.size(); ++j) {
@@ -948,7 +950,7 @@ TEST(raftPaperTests, TestLeaderCommitPrecedingEntries) {
       r->step(msg);
     }
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
     size_t j;
     for (j = 0; j < msgs.size(); ++j) {
@@ -1601,7 +1603,7 @@ TEST(raftPaperTests, TestVoteRequest) {
       r->step(msg);
     }
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
     
     size_t j;
@@ -1758,7 +1760,7 @@ TEST(raftPaperTests, TestVoter) {
 			r->step(msg);
 		}
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
 
     EXPECT_EQ((int)msgs.size(), 1);
@@ -1819,7 +1821,7 @@ TEST(raftPaperTests, TestLeaderOnlyCommitsLogFromCurrentTerm) {
     r->becomeCandidate();
     r->becomeLeader();
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
 
     // propose a entry to current term

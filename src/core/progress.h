@@ -2,7 +2,7 @@
 #define __PROGRESS_H__
 
 #include "libraft.h"
-
+namespace libraft {
 struct inflights {
   // the starting index in the buffer
   int start_;
@@ -110,5 +110,5 @@ struct Progress {
   Progress(uint64_t next, int maxInfilght, Logger *logger);
   ~Progress();
 };
-
+}; // namespace libraft
 #endif  // __PROGRESS_H__

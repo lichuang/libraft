@@ -2,7 +2,7 @@
 #define __UTIL_H__
 
 #include "libraft.h"
-
+namespace libraft {
 void limitSize(uint64_t maxSize, EntryVec *entries);
 
 bool isDeepEqualNodes(const vector<uint64_t>& ns1, const vector<uint64_t>& ns2);
@@ -21,5 +21,5 @@ bool isResponseMessage(const MessageType type);
 
 // string util
 string joinStrings(const vector<string>& strs, const string &sep);
-
+}; // namespace libraft
 #endif  // __UTIL_H__

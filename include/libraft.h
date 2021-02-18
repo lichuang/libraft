@@ -10,8 +10,10 @@
 using namespace std;
 using namespace raftpb;
 
-const static uint64_t None = 0;
-const static uint64_t noLimit = ULONG_MAX;
+namespace libraft {
+
+const static uint64_t kNone = 0;
+const static uint64_t kNoLimit = ULONG_MAX;
 
 enum ErrorCode {
   OK                                = 0,
@@ -37,7 +39,7 @@ struct SoftState {
   StateType state;
 
   SoftState()
-    : leader(None)
+    : leader(kNone)
     , state(StateFollower) {}
 
   inline SoftState& operator=(const SoftState& from) {
@@ -61,6 +63,7 @@ struct ReadState {
 };
 
 typedef vector<Entry> EntryVec;
+typedef vector<Message*> MessageVec;
 
 struct Ready {
  	// The current volatile state of a Node.
@@ -95,7 +98,7 @@ struct Ready {
 	// committed to stable storage.
 	// If it contains a MsgSnap message, the application MUST report back to raft
 	// when the snapshot has been received or has failed by calling ReportSnapshot.
-  vector<Message*>  messages;
+  MessageVec  messages;
 };
 
 class Storage {
@@ -269,4 +272,5 @@ extern Node* StartNode(const Config *config, const vector<Peer>& peers);
 extern Node* RestartNode(const Config *config);
 extern const char* GetErrorString(int err);
 
+}; // namespace libraft
 #endif  // __LIB_RAFT_H__

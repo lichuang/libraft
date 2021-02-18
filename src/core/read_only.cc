@@ -1,5 +1,6 @@
 #include "core/read_only.h"
 
+namespace libraft {
 readOnly::readOnly(ReadOnlyOption option, Logger *logger)
   : option_(option),
     logger_(logger) {
@@ -72,3 +73,4 @@ string readOnly::lastPendingRequestCtx() {
 
   return readIndexQueue_[readIndexQueue_.size() - 1];
 }
+}; // namespace libraft

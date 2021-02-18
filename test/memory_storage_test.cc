@@ -4,6 +4,8 @@
 #include "base/util.h"
 #include "storage/memory_storage.h"
 
+using namespace libraft;
+
 TEST(memoryStorageTests, TestStorageTerm) {
   EntryVec entries;
 
@@ -83,13 +85,13 @@ TEST(memoryStorageTests, TestStorageEntries) {
 
   vector<tmp> tests;
   {
-    tests.push_back(tmp(2, 6, noLimit, ErrCompacted));
-    tests.push_back(tmp(3, 4, noLimit, ErrCompacted));
+    tests.push_back(tmp(2, 6, kNoLimit, ErrCompacted));
+    tests.push_back(tmp(3, 4, kNoLimit, ErrCompacted));
 
     {
       Entry entry;
 
-      tmp t(4, 5, noLimit, OK);
+      tmp t(4, 5, kNoLimit, OK);
 
       entry.set_index(4);
       entry.set_term(4);
@@ -100,7 +102,7 @@ TEST(memoryStorageTests, TestStorageEntries) {
     {
       Entry entry;
 
-      tmp t(4, 6, noLimit, OK);
+      tmp t(4, 6, kNoLimit, OK);
 
       entry.set_index(4);
       entry.set_term(4);
@@ -116,7 +118,7 @@ TEST(memoryStorageTests, TestStorageEntries) {
     {
       Entry entry;
 
-      tmp t(4, 7, noLimit, OK);
+      tmp t(4, 7, kNoLimit, OK);
 
       entry.set_index(4);
       entry.set_term(4);

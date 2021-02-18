@@ -9,6 +9,8 @@
 #include "storage/memory_storage.h"
 #include "raft_test_util.h"
 
+using namespace libraft;
+
 // TestMsgAppFlowControlFull ensures:
 // 1. msgApp can fill the sending window until full
 // 2. when the window is full, no more msgApp can be sent.
@@ -38,7 +40,7 @@ TEST(raftFlowController, TestMsgAppFlowControlFull) {
       r->step(msg);
     }
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
     EXPECT_EQ((int)msgs.size(), 1);
   }
@@ -59,7 +61,7 @@ TEST(raftFlowController, TestMsgAppFlowControlFull) {
       r->step(msg);
     }
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
     EXPECT_EQ((int)msgs.size(), 0);
   }
@@ -95,7 +97,7 @@ TEST(raftFlowController, TestMsgAppFlowControlMoveForward) {
       r->step(msg);
     }
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
   }
 
@@ -112,7 +114,7 @@ TEST(raftFlowController, TestMsgAppFlowControlMoveForward) {
       r->step(msg);
     }
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
 
     // fill in the inflights window again
@@ -178,7 +180,7 @@ TEST(raftFlowController, TestMsgAppFlowControlRecvHeartbeat) {
       r->step(msg);
     }
 
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
   }
 
@@ -196,7 +198,7 @@ TEST(raftFlowController, TestMsgAppFlowControlRecvHeartbeat) {
 
         r->step(msg);
       }
-      vector<Message*> msgs;
+      MessageVec msgs;
       r->readMessages(&msgs);
       EXPECT_FALSE(pr2->ins_.full());
     }
@@ -210,7 +212,7 @@ TEST(raftFlowController, TestMsgAppFlowControlRecvHeartbeat) {
       msg.add_entries()->set_data("somedata");
 
       r->step(msg);
-      vector<Message*> msgs;
+      MessageVec msgs;
       r->readMessages(&msgs);
       EXPECT_EQ((int)msgs.size(), 1);
     }
@@ -226,7 +228,7 @@ TEST(raftFlowController, TestMsgAppFlowControlRecvHeartbeat) {
 
         r->step(msg);
       }
-      vector<Message*> msgs;
+      MessageVec msgs;
       r->readMessages(&msgs);
       EXPECT_EQ((int)msgs.size(), 0);
     }
@@ -240,7 +242,7 @@ TEST(raftFlowController, TestMsgAppFlowControlRecvHeartbeat) {
 
       r->step(msg);
     }
-    vector<Message*> msgs;
+    MessageVec msgs;
     r->readMessages(&msgs);
   }
 }

@@ -4,6 +4,7 @@
 #include "libraft.h"
 #include "unstable_log.h"
 
+namespace libraft {
 struct raftLog {
   // storage contains all stable entries since the last snapshot.
   Storage *storage_;
@@ -78,4 +79,5 @@ struct raftLog {
 
 extern raftLog* newLog(Storage *storage, Logger *logger);
 
+}; // namespace libraft
 #endif // __LOG_H__

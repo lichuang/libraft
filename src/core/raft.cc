@@ -5,6 +5,7 @@
 #include "base/util.h"
 #include "core/read_only.h"
 
+namespace libraft {
 HardState kEmptyState;
 const static string kCampaignPreElection = "CampaignPreElection";
 const static string kCampaignElection = "CampaignElection";
@@ -56,8 +57,8 @@ raft::raft(const Config *config, raftLog *log)
     raftLog_(log),
     maxInfilght_(config->maxInflightMsgs),
     maxMsgSize_(config->maxSizePerMsg),
-    leader_(None),
-    leadTransferee_(None),
+    leader_(kNone),
+    leadTransferee_(kNone),
     readOnly_(new readOnly(config->readOnlyOption, config->logger)),
     heartbeatTimeout_(config->heartbeatTick),
     electionTimeout_(config->electionTick),
@@ -110,7 +111,7 @@ raft* newRaft(const Config *config) {
     rl->appliedTo(config->applied);
   }
 
-  r->becomeFollower(r->term_, None);
+  r->becomeFollower(r->term_, kNone);
   vector<string> peerStrs;
   map<uint64_t, Progress*>::const_iterator iter;
   char tmp[32];
@@ -169,7 +170,7 @@ bool raft::checkQuorumActive() {
 }
 
 bool raft::hasLeader() {
-  return leader_ != None;
+  return leader_ != kNone;
 }
 
 void raft::softState(SoftState *ss) {
@@ -382,9 +383,9 @@ bool raft::maybeCommit() {
 void raft::reset(uint64_t term) {
   if (term_ != term) {
     term_ = term;
-    vote_ = None;
+    vote_ = kNone;
   }
-  leader_ = None;
+  leader_ = kNone;
 
   electionElapsed_ = 0;
   heartbeatElapsed_ = 0;
@@ -449,7 +450,7 @@ void raft::tickHeartbeat() {
       step(msg);
     }
     // If current leader cannot transfer leadership in electionTimeout, it becomes leader again.
-    if (state_ == StateLeader && leadTransferee_ != None) {
+    if (state_ == StateLeader && leadTransferee_ != kNone) {
       abortLeaderTransfer();
     }
   }
@@ -529,7 +530,7 @@ void raft::becomeLeader() {
   stateStep = stepLeader;
 
   EntryVec entries;
-  int err = raftLog_->entries(raftLog_->committed_ + 1, noLimit, &entries);
+  int err = raftLog_->entries(raftLog_->committed_ + 1, kNoLimit, &entries);
   if (!SUCCESS(err)) {
     logger_->Fatalf(__FILE__, __LINE__, "unexpected error getting uncommitted entries (%s)", GetErrorString(err));
   }
@@ -639,7 +640,7 @@ int raft::step(const Message& msg) {
     uint64_t leader = from;
     if (type == MsgVote || type == MsgPreVote) {
       bool force = (msg.context() == kCampaignTransfer);
-      bool inLease = (checkQuorum_ && leader_ != None && electionElapsed_ < electionTimeout_);
+      bool inLease = (checkQuorum_ && leader_ != kNone && electionElapsed_ < electionTimeout_);
       if (!force && inLease) {
         // If a server receives a RequestVote request within the minimum election timeout
         // of hearing from a current leader, it does not update its term or grant its vote
@@ -648,7 +649,7 @@ int raft::step(const Message& msg) {
           msg.logterm(), msg.index(), term, electionTimeout_ - electionElapsed_);
         return OK;
       }
-      leader = None;
+      leader = kNone;
     }
     if (type == MsgPreVote) {
       // Never change our term in response to a PreVote
@@ -697,7 +698,7 @@ int raft::step(const Message& msg) {
   switch (type) {
   case MsgHup:
     if (state_ != StateLeader) {
-      err = raftLog_->slice(raftLog_->applied_ + 1, raftLog_->committed_ + 1, noLimit, &entries);
+      err = raftLog_->slice(raftLog_->applied_ + 1, raftLog_->committed_ + 1, kNoLimit, &entries);
       if (!SUCCESS(err)) {
         logger_->Fatalf(__FILE__, __LINE__, "unexpected error getting unapplied entries (%s)", GetErrorString(err));
       }
@@ -721,7 +722,7 @@ int raft::step(const Message& msg) {
   case MsgPreVote:
     // The m.Term > r.Term clause is for MsgPreVote. For MsgVote m.Term should
     // always equal r.Term.
-    if ((vote_ == None || term > term_ || vote_ == from) && raftLog_->isUpToDate(msg.index(), msg.logterm())) {
+    if ((vote_ == kNone || term > term_ || vote_ == from) && raftLog_->isUpToDate(msg.index(), msg.logterm())) {
       logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] cast %s for %x [logterm: %llu, index: %llu] at term %llu",
         id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, msgTypeString(type), from, msg.logterm(), msg.index(), term_);
       respMsg = new Message();
@@ -769,7 +770,7 @@ void stepLeader(raft *r, const Message& msg) {
   case MsgCheckQuorum:
     if (!r->checkQuorumActive()) {
       logger->Warningf(__FILE__, __LINE__, "%x stepped down to follower since quorum is not active", r->id_);
-      r->becomeFollower(r->term_, None);
+      r->becomeFollower(r->term_, kNone);
     }
     return;
     break;
@@ -783,7 +784,7 @@ void stepLeader(raft *r, const Message& msg) {
       // drop any new proposals.
       return;
     }
-    if (r->leadTransferee_ != None) {
+    if (r->leadTransferee_ != kNone) {
       logger->Debugf(__FILE__, __LINE__,
         "%x [term %d] transfer leadership to %x is in progress; dropping proposal",
         r->id_, r->term_, r->leadTransferee_);
@@ -831,7 +832,7 @@ void stepLeader(raft *r, const Message& msg) {
         if (r->checkQuorum_) {
           ri = r->raftLog_->committed_;
         }
-        if (msg.from() == None || msg.from() == r->id_) { // from local member
+        if (msg.from() == kNone || msg.from() == r->id_) { // from local member
           r->readStates_.push_back(new ReadState(r->raftLog_->committed_, msg.entries(0).data())); 
         } else {
           n = cloneMessage(msg);
@@ -928,7 +929,7 @@ void stepLeader(raft *r, const Message& msg) {
     r->readOnly_->advance(msg, &rss);
     for (i = 0; i < rss.size(); ++i) {
       req = rss[i]->req_;
-      if (req->from() == None || req->from() == r->id_) {
+      if (req->from() == kNone || req->from() == r->id_) {
         r->readStates_.push_back(new ReadState(rss[i]->index_, req->entries(0).data()));
       } else {
         respMsg = new Message();
@@ -971,7 +972,7 @@ void stepLeader(raft *r, const Message& msg) {
   case MsgTransferLeader:
     leadTransferee = msg.from();
     lastLeadTransferee = r->leadTransferee_;
-    if (lastLeadTransferee != None) {
+    if (lastLeadTransferee != kNone) {
       if (lastLeadTransferee == leadTransferee) {
         logger->Infof(__FILE__, __LINE__,
           "%x [term %llu] transfer leadership to %x is in progress, ignores request to same node %x",
@@ -1036,7 +1037,7 @@ void stepCandidate(raft* r, const Message& msg) {
         r->bcastAppend();
       }
     } else if (r->quorum() == (int)r->votes_.size() - granted) {
-      r->becomeFollower(r->term_, None);
+      r->becomeFollower(r->term_, kNone);
     }
     return;
   }
@@ -1068,7 +1069,7 @@ void stepFollower(raft* r, const Message& msg) {
 
   switch (type) {
   case MsgProp:
-    if (r->leader_ == None) {
+    if (r->leader_ == kNone) {
       return;
     }
     n = cloneMessage(msg);
@@ -1091,7 +1092,7 @@ void stepFollower(raft* r, const Message& msg) {
     r->handleSnapshot(msg);
     break;
   case MsgTransferLeader:
-    if (r->leader_ == None) {
+    if (r->leader_ == kNone) {
       logger->Infof(__FILE__, __LINE__,
         "%x no leader at term %llu; dropping leader transfer msg",
         r->id_, r->term_);
@@ -1117,7 +1118,7 @@ void stepFollower(raft* r, const Message& msg) {
     }
     break;
   case MsgReadIndex:
-    if (r->leader_ == None) {
+    if (r->leader_ == kNone) {
       logger->Infof(__FILE__, __LINE__, "%x no leader at term %llu; dropping index reading msg", r->id_, r->term_);
       return;
     }
@@ -1247,7 +1248,7 @@ void raft::delProgress(uint64_t id) {
 }
 
 void raft::abortLeaderTransfer() {
-  leadTransferee_ = None;
+  leadTransferee_ = kNone;
 }
 
 void raft::addNode(uint64_t id) {
@@ -1279,7 +1280,7 @@ void raft::removeNode(uint64_t id) {
   }
 }
 
-void raft::readMessages(vector<Message*> *msgs) {
+void raft::readMessages(MessageVec *msgs) {
   *msgs = msgs_;
   msgs_.clear();
 }
@@ -1294,3 +1295,4 @@ void raft::sendTimeoutNow(uint64_t to) {
 void raft::resetPendingConf() {
   pendingConf_ = false;
 }
+}; // namespace libraft

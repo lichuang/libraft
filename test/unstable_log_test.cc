@@ -4,6 +4,8 @@
 #include "base/util.h"
 #include "storage/unstable_log.h"
 
+using namespace libraft;
+
 TEST(unstableLogTests, TestUnstableMaybeFirstIndex) {
   struct tmp {
     EntryVec entries;

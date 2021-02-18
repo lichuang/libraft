@@ -3,6 +3,7 @@
 
 #include "libraft.h"
 
+namespace libraft {
 // unstable.entries[i] has raft log position i+unstable.offset.
 // Note that unstable.offset may be less than the highest log
 // position in storage; this means that the next write to storage
@@ -37,5 +38,6 @@ struct unstableLog {
 
   void mustCheckOutOfBounds(uint64_t lo, uint64_t hi);
 };
+}; // namespace libraft
 
 #endif  // __UNSTABLE_LOG_H__

@@ -6,7 +6,7 @@
 #include <string>
 
 using namespace std;
-
+namespace libraft {
 struct readIndexStatus {
   uint64_t index_;
   Message *req_;
@@ -30,5 +30,6 @@ struct readOnly {
   void advance(const Message& msg, vector<readIndexStatus*>* rss);
   string lastPendingRequestCtx();
 };
+}; // namespace libraft
 
 #endif  // __READ_ONLY_H__
