@@ -100,7 +100,7 @@ struct raftLog {
   // check if [lo,hi] is out of bounds
   int mustCheckOutOfBounds(uint64_t lo, uint64_t hi);
 
-  // get term of index i
+  // returns the term of the entry at index i, if there is any.
   int term(uint64_t i, uint64_t *t);
 
   uint64_t zeroTermOnErrCompacted(uint64_t t, int err);

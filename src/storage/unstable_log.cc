@@ -5,9 +5,11 @@
 #include "storage/unstable_log.h"
 
 namespace libraft {
+
 // maybeFirstIndex returns the index of the first possible entry in entries
 // if it has a snapshot.
-bool unstableLog::maybeFirstIndex(uint64_t *first) {
+bool 
+unstableLog::maybeFirstIndex(uint64_t *first) {
   if (snapshot_ != NULL) {
     *first = snapshot_->metadata().index() + 1;
     return true;
@@ -19,13 +21,16 @@ bool unstableLog::maybeFirstIndex(uint64_t *first) {
 
 // maybeLastIndex returns the last index if it has at least one
 // unstable entry or snapshot.
-bool unstableLog::maybeLastIndex(uint64_t *last) {
-  *last = 0; 
+bool 
+unstableLog::maybeLastIndex(uint64_t *last) {
+  *last = 0;
+  // first check entities
   if (entries_.size() > 0) {
     *last = offset_ + entries_.size() - 1;
     return true;
   }
 
+  // then check snapshot
   if (snapshot_ != NULL) {
     *last = snapshot_->metadata().index();
     return true;
@@ -36,7 +41,8 @@ bool unstableLog::maybeLastIndex(uint64_t *last) {
 
 // maybeTerm returns the term of the entry at index i, if there
 // is any.
-bool unstableLog::maybeTerm(uint64_t i, uint64_t *term) {
+bool
+unstableLog::maybeTerm(uint64_t i, uint64_t *term) {
   *term = 0;
   if (i < offset_) {
     if (snapshot_ == NULL) {
@@ -62,7 +68,8 @@ bool unstableLog::maybeTerm(uint64_t i, uint64_t *term) {
   return true;
 }
 
-void unstableLog::stableTo(uint64_t i, uint64_t t) {
+void
+unstableLog::stableTo(uint64_t i, uint64_t t) {
   uint64_t gt;
   bool ok = maybeTerm(i, &gt);
   if (!ok) {
@@ -79,14 +86,16 @@ void unstableLog::stableTo(uint64_t i, uint64_t t) {
   }
 }
 
-void unstableLog::stableSnapTo(uint64_t i) {
+void 
+unstableLog::stableSnapTo(uint64_t i) {
   if (snapshot_ != NULL && snapshot_->metadata().index() == i) {
     delete snapshot_;
     snapshot_ = NULL;
   }
 }
 
-void unstableLog::restore(const Snapshot& snapshot) {
+void 
+unstableLog::restore(const Snapshot& snapshot) {
   offset_ = snapshot.metadata().index() + 1;
   entries_.clear();
   if (snapshot_ == NULL) {
@@ -95,7 +104,8 @@ void unstableLog::restore(const Snapshot& snapshot) {
   snapshot_->CopyFrom(snapshot);
 }
 
-void unstableLog::truncateAndAppend(const EntryVec& entries) {
+void 
+unstableLog::truncateAndAppend(const EntryVec& entries) {
   uint64_t after = entries[0].index();
 
   if (after == offset_ + uint64_t(entries_.size())) {
@@ -123,13 +133,15 @@ void unstableLog::truncateAndAppend(const EntryVec& entries) {
   entries_.insert(entries_.end(), entries.begin(), entries.end());
 }
 
-void unstableLog::slice(uint64_t lo, uint64_t hi, EntryVec *entries) {
+void 
+unstableLog::slice(uint64_t lo, uint64_t hi, EntryVec *entries) {
   mustCheckOutOfBounds(lo, hi);
   entries->assign(entries_.begin() + lo - offset_, entries_.begin() + hi - offset_);
 }
 
 // u.offset <= lo <= hi <= u.offset+len(u.offset)
-void unstableLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
+void 
+unstableLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
   if (lo > hi) {
     logger_->Fatalf(__FILE__, __LINE__, "invalid unstable.slice %llu > %llu", lo, hi);
   }

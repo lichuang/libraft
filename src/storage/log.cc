@@ -295,8 +295,7 @@ raftLog::matchTerm(uint64_t i, uint64_t term) {
   return t == term;
 }
 
-// get term of index, the term is saved in *t
-// if returned term is 0,means that index is not valid.
+// returns the term of the entry at index i, if there is any.
 int
 raftLog::term(uint64_t i, uint64_t *t) {
   uint64_t dummyIndex;

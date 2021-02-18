@@ -27,9 +27,13 @@ struct unstableLog {
 
   void truncateAndAppend(const EntryVec& entries);
 
+  // maybeFirstIndex returns the index of the first possible entry in entries
+  // if it has a snapshot.
   bool maybeFirstIndex(uint64_t *first);
 
-  bool  maybeLastIndex(uint64_t* last);
+  // maybeLastIndex returns the last index if it has at least one
+  // unstable entry or snapshot.
+  bool maybeLastIndex(uint64_t* last);
 
   bool maybeTerm(uint64_t i, uint64_t *term);
 
