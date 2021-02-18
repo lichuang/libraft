@@ -291,6 +291,10 @@ public:
 extern Node* StartNode(const Config *config, const vector<Peer>& peers);
 extern Node* RestartNode(const Config *config);
 
+// empty (hard,soft) state constants
+static const HardState kEmptyHardState;
+static const SoftState kEmptySoftState;
+
 }; // namespace libraft
 
 #endif  // __LIB_RAFT_H__

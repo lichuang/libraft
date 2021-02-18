@@ -11,20 +11,21 @@
 #include "storage/log.h"
 
 using namespace std;
+
 namespace libraft {
 
 struct readOnly;
 struct ReadState;
 
 enum CampaignType {
-  // campaignPreElection represents the first phase of a normal election when
+  // CampaignPreElection represents the first phase of a normal election when
   // Config.PreVote is true.
-  campaignPreElection = 1,
-  // campaignElection represents a normal (time-based) election (the second phase
+  CampaignPreElection = 0,
+  // CampaignElection represents a normal (time-based) election (the second phase
   // of the election when Config.PreVote is true).
-  campaignElection = 2,
-  // campaignTransfer represents the type of leader transfer
-  campaignTransfer = 3
+  CampaignElection = 1,
+  // CampaignTransfer represents the type of leader transfer
+  CampaignTransfer = 2
 };
 
 struct raft;
@@ -76,11 +77,11 @@ struct raft {
 
   Logger* logger_;
 
-  stepFun stateStep;
+  // current role state machine function
+  stepFun stateStepFunc_;
 
   raft(const Config *, raftLog *);
   void tick();
-  const char* getCampaignString(CampaignType t);
   void loadState(const HardState &hs);
   void nodes(vector<uint64_t> *nodes);
   bool hasLeader();
@@ -107,7 +108,10 @@ struct raft {
   void handleSnapshot(const Message& msg);
   void tickElection();
   void tickHeartbeat();
+
+  // return num of granted peers in cluster,v means accepted or not
   int  poll(uint64_t id, MessageType t, bool v);
+
   int  step(const Message& msg);
   bool promotable();
   bool restore(const Snapshot& snapshot);
@@ -128,6 +132,7 @@ struct raft {
 extern raft* newRaft(const Config *);
 string entryString(const Entry& entry);
 
+// different role's state machine functions
 void stepLeader(raft *r, const Message& msg);
 void stepCandidate(raft* r, const Message& msg);
 void stepFollower(raft* r, const Message& msg);

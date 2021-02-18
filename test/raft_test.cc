@@ -2631,13 +2631,13 @@ void testRecvMsgVote(MessageType type) {
     r->state_ = t.state;
     switch (t.state) {
     case StateFollower:
-      r->stateStep = stepFollower;
+      r->stateStepFunc_ = stepFollower;
       break;
     case StateCandidate:
-      r->stateStep = stepCandidate;
+      r->stateStepFunc_ = stepCandidate;
       break;
     case StateLeader:
-      r->stateStep = stepLeader;
+      r->stateStepFunc_ = stepLeader;
       break;
     default:
       break;
@@ -3740,13 +3740,13 @@ TEST(raftTests, TestRecvMsgBeat) {
     r->state_ = t.state;
     switch (t.state) {
     case StateFollower:
-      r->stateStep = stepFollower;
+      r->stateStepFunc_ = stepFollower;
       break;
     case StateCandidate:
-      r->stateStep = stepCandidate;
+      r->stateStepFunc_ = stepCandidate;
       break;
     case StateLeader:
-      r->stateStep = stepLeader;
+      r->stateStepFunc_ = stepLeader;
       break;
     default:
       break;

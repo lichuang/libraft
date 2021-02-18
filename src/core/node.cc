@@ -9,10 +9,6 @@
 
 namespace libraft {
 
-const static HardState kEmptyHardState;
-const static SoftState kEmptySoftState;
-const static Snapshot  kEmptySnapshot;
-
 // IsEmptySnap returns true if the given Snapshot is empty.
 inline static bool 
 isEmptyHardState(const HardState& hs) {

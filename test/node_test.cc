@@ -61,7 +61,7 @@ TEST(nodeTests, TestNodePropose) {
     n->Advance();
   }
 
-  r->stateStep = appendStep;
+  r->stateStepFunc_ = appendStep;
   string wrequestCtx = "somedata2";
   n->ReadIndex(wrequestCtx, &ready);
 
@@ -207,7 +207,7 @@ TEST(nodeTests, TestNodeProposeConfig) {
 
     // change the step function to appendStep until this raft becomes leader
     if (ready->softState.leader == r->id_) {
-      r->stateStep = appendStep;
+      r->stateStepFunc_ = appendStep;
       n->Advance();
       break;
     }

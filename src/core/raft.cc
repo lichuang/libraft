@@ -11,13 +11,13 @@
 
 namespace libraft {
 
-HardState kEmptyState;
-const static string kCampaignPreElection = "CampaignPreElection";
-const static string kCampaignElection = "CampaignElection";
-const static string kCampaignTransfer = "CampaignTransfer";
+static const char* kCampaignString[] = {
+  "CampaignPreElection",
+  "CampaignElection",
+  "CampaignTransfer",
+};
 
-static const char* 
-kMsgString[] = {
+static const char* kMsgString[] = {
   "MsgHup",
   "MsgBeat",
   "MsgProp",
@@ -39,7 +39,8 @@ kMsgString[] = {
   "MsgPreVoteResp",
 };
 
-string entryString(const Entry& entry) {
+string 
+entryString(const Entry& entry) {
   char tmp[100];
   snprintf(tmp, sizeof(tmp), "term:%llu, index:%llu, type:%d", 
     entry.term(), entry.index(), entry.type());
@@ -48,7 +49,8 @@ string entryString(const Entry& entry) {
   return str;
 }
 
-void copyEntries(const Message& msg, EntryVec *entries) {
+static void 
+copyEntries(const Message& msg, EntryVec *entries) {
   int i = 0;
   for (i = 0; i < msg.entries_size(); ++i) {
     entries->push_back(msg.entries(i));
@@ -70,66 +72,8 @@ raft::raft(const Config *config, raftLog *log)
     checkQuorum_(config->checkQuorum),
     preVote_(config->preVote),
     logger_(config->logger),
-    stateStep(NULL) {
+    stateStepFunc_(NULL) {
   srand((unsigned)time(NULL));
-}
-
-//TODO:
-void validateConfig(const Config *config) {
-
-}
-
-raft* newRaft(const Config *config) {
-  validateConfig(config);
-
-  raftLog *rl = newLog(config->storage, config->logger);
-  HardState hs;
-  ConfState cs;
-  Logger *logger = config->logger;
-  vector<uint64_t> peers = config->peers;
-  int err;
-  size_t i;
-  
-  err = config->storage->InitialState(&hs, &cs);
-  if (!SUCCESS(err)) {
-    logger->Fatalf(__FILE__, __LINE__, "storage InitialState fail: %s", GetErrorString(err)); 
-  }
-  if (cs.nodes_size() > 0) {
-    if (peers.size() > 0) {
-      logger->Fatalf(__FILE__, __LINE__, "cannot specify both newRaft(peers) and ConfState.Nodes)");
-    }
-    peers.clear();
-    for (i = 0; (int)i < cs.nodes_size(); ++i) {
-      peers.push_back(cs.nodes(i));
-    }
-  }
-
-  raft *r = new raft(config, rl);
-  for (i = 0; i < peers.size(); ++i) {
-    r->prs_[peers[i]] = new Progress(1, r->maxInfilght_, logger);
-  }
-
-  if (!isHardStateEqual(hs, kEmptyState)) {
-    r->loadState(hs);
-  }
-  if (config->applied > 0) {
-    rl->appliedTo(config->applied);
-  }
-
-  r->becomeFollower(r->term_, kNone);
-  vector<string> peerStrs;
-  map<uint64_t, Progress*>::const_iterator iter;
-  char tmp[32];
-  for (iter = r->prs_.begin(); iter != r->prs_.end(); ++iter) {
-    snprintf(tmp, sizeof(tmp), "%llu", iter->first);
-    peerStrs.push_back(tmp);
-  }
-  string nodeStr = joinStrings(peerStrs, ",");
-
-  r->logger_->Infof(__FILE__, __LINE__,
-    "newRaft %llu [peers: [%s], term: %llu, commit: %llu, applied: %llu, lastindex: %llu, lastterm: %llu]",
-    r->id_, nodeStr.c_str(), r->term_, rl->committed_, rl->applied_, rl->lastIndex(), rl->lastTerm());
-  return r;
 }
 
 void raft::tick() {
@@ -148,7 +92,8 @@ void raft::tick() {
   }
 }
 
-Message* cloneMessage(const Message& msg) {
+Message* 
+cloneMessage(const Message& msg) {
   return new Message(msg);
 }
 
@@ -156,7 +101,8 @@ Message* cloneMessage(const Message& msg) {
 // the view of the local raft state machine. Otherwise, it returns
 // false.
 // checkQuorumActive also resets all RecentActive to false.
-bool raft::checkQuorumActive() {
+bool 
+raft::checkQuorumActive() {
   int act = 0;
 
   map<uint64_t, Progress*>::const_iterator iter;
@@ -174,22 +120,26 @@ bool raft::checkQuorumActive() {
   return act >= quorum();
 }
 
-bool raft::hasLeader() {
+bool 
+raft::hasLeader() {
   return leader_ != kNone;
 }
 
-void raft::softState(SoftState *ss) {
+void 
+raft::softState(SoftState *ss) {
   ss->leader = leader_;
   ss->state  = state_;
 }
 
-void raft::hardState(HardState *hs) {
+void 
+raft::hardState(HardState *hs) {
   hs->set_term(term_);
   hs->set_vote(vote_);
   hs->set_commit(raftLog_->committed_);
 }
 
-void raft::nodes(vector<uint64_t> *nodes) {
+void 
+raft::nodes(vector<uint64_t> *nodes) {
   nodes->clear();
   map<uint64_t, Progress*>::const_iterator iter = prs_.begin();
   while (iter != prs_.end()) {
@@ -198,7 +148,8 @@ void raft::nodes(vector<uint64_t> *nodes) {
   }
 }
 
-void raft::loadState(const HardState &hs) {
+void
+raft::loadState(const HardState &hs) {
   if (hs.commit() < raftLog_->committed_ || hs.commit() > raftLog_->lastIndex()) {
     logger_->Fatalf(__FILE__, __LINE__, 
       "%x state.commit %llu is out of range [%llu, %llu]", id_, hs.commit(), raftLog_->committed_, raftLog_->lastIndex());
@@ -209,12 +160,14 @@ void raft::loadState(const HardState &hs) {
   vote_ = hs.vote();
 }
 
-int raft::quorum() {
+int
+raft::quorum() {
   return (prs_.size() / 2) + 1;
 }
 
 // send persists state to stable storage and then sends to its mailbox.
-void raft::send(Message *msg) {
+void
+raft::send(Message *msg) {
   msg->set_from(id_);
   int type = msg->type();
 
@@ -241,7 +194,8 @@ void raft::send(Message *msg) {
 }
 
 // sendAppend sends RPC, with entries to the given peer.
-void raft::sendAppend(uint64_t to) {
+void
+raft::sendAppend(uint64_t to) {
   Progress *pr = prs_[to];
   if (pr == NULL || pr->isPaused()) {
     logger_->Infof(__FILE__, __LINE__, "node %x paused", to);
@@ -320,7 +274,8 @@ void raft::sendAppend(uint64_t to) {
 }
 
 // sendHeartbeat sends an empty MsgApp
-void raft::sendHeartbeat(uint64_t to, const string &ctx) {
+void
+raft::sendHeartbeat(uint64_t to, const string &ctx) {
   // Attach the commit as min(to.matched, r.committed).
   // When the leader sends out heartbeat message,
   // the receiver(follower) might not be matched with the leader
@@ -338,7 +293,8 @@ void raft::sendHeartbeat(uint64_t to, const string &ctx) {
 
 // bcastAppend sends RPC, with entries to all peers that are not up-to-date
 // according to the progress recorded in r.prs.
-void raft::bcastAppend() {
+void
+raft::bcastAppend() {
   map<uint64_t, Progress*>::const_iterator iter = prs_.begin();
   for (;iter != prs_.end();++iter) {
     if (iter->first == id_) {
@@ -348,14 +304,15 @@ void raft::bcastAppend() {
   }
 }
 
-
 // bcastHeartbeat sends RPC, without entries to all the peers.
-void raft::bcastHeartbeat() {
+void
+raft::bcastHeartbeat() {
   string ctx = readOnly_->lastPendingRequestCtx();
   bcastHeartbeatWithCtx(ctx);
 }
 
-void raft::bcastHeartbeatWithCtx(const string &ctx) {
+void
+raft::bcastHeartbeatWithCtx(const string &ctx) {
   map<uint64_t, Progress*>::const_iterator iter = prs_.begin();
   for (;iter != prs_.end();++iter) {
     if (iter->first == id_) {
@@ -373,9 +330,10 @@ struct reverseCompartor {
 };
 
 // maybeCommit attempts to advance the commit index. Returns true if
-// the commit index changed (in which case the caller should call
-// r.bcastAppend).
-bool raft::maybeCommit() {
+// the commit index changed (in which case the caller should 
+// call r.bcastAppend).
+bool 
+raft::maybeCommit() {
   map<uint64_t, Progress*>::const_iterator iter;
   vector<uint64_t> mis;
   for (iter = prs_.begin(); iter != prs_.end(); ++iter) {
@@ -385,7 +343,8 @@ bool raft::maybeCommit() {
   return raftLog_->maybeCommit(mis[quorum() - 1], term_);
 }
 
-void raft::reset(uint64_t term) {
+void
+raft::reset(uint64_t term) {
   if (term_ != term) {
     term_ = term;
     vote_ = kNone;
@@ -414,7 +373,8 @@ void raft::reset(uint64_t term) {
   readOnly_ = new readOnly(readOnly_->option_, logger_);
 }
 
-void raft::appendEntry(EntryVec* entries) {
+void
+raft::appendEntry(EntryVec* entries) {
   uint64_t li = raftLog_->lastIndex();
   logger_->Debugf(__FILE__, __LINE__, "lastIndex:%llu", li);
   size_t i;
@@ -429,7 +389,8 @@ void raft::appendEntry(EntryVec* entries) {
 }
 
 // tickElection is run by followers and candidates after r.electionTimeout.
-void raft::tickElection() {
+void
+raft::tickElection() {
   electionElapsed_++;
   
   if (promotable() && pastElectionTimeout()) {
@@ -442,7 +403,8 @@ void raft::tickElection() {
 }
 
 // tickHeartbeat is run by leaders to send a MsgBeat after r.heartbeatTimeout.
-void raft::tickHeartbeat() {
+void
+raft::tickHeartbeat() {
   heartbeatElapsed_++;
   electionElapsed_++;
 
@@ -476,30 +438,35 @@ void raft::tickHeartbeat() {
 
 // promotable indicates whether state machine can be promoted to leader,
 // which is true when its own id is in progress list.
-bool raft::promotable() {
+bool
+raft::promotable() {
   return prs_.find(id_) != prs_.end();
 }
 
 // pastElectionTimeout returns true iff r.electionElapsed is greater
 // than or equal to the randomized election timeout in
 // [electiontimeout, 2 * electiontimeout - 1].
-bool raft::pastElectionTimeout() {
+bool
+raft::pastElectionTimeout() {
   return electionElapsed_ >= randomizedElectionTimeout_;
 }
 
-void raft::resetRandomizedElectionTimeout() {
+void
+raft::resetRandomizedElectionTimeout() {
   randomizedElectionTimeout_ = electionTimeout_ + rand() % electionTimeout_;
 }
 
-void raft::becomeFollower(uint64_t term, uint64_t leader) {
+void
+raft::becomeFollower(uint64_t term, uint64_t leader) {
   reset(term);
   leader_ = leader;
   state_ = StateFollower;
-  stateStep = stepFollower;
+  stateStepFunc_ = stepFollower;
   logger_->Infof(__FILE__, __LINE__, "%x became follower at term %llu", id_, term_);
 }
 
-void raft::becomePreCandidate() {
+void
+raft::becomePreCandidate() {
   // TODO(xiangli) remove the panic when the raft implementation is stable
   if (state_ == StateLeader) {
     logger_->Fatalf(__FILE__, __LINE__, "invalid transition [leader -> pre-candidate]");
@@ -508,11 +475,12 @@ void raft::becomePreCandidate() {
   // but doesn't change anything else. In particular it does not increase
   // r.Term or change r.Vote.
   state_ = StatePreCandidate;
-  stateStep = stepCandidate;
+  stateStepFunc_ = stepCandidate;
   logger_->Infof(__FILE__, __LINE__, "%x became pre-candidate at term %llu", id_, term_);
 }
 
-void raft::becomeCandidate() {
+void
+raft::becomeCandidate() {
   if (state_ == StateLeader) {
     logger_->Fatalf(__FILE__, __LINE__, "invalid transition [leader -> candidate]");
   }
@@ -520,11 +488,12 @@ void raft::becomeCandidate() {
   reset(term_ + 1);
   vote_ = id_;
   state_ = StateCandidate;
-  stateStep = stepCandidate;
+  stateStepFunc_ = stepCandidate;
   logger_->Infof(__FILE__, __LINE__, "%x became candidate at term %llu", id_, term_);
 }
 
-void raft::becomeLeader() {
+void
+raft::becomeLeader() {
   if (state_ == StateFollower) {
     logger_->Fatalf(__FILE__, __LINE__, "invalid transition [follower -> leader]");
   }
@@ -532,7 +501,7 @@ void raft::becomeLeader() {
   reset(term_);
   leader_ = id_;
   state_ = StateLeader;
-  stateStep = stepLeader;
+  stateStepFunc_ = stepLeader;
 
   EntryVec entries;
   int err = raftLog_->entries(raftLog_->committed_ + 1, kNoLimit, &entries);
@@ -553,22 +522,12 @@ void raft::becomeLeader() {
   logger_->Infof(__FILE__, __LINE__, "%x became leader at term %llu", id_, term_);
 }
 
-const char* raft::getCampaignString(CampaignType t) {
-  switch (t) {
-  case campaignPreElection:
-    return "campaignPreElection";
-  case campaignElection:
-    return "campaignElection";
-  case campaignTransfer:
-    return "campaignTransfer";
-  }
-  return "unknown campaign type";
-}
-
-void raft::campaign(CampaignType t) {
+void
+raft::campaign(CampaignType t) {
   uint64_t term;
   MessageType voteMsg;
-  if (t == campaignPreElection) {
+
+  if (t == CampaignPreElection) {
     becomePreCandidate();
     voteMsg = MsgPreVote;
     // PreVote RPCs are sent for the next term before we've incremented r.Term.
@@ -582,8 +541,8 @@ void raft::campaign(CampaignType t) {
   if (quorum() == poll(id_, voteRespMsgType(voteMsg), true)) {
     // We won the election after voting for ourselves (which must mean that
     // this is a single-node cluster). Advance to the next state.
-    if (t == campaignPreElection) {
-      campaign(campaignElection);
+    if (t == CampaignPreElection) {
+      campaign(CampaignElection);
     } else {
       becomeLeader();
     }
@@ -596,10 +555,10 @@ void raft::campaign(CampaignType t) {
       continue;
     }
     logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu] sent %s request to %x at term %llu",
-      id_, raftLog_->lastTerm(), raftLog_->lastIndex(), getCampaignString(t), id, term_);
+      id_, raftLog_->lastTerm(), raftLog_->lastIndex(), kCampaignString[t], id, term_);
     string ctx = "";
-    if (t == campaignTransfer) {
-      ctx = kCampaignTransfer;
+    if (t == CampaignTransfer) {
+      ctx = kCampaignString[CampaignTransfer];
     }
     Message *msg = new Message();
     msg->set_term(term);
@@ -612,7 +571,8 @@ void raft::campaign(CampaignType t) {
   }
 }
 
-int raft::poll(uint64_t id, MessageType t, bool v) {
+int
+raft::poll(uint64_t id, MessageType t, bool v) {
   if (v) {
     logger_->Infof(__FILE__, __LINE__, "%x received %s from %x at term %llu", id_, kMsgString[t], id, term_);
   } else {
@@ -631,9 +591,11 @@ int raft::poll(uint64_t id, MessageType t, bool v) {
   return granted;
 }
 
-int raft::step(const Message& msg) {
+int
+raft::step(const Message& msg) {
   logger_->Debugf(__FILE__, __LINE__, "msg %s %llu -> %llu, term:%llu",
                   kMsgString[msg.type()], msg.from(), msg.to(), term_);
+
   // Handle the message term, which may result in our stepping down to a follower.
   Message *respMsg;
   uint64_t term = msg.term();
@@ -644,7 +606,7 @@ int raft::step(const Message& msg) {
   } else if (term > term_) {
     uint64_t leader = from;
     if (type == MsgVote || type == MsgPreVote) {
-      bool force = (msg.context() == kCampaignTransfer);
+      bool force = (msg.context() == kCampaignString[CampaignTransfer]);
       bool inLease = (checkQuorum_ && leader_ != kNone && electionElapsed_ < electionTimeout_);
       if (!force && inLease) {
         // If a server receives a RequestVote request within the minimum election timeout
@@ -715,9 +677,9 @@ int raft::step(const Message& msg) {
       }
       logger_->Infof(__FILE__, __LINE__, "%x is starting a new election at term %llu", id_, term_);
       if (preVote_) {
-        campaign(campaignPreElection);
+        campaign(CampaignPreElection);
       } else {
-        campaign(campaignElection);
+        campaign(CampaignElection);
       }
     } else {
       logger_->Debugf(__FILE__, __LINE__, "%x ignoring MsgHup because already leader", id_);
@@ -750,14 +712,15 @@ int raft::step(const Message& msg) {
     }
     break;
   default:
-    stateStep(this, msg);
+    stateStepFunc_(this, msg);
     break;
   }
 
   return OK;
 }
 
-void stepLeader(raft *r, const Message& msg) {
+void 
+stepLeader(raft *r, const Message& msg) {
   int type = msg.type();
   size_t i;
   uint64_t term, ri;
@@ -1016,7 +979,8 @@ void stepLeader(raft *r, const Message& msg) {
 
 // stepCandidate is shared by StateCandidate and StatePreCandidate; the difference is
 // whether they respond to MsgVoteResp or MsgPreVoteResp.
-void stepCandidate(raft* r, const Message& msg) {
+void 
+stepCandidate(raft* r, const Message& msg) {
   // Only handle vote responses corresponding to our candidacy (while in
   // StateCandidate, we may get stale MsgPreVoteResp messages in this term from
   // our pre-candidate state).
@@ -1036,7 +1000,7 @@ void stepCandidate(raft* r, const Message& msg) {
       r->id_, r->quorum(), granted, kMsgString[type], r->votes_.size() - granted);
     if (granted == r->quorum()) {
       if (r->state_ == StatePreCandidate) {
-        r->campaign(campaignPreElection);
+        r->campaign(CampaignPreElection);
       } else {
         r->becomeLeader();
         r->bcastAppend();
@@ -1067,7 +1031,8 @@ void stepCandidate(raft* r, const Message& msg) {
   }
 }
 
-void stepFollower(raft* r, const Message& msg) {
+void 
+stepFollower(raft* r, const Message& msg) {
   int type = msg.type();
   Message *n;
   Logger* logger = r->logger_;
@@ -1115,7 +1080,7 @@ void stepFollower(raft* r, const Message& msg) {
  			// Leadership transfers never use pre-vote even if r.preVote is true; we
 			// know we are not recovering from a partition so there is no need for the
 			// extra round trip.
-      r->campaign(campaignTransfer);
+      r->campaign(CampaignTransfer);
     } else {
       logger->Infof(__FILE__, __LINE__,
         "%x received MsgTimeoutNow from %x but is not promotable",
@@ -1144,7 +1109,8 @@ void stepFollower(raft* r, const Message& msg) {
 
 // restore recovers the state machine from a snapshot. It restores the log and the
 // configuration of state machine.
-bool raft::restore(const Snapshot& snapshot) {
+bool
+raft::restore(const Snapshot& snapshot) {
   if (snapshot.metadata().index() <= raftLog_->committed_) {
     return false;
   }
@@ -1175,7 +1141,8 @@ bool raft::restore(const Snapshot& snapshot) {
   return true;
 }
 
-void raft::handleSnapshot(const Message& msg) {
+void
+raft::handleSnapshot(const Message& msg) {
   uint64_t sindex = msg.snapshot().metadata().index();
   uint64_t sterm  = msg.snapshot().metadata().term();
   Message *resp = new Message;
@@ -1194,7 +1161,8 @@ void raft::handleSnapshot(const Message& msg) {
   send(resp);
 }
 
-void raft::handleHeartbeat(const Message& msg) {
+void
+raft::handleHeartbeat(const Message& msg) {
   raftLog_->commitTo(msg.commit());
   Message *resp = new Message();
   resp->set_to(msg.from());
@@ -1203,7 +1171,8 @@ void raft::handleHeartbeat(const Message& msg) {
   send(resp);
 }
 
-void raft::handleAppendEntries(const Message& msg) {
+void
+raft::handleAppendEntries(const Message& msg) {
   if (msg.index() < raftLog_->committed_) {
     Message *resp = new Message();
     resp->set_to(msg.from());
@@ -1239,7 +1208,8 @@ void raft::handleAppendEntries(const Message& msg) {
   }
 }
 
-void raft::setProgress(uint64_t id, uint64_t match, uint64_t next) {
+void
+raft::setProgress(uint64_t id, uint64_t match, uint64_t next) {
   if (prs_[id] != NULL)  {
     delete prs_[id];
   }
@@ -1247,16 +1217,19 @@ void raft::setProgress(uint64_t id, uint64_t match, uint64_t next) {
   prs_[id]->match_ = match;
 }
 
-void raft::delProgress(uint64_t id) {
+void
+raft::delProgress(uint64_t id) {
   delete prs_[id];
   prs_.erase(id);
 }
 
-void raft::abortLeaderTransfer() {
+void
+raft::abortLeaderTransfer() {
   leadTransferee_ = kNone;
 }
 
-void raft::addNode(uint64_t id) {
+void
+raft::addNode(uint64_t id) {
   pendingConf_ = false;
   if (prs_.find(id) != prs_.end()) {
     return;
@@ -1264,7 +1237,8 @@ void raft::addNode(uint64_t id) {
   setProgress(id, 0, raftLog_->lastIndex() + 1);
 }
 
-void raft::removeNode(uint64_t id) {
+void
+raft::removeNode(uint64_t id) {
   delProgress(id);
   pendingConf_ = false;
 
@@ -1285,20 +1259,83 @@ void raft::removeNode(uint64_t id) {
   }
 }
 
-void raft::readMessages(MessageVec *msgs) {
+void
+raft::readMessages(MessageVec *msgs) {
   *msgs = msgs_;
   msgs_.clear();
 }
 
-void raft::sendTimeoutNow(uint64_t to) {
+void
+raft::sendTimeoutNow(uint64_t to) {
   Message *msg = new Message();
   msg->set_to(to);
   msg->set_type(MsgTimeoutNow);
   send(msg);
 }
 
-void raft::resetPendingConf() {
+void
+raft::resetPendingConf() {
   pendingConf_ = false;
+}
+
+//TODO:
+static void 
+validateConfig(const Config *config) {
+
+}
+
+raft* 
+newRaft(const Config *config) {
+  validateConfig(config);
+
+  raftLog *rl = newLog(config->storage, config->logger);
+  HardState hs;
+  ConfState cs;
+  Logger *logger = config->logger;
+  vector<uint64_t> peers = config->peers;
+  int err;
+  size_t i;
+  
+  err = config->storage->InitialState(&hs, &cs);
+  if (!SUCCESS(err)) {
+    logger->Fatalf(__FILE__, __LINE__, "storage InitialState fail: %s", GetErrorString(err)); 
+  }
+  if (cs.nodes_size() > 0) {
+    if (peers.size() > 0) {
+      logger->Fatalf(__FILE__, __LINE__, "cannot specify both newRaft(peers) and ConfState.Nodes)");
+    }
+    peers.clear();
+    for (i = 0; (int)i < cs.nodes_size(); ++i) {
+      peers.push_back(cs.nodes(i));
+    }
+  }
+
+  raft *r = new raft(config, rl);
+  for (i = 0; i < peers.size(); ++i) {
+    r->prs_[peers[i]] = new Progress(1, r->maxInfilght_, logger);
+  }
+
+  if (!isHardStateEqual(hs, kEmptyHardState)) {
+    r->loadState(hs);
+  }
+  if (config->applied > 0) {
+    rl->appliedTo(config->applied);
+  }
+
+  r->becomeFollower(r->term_, kNone);
+  vector<string> peerStrs;
+  map<uint64_t, Progress*>::const_iterator iter;
+  char tmp[32];
+  for (iter = r->prs_.begin(); iter != r->prs_.end(); ++iter) {
+    snprintf(tmp, sizeof(tmp), "%llu", iter->first);
+    peerStrs.push_back(tmp);
+  }
+  string nodeStr = joinStrings(peerStrs, ",");
+
+  r->logger_->Infof(__FILE__, __LINE__,
+    "newRaft %llu [peers: [%s], term: %llu, commit: %llu, applied: %llu, lastindex: %llu, lastterm: %llu]",
+    r->id_, nodeStr.c_str(), r->term_, rl->committed_, rl->applied_, rl->lastIndex(), rl->lastTerm());
+  return r;
 }
 
 }; // namespace libraft
