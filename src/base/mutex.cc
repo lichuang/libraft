@@ -1,4 +1,9 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #include "base/mutex.h"
+
 namespace libraft {
 struct LockerImpl {
   LockerImpl() {

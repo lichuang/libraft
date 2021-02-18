@@ -1,10 +1,15 @@
-#ifndef __LOG_H__
-#define __LOG_H__
+/*
+ * Copyright (C) lichuang
+ */
+
+#ifndef __LIBRAFT_LOG_H__
+#define __LIBRAFT_LOG_H__
 
 #include "libraft.h"
 #include "unstable_log.h"
 
 namespace libraft {
+
 struct raftLog {
   // storage contains all stable entries since the last snapshot.
   Storage *storage_;
@@ -80,4 +85,5 @@ struct raftLog {
 extern raftLog* newLog(Storage *storage, Logger *logger);
 
 }; // namespace libraft
-#endif // __LOG_H__
+
+#endif // __LIBRAFT_LOG_H__

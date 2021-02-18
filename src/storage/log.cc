@@ -1,7 +1,12 @@
-#include "storage/log.h"
+/*
+ * Copyright (C) lichuang
+ */
+
 #include "base/util.h"
+#include "storage/log.h"
 
 namespace libraft {
+
 // newLog returns log using the given storage. It recovers the log to the state
 // that it just commits and applies the latest snapshot.
 raftLog* newLog(Storage *storage, Logger *logger) {
@@ -400,4 +405,5 @@ int raftLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
 
   return OK;
 }
+
 }; // namespace libraft

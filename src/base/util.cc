@@ -1,6 +1,10 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #include <string>
-#include "base/util.h"
 #include "base/default_logger.h"
+#include "base/util.h"
 
 using namespace std;
 namespace libraft {

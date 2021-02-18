@@ -1,5 +1,10 @@
-#ifndef __MUTEX_H__
-#define __MUTEX_H__
+/*
+ * Copyright (C) lichuang
+ */
+
+#ifndef __LIBRAFT_MUTEX_H__
+#define __LIBRAFT_MUTEX_H__
+
 namespace libraft {
 struct LockerImpl;
 
@@ -26,4 +31,5 @@ private:
   Locker *locker_;
 };
 }; // namespace libraft
-#endif  // __MUTEX_H__
+
+#endif  // __LIBRAFT_MUTEX_H__

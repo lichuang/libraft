@@ -1,8 +1,14 @@
-#ifndef __PROGRESS_H__
-#define __PROGRESS_H__
+/*
+ * Copyright (C) lichuang
+ */
+
+#ifndef __LIBRAFT_PROGRESS_H__
+#define __LIBRAFT_PROGRESS_H__
 
 #include "libraft.h"
+
 namespace libraft {
+
 struct inflights {
   // the starting index in the buffer
   int start_;
@@ -111,4 +117,4 @@ struct Progress {
   ~Progress();
 };
 }; // namespace libraft
-#endif  // __PROGRESS_H__
+#endif  // __LIBRAFT_PROGRESS_H__

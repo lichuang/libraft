@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #ifndef __LIB_RAFT_H__
 #define __LIB_RAFT_H__
 
@@ -273,4 +277,5 @@ extern Node* RestartNode(const Config *config);
 extern const char* GetErrorString(int err);
 
 }; // namespace libraft
+
 #endif  // __LIB_RAFT_H__

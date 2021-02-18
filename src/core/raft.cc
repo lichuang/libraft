@@ -1,11 +1,16 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #include <stdlib.h>
 #include <time.h>
 #include <algorithm>
-#include "core/raft.h"
 #include "base/util.h"
+#include "core/raft.h"
 #include "core/read_only.h"
 
 namespace libraft {
+
 HardState kEmptyState;
 const static string kCampaignPreElection = "CampaignPreElection";
 const static string kCampaignElection = "CampaignElection";
@@ -1295,4 +1300,5 @@ void raft::sendTimeoutNow(uint64_t to) {
 void raft::resetPendingConf() {
   pendingConf_ = false;
 }
+
 }; // namespace libraft

@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #include <gtest/gtest.h>
 #include <math.h>
 #include "libraft.h"

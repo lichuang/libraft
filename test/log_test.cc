@@ -1,9 +1,13 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #include <gtest/gtest.h>
 #include "libraft.h"
+#include "base/default_logger.h"
 #include "base/util.h"
 #include "storage/log.h"
 #include "storage/memory_storage.h"
-#include "base/default_logger.h"
 
 using namespace libraft;
 

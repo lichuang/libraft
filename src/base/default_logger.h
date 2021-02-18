@@ -1,9 +1,14 @@
-#ifndef __LOGGER_H__
-#define __LOGGER_H__
+/*
+ * Copyright (C) lichuang
+ */
+
+#ifndef __LIBRAFT_LOGGER_H__
+#define __LIBRAFT_LOGGER_H__
 
 #include <stdio.h>
 #include <stdlib.h>
 #include "libraft.h"
+
 namespace libraft {
 #define doLog(c) va_list args; \
                  va_start(args, fmt); \
@@ -43,4 +48,4 @@ public:
 extern DefaultLogger kDefaultLogger;
 }; // namespace libraft
 
-#endif // __LOGGER_H__
+#endif // __LIBRAFT_LOGGER_H__

@@ -1,13 +1,18 @@
-#ifndef __RAFT_H__
-#define __RAFT_H__
+/*
+ * Copyright (C) lichuang
+ */
+
+#ifndef __LIBRAFT_RAFT_H__
+#define __LIBRAFT_RAFT_H__
 
 #include <map>
 #include "libraft.h"
-#include "storage/log.h"
 #include "core/progress.h"
+#include "storage/log.h"
 
 using namespace std;
 namespace libraft {
+
 struct readOnly;
 struct ReadState;
 
@@ -125,6 +130,7 @@ string entryString(const Entry& entry);
 void stepLeader(raft *r, const Message& msg);
 void stepCandidate(raft* r, const Message& msg);
 void stepFollower(raft* r, const Message& msg);
+
 }; // namespace libraft
 
-#endif  // __RAFT_H__
+#endif  // __LIBRAFT_RAFT_H__

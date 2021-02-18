@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #include <stdlib.h>
 #include <time.h>
 #include "raft_test_util.h"

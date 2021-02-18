@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #include "base/default_logger.h"
 
 namespace libraft {

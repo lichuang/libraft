@@ -1,5 +1,9 @@
-#ifndef __NODE_H__
-#define __NODE_H__
+/*
+ * Copyright (C) lichuang
+ */
+
+#ifndef __LIBRAFT_NODE_H__
+#define __LIBRAFT_NODE_H__
 
 #include "libraft.h"
 namespace libraft {
@@ -64,4 +68,5 @@ public:
   ConfState*  confState_;
 };
 }; // namespace libraft
-#endif  // __NODE_H__
+
+#endif  // __LIBRAFT_NODE_H__

@@ -1,7 +1,12 @@
-#ifndef __UTIL_H__
-#define __UTIL_H__
+/*
+ * Copyright (C) lichuang
+ */
+
+#ifndef __LIBRAFT_UTIL_H__
+#define __LIBRAFT_UTIL_H__
 
 #include "libraft.h"
+
 namespace libraft {
 void limitSize(uint64_t maxSize, EntryVec *entries);
 
@@ -22,4 +27,5 @@ bool isResponseMessage(const MessageType type);
 // string util
 string joinStrings(const vector<string>& strs, const string &sep);
 }; // namespace libraft
-#endif  // __UTIL_H__
+
+#endif  // __LIBRAFT_UTIL_H__

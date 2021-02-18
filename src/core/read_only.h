@@ -1,12 +1,17 @@
-#ifndef __READ_ONLY_H__
-#define __READ_ONLY_H__
+/*
+ * Copyright (C) lichuang
+ */
 
-#include "core/raft.h"
+#ifndef __LIBRAFT_READ_ONLY_H__
+#define __LIBRAFT_READ_ONLY_H__
+
 #include <map>
 #include <string>
+#include "core/raft.h"
 
 using namespace std;
 namespace libraft {
+
 struct readIndexStatus {
   uint64_t index_;
   Message *req_;
@@ -30,6 +35,7 @@ struct readOnly {
   void advance(const Message& msg, vector<readIndexStatus*>* rss);
   string lastPendingRequestCtx();
 };
+
 }; // namespace libraft
 
-#endif  // __READ_ONLY_H__
+#endif  // __LIBRAFT_READ_ONLY_H__

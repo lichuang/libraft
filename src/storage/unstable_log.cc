@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #include "storage/unstable_log.h"
 
 namespace libraft {
@@ -135,4 +139,5 @@ void unstableLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
     logger_->Fatalf(__FILE__, __LINE__, "unstable.slice[%llu,%llu) out of bound [%llu,%llu]", lo, hi, offset_, upper);
   }
 }
+
 }; // namespace libraft

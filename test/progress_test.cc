@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #include <gtest/gtest.h>
 #include "libraft.h"
 #include "base/default_logger.h"

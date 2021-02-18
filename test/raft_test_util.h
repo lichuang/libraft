@@ -1,5 +1,9 @@
-#ifndef __RAFT_TEST_UTIL_H__
-#define __RAFT_TEST_UTIL_H__
+/*
+ * Copyright (C) lichuang
+ */
+
+#ifndef __LIBRAFT_RAFT_TEST_UTIL_H__
+#define __LIBRAFT_RAFT_TEST_UTIL_H__
 
 #include "libraft.h"
 #include "core/raft.h"
@@ -88,4 +92,4 @@ extern void nextEnts(raft *r, Storage *s, EntryVec *entries);
 extern string raftLogString(raftLog *log);
 extern void idsBySize(int size, vector<uint64_t>* ids);
 
-#endif  // __RAFT_TEST_UTIL_H__
+#endif  // __LIBRAFT_RAFT_TEST_UTIL_H__

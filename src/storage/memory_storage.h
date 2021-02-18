@@ -1,9 +1,15 @@
-#ifndef __MEMORY_STORAGE_H__
-#define __MEMORY_STORAGE_H__
+/*
+ * Copyright (C) lichuang
+ */
+
+#ifndef __LIBRAFT_MEMORY_STORAGE_H__
+#define __LIBRAFT_MEMORY_STORAGE_H__
 
 #include "libraft.h"
 #include "base/mutex.h"
+
 namespace libraft {
+
 class MemoryStorage : public Storage {
 public:
   MemoryStorage(Logger *logger);
@@ -35,5 +41,7 @@ public:
   Locker locker_;
   Logger *logger_;
 };
+
 }; // namespace libraft
-#endif  // __MEMORY_STORAGE_H__
+
+#endif  // __LIBRAFT_MEMORY_STORAGE_H__

@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #include <gtest/gtest.h>
 #include <math.h>
 #include "libraft.h"
@@ -5,9 +9,9 @@
 #include "base/default_logger.h"
 #include "core/raft.h"
 #include "core/progress.h"
-#include "storage/memory_storage.h"
 #include "core/read_only.h"
 #include "core/node.h"
+#include "storage/memory_storage.h"
 #include "raft_test_util.h"
 
 using namespace libraft;

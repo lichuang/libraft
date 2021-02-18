@@ -1,7 +1,11 @@
+/*
+ * Copyright (C) lichuang
+ */
+
 #include <unistd.h>
+#include "base/util.h"
 #include "core/node.h"
 #include "core/raft.h"
-#include "base/util.h"
 
 namespace libraft {
 const static HardState kEmptyHardState;

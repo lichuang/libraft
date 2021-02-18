@@ -1,5 +1,9 @@
-#include "storage/memory_storage.h"
+/*
+ * Copyright (C) lichuang
+ */
+
 #include "base/util.h"
+#include "storage/memory_storage.h"
 
 namespace libraft {
 MemoryStorage::MemoryStorage(Logger *logger) 
@@ -207,4 +211,5 @@ int MemoryStorage::CreateSnapshot(uint64_t i, ConfState *cs, const string& data,
 
   return OK;
 }
+
 }; // namespace libraft
