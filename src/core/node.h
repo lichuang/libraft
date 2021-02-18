@@ -6,7 +6,9 @@
 #define __LIBRAFT_NODE_H__
 
 #include "libraft.h"
+
 namespace libraft {
+
 enum NodeMessageType {
   ProposeMessage    = 0,
   RecvMessage       = 1,
@@ -46,7 +48,10 @@ private:
 
 public:
   bool stopped_;
+
+  // the Raft state machine
   raft *raft_;
+
   Logger *logger_;
 
   // save previous the state
@@ -54,10 +59,17 @@ public:
   SoftState prevSoftState_;
   HardState prevHardState_;
   bool waitAdvanced_;
+
+  // save Ready data in each step
   Ready ready_;
+
+  // if there is no leader, then cannot propose any msg
   bool canPropose_;
+
+  // save state machine msg type
   NodeMessageType msgType_;
 
+  // save previous storage data, in `Advance' func, use these datas to update storage
   uint64_t prevLastUnstableIndex_;
   uint64_t prevLastUnstableTerm_;
   bool     havePrevLastUnstableIndex_;
@@ -67,6 +79,7 @@ public:
   ConfChange confChange_;
   ConfState*  confState_;
 };
+
 }; // namespace libraft
 
 #endif  // __LIBRAFT_NODE_H__

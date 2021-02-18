@@ -25,8 +25,24 @@ enum ErrorCode {
   ErrSnapOutOfDate                  = 2,
   ErrUnavailable                    = 3,
   ErrSnapshotTemporarilyUnavailable = 4,
-  ErrSeriaFail                      = 5
+  ErrSeriaFail                      = 5,
+  NumErrorCode
 };
+
+static const char* 
+kErrString[NumErrorCode] = {
+  "OK",
+  "ErrCompacted",
+  "ErrSnapOutOfDate",
+  "ErrUnavailable",
+  "ErrSnapshotTemporarilyUnavailable",
+  "ErrSeriaFail",
+};
+
+inline const char* 
+GetErrorString(int err) {
+  return kErrString[err];
+}
 
 inline bool SUCCESS(int err) { return err == OK; }
 
@@ -35,7 +51,7 @@ enum StateType {
   StateCandidate = 1,
   StateLeader = 2,
   StatePreCandidate = 3,
-  numStates
+  NumStateType
 };
 
 struct SoftState {
@@ -274,7 +290,6 @@ public:
 
 extern Node* StartNode(const Config *config, const vector<Peer>& peers);
 extern Node* RestartNode(const Config *config);
-extern const char* GetErrorString(int err);
 
 }; // namespace libraft
 

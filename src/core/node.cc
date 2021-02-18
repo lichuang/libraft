@@ -8,16 +8,19 @@
 #include "core/raft.h"
 
 namespace libraft {
+
 const static HardState kEmptyHardState;
 const static SoftState kEmptySoftState;
 const static Snapshot  kEmptySnapshot;
 
 // IsEmptySnap returns true if the given Snapshot is empty.
-static bool isEmptyHardState(const HardState& hs) {
+inline static bool 
+isEmptyHardState(const HardState& hs) {
   return isHardStateEqual(hs, kEmptyHardState);
 }
 
-static bool isEmptySoftState(const SoftState& ss) {
+inline static bool 
+isEmptySoftState(const SoftState& ss) {
   return isSoftStateEqual(ss, kEmptySoftState);
 }
 
@@ -42,18 +45,21 @@ NodeImpl::~NodeImpl() {
   delete raft_;
 }
 
-void NodeImpl::Tick(Ready **ready) {
+void 
+NodeImpl::Tick(Ready **ready) {
   msgType_ = TickMessage;
   stateMachine(Message(), ready);
 }
 
-int NodeImpl::Campaign(Ready **ready) {
+int 
+NodeImpl::Campaign(Ready **ready) {
   Message msg;
   msg.set_type(MsgHup);
   return doStep(msg, ready);
 }
 
-int NodeImpl::Propose(const string& data, Ready **ready) {
+int 
+NodeImpl::Propose(const string& data, Ready **ready) {
   Message msg;
   msg.set_type(MsgProp);
   msg.set_from(raft_->id_);
@@ -61,7 +67,8 @@ int NodeImpl::Propose(const string& data, Ready **ready) {
   return doStep(msg, ready);
 }
 
-int NodeImpl::ProposeConfChange(const ConfChange& cc, Ready **ready) {
+int 
+NodeImpl::ProposeConfChange(const ConfChange& cc, Ready **ready) {
   string data;
   if (!cc.SerializeToString(&data)) {
     logger_->Errorf(__FILE__, __LINE__, "ConfChange SerializeToString error");
@@ -78,7 +85,8 @@ int NodeImpl::ProposeConfChange(const ConfChange& cc, Ready **ready) {
   return Step(msg, ready);
 }
 
-int NodeImpl::Step(const Message& msg, Ready **ready) {
+int 
+NodeImpl::Step(const Message& msg, Ready **ready) {
   // ignore unexpected local messages receiving over network
   if (isLoaclMessage(msg.type())) {
     *ready = NULL;
@@ -88,7 +96,8 @@ int NodeImpl::Step(const Message& msg, Ready **ready) {
   return doStep(msg, ready);
 }
 
-void NodeImpl::Advance() {
+void
+NodeImpl::Advance() {
   if (prevHardState_.commit() != 0) {
     raft_->raftLog_->appliedTo(prevHardState_.commit());
   }
@@ -107,7 +116,8 @@ void NodeImpl::Advance() {
   waitAdvanced_ = false;
 }
 
-void NodeImpl::ApplyConfChange(const ConfChange& cc, ConfState *cs, Ready **ready) {
+void 
+NodeImpl::ApplyConfChange(const ConfChange& cc, ConfState *cs, Ready **ready) {
   confChange_ = cc;
   confState_ = cs;
   /*
@@ -118,7 +128,8 @@ void NodeImpl::ApplyConfChange(const ConfChange& cc, ConfState *cs, Ready **read
   handleConfChange();
 }
 
-int NodeImpl::doStep(const Message& msg, Ready **ready) {
+int 
+NodeImpl::doStep(const Message& msg, Ready **ready) {
   if (msg.type() == MsgProp) {
     msgType_ = ProposeMessage;
   } else {
@@ -128,7 +139,8 @@ int NodeImpl::doStep(const Message& msg, Ready **ready) {
   return stateMachine(msg, ready);
 }
 
-void NodeImpl::TransferLeadership(uint64_t leader, uint64_t transferee, Ready **ready) {
+void 
+NodeImpl::TransferLeadership(uint64_t leader, uint64_t transferee, Ready **ready) {
   msgType_ = RecvMessage;
   Message msg;
   msg.set_type(MsgTransferLeader);
@@ -146,7 +158,8 @@ int NodeImpl::ReadIndex(const string &rctx, Ready **ready) {
   return doStep(msg, ready);
 }
 
-int NodeImpl::stateMachine(const Message& msg, Ready **ready) {
+int 
+NodeImpl::stateMachine(const Message& msg, Ready **ready) {
   if (stopped_) {
     return OK;
   }
@@ -206,7 +219,8 @@ int NodeImpl::stateMachine(const Message& msg, Ready **ready) {
   return ret;
 }
 
-void NodeImpl::handleConfChange() {
+void 
+NodeImpl::handleConfChange() {
   if (confChange_.nodeid() == kNone) {
     raft_->resetPendingConf();
     goto addnodes;
@@ -240,16 +254,19 @@ addnodes:
   }
 }
 
-void NodeImpl::reset() {
+void 
+NodeImpl::reset() {
   msgType_ = NoneMessage;
   confState_ = NULL;
 }
 
-bool NodeImpl::isMessageFromClusterNode(const Message& msg) {
+bool 
+NodeImpl::isMessageFromClusterNode(const Message& msg) {
   return (raft_->prs_.find(msg.from()) != raft_->prs_.end());
 }
 
-Ready* NodeImpl::newReady() {
+Ready* 
+NodeImpl::newReady() {
   // 1) reset ready data
   ready_.softState = kEmptySoftState;
   ready_.hardState = kEmptyHardState;
@@ -305,11 +322,13 @@ Ready* NodeImpl::newReady() {
   return &ready_;
 }
 
-void NodeImpl::Stop() {
+void 
+NodeImpl::Stop() {
   stopped_ = true;
 }
 
-bool NodeImpl::readyContainUpdate() {
+bool 
+NodeImpl::readyContainUpdate() {
   return (!isEmptySoftState(ready_.softState) ||
           !isEmptyHardState(ready_.hardState) ||
           !isEmptySnapshot(ready_.snapshot)  ||
@@ -321,7 +340,8 @@ bool NodeImpl::readyContainUpdate() {
 
 // StartNode returns a new Node given configuration and a list of raft peers.
 // It appends a ConfChangeAddNode entry for each given peer to the initial log.
-Node* StartNode(const Config* config, const vector<Peer>& peers) {
+Node* 
+StartNode(const Config* config, const vector<Peer>& peers) {
   NodeImpl* node = new NodeImpl();
   node->logger_ = config->logger;
   raft *r = newRaft(config);
@@ -351,10 +371,12 @@ Node* StartNode(const Config* config, const vector<Peer>& peers) {
 
     r->raftLog_->append(entries);
   }
+
 	// Mark these initial entries as committed.
 	// TODO(bdarnell): These entries are still unstable; do we need to preserve
 	// the invariant that committed < unstable?
   r->raftLog_->committed_ = r->raftLog_->lastIndex();
+
  	// Now apply them, mainly so that the application can call Campaign
 	// immediately after StartNode in tests. Note that these nodes will
 	// be added to raft twice: here and when the application's Ready
@@ -379,7 +401,8 @@ Node* StartNode(const Config* config, const vector<Peer>& peers) {
 // The current membership of the cluster will be restored from the Storage.
 // If the caller has an existing state machine, pass in the last log index that
 // has been applied to it; otherwise use zero.
-Node* RestartNode(const Config *config) {
+Node* 
+RestartNode(const Config *config) {
   raft *r = newRaft(config);
   NodeImpl* node = new NodeImpl();
   node->logger_ = config->logger;
@@ -388,4 +411,5 @@ Node* RestartNode(const Config *config) {
 
   return node;
 }
+
 }; // namespace libraft

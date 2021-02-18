@@ -609,7 +609,7 @@ void testVoteFromAnyState(MessageType vt) {
   peers.push_back(3);
 
   size_t i;
-  for (i = 0; i < (int)numStates; ++i) {
+  for (i = 0; i < (int)NumStateType; ++i) {
     raft *r = newTestRaft(1, peers, 10, 1, new MemoryStorage(&kDefaultLogger));
     r->term_ = 1;
 

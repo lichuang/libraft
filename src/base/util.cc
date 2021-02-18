@@ -8,11 +8,9 @@
 
 using namespace std;
 namespace libraft {
-const char* GetErrorString(int err) {
-  return "";
-}
 
-bool isDeepEqualSnapshot(const Snapshot *s1, const Snapshot *s2) {
+bool 
+isDeepEqualSnapshot(const Snapshot *s1, const Snapshot *s2) {
   if (s1 == NULL || s2 == NULL) {
     return false;
   }
@@ -30,7 +28,8 @@ bool isDeepEqualSnapshot(const Snapshot *s1, const Snapshot *s2) {
   return true;
 }
 
-bool isDeepEqualEntry(const Entry& ent1, const Entry& ent2) {
+bool 
+isDeepEqualEntry(const Entry& ent1, const Entry& ent2) {
   if (ent1.type() != ent2.type()) {
     return false;
   }
@@ -46,7 +45,8 @@ bool isDeepEqualEntry(const Entry& ent1, const Entry& ent2) {
   return true;
 }
 
-bool isDeepEqualEntries(const EntryVec& ents1, const EntryVec& ents2) {
+bool 
+isDeepEqualEntries(const EntryVec& ents1, const EntryVec& ents2) {
   if (ents1.size() != ents2.size()) {
     return false;
   }
@@ -72,7 +72,8 @@ bool isDeepEqualNodes(const vector<uint64_t>& ns1, const vector<uint64_t>& ns2) 
   return true;
 }
 
-void limitSize(uint64_t maxSize, EntryVec *entries) {
+void 
+limitSize(uint64_t maxSize, EntryVec *entries) {
   if (entries->empty()) {
     return;
   }
@@ -90,7 +91,8 @@ void limitSize(uint64_t maxSize, EntryVec *entries) {
   entries->erase(entries->begin() + limit, entries->end());
 }
 
-bool isLoaclMessage(const MessageType type) {
+bool 
+isLoaclMessage(const MessageType type) {
   return (type == MsgHup          ||
           type == MsgBeat         ||
           type == MsgUnreachable  ||
@@ -98,7 +100,8 @@ bool isLoaclMessage(const MessageType type) {
           type == MsgCheckQuorum);
 }
 
-bool isResponseMessage(const MessageType type) {
+bool 
+isResponseMessage(const MessageType type) {
   return (type == MsgAppResp        ||
           type == MsgVoteResp       ||
           type == MsgHeartbeatResp  ||
@@ -106,13 +109,15 @@ bool isResponseMessage(const MessageType type) {
           type == MsgPreVoteResp);
 }
 
-bool isHardStateEqual(const HardState& h1, const HardState& h2) {
+bool 
+isHardStateEqual(const HardState& h1, const HardState& h2) {
   return h1.term() == h2.term() &&
          h1.vote() == h2.vote() &&
          h1.commit() == h2.commit();
 }
 
-bool isSoftStateEqual(const SoftState& s1, const SoftState& s2) {
+bool 
+isSoftStateEqual(const SoftState& s1, const SoftState& s2) {
   if (s1.leader != s2.leader) {
     return false;
   }
@@ -120,14 +125,16 @@ bool isSoftStateEqual(const SoftState& s1, const SoftState& s2) {
   return s1.state == s2.state;
 }
 
-bool isEmptySnapshot(const Snapshot* snapshot) {
+bool 
+isEmptySnapshot(const Snapshot* snapshot) {
   if (snapshot == NULL) {
     return true;
   }
   return snapshot->metadata().index() == 0;
 }
 
-bool isDeepEqualReadStates(const vector<ReadState*>& rs1, const vector<ReadState*>& rs2) {
+bool 
+isDeepEqualReadStates(const vector<ReadState*>& rs1, const vector<ReadState*>& rs2) {
   if (rs1.size() != rs2.size()) {
     return false;
   }
@@ -146,7 +153,8 @@ bool isDeepEqualReadStates(const vector<ReadState*>& rs1, const vector<ReadState
   return true;
 }
 
-bool isDeepEqualMessage(const Message& msg1, const Message& msg2) {
+bool 
+isDeepEqualMessage(const Message& msg1, const Message& msg2) {
   if (msg1.from() != msg2.from()) {
     return false;
   }
@@ -170,7 +178,8 @@ bool isDeepEqualMessage(const Message& msg1, const Message& msg2) {
   return true;
 }
 
-int numOfPendingConf(const EntryVec& entries) {
+int 
+numOfPendingConf(const EntryVec& entries) {
   size_t i;
   int n = 0;
   for (i = 0; i < entries.size(); ++i) {
@@ -182,14 +191,16 @@ int numOfPendingConf(const EntryVec& entries) {
   return n;
 }
 
-MessageType voteRespMsgType(int t) {
+MessageType 
+voteRespMsgType(int t) {
   if (t == MsgVote) {
     return MsgVoteResp;
   }
   return MsgPreVoteResp;
 }
 
-string joinStrings(const vector<string>& strs, const string &sep) {
+string 
+joinStrings(const vector<string>& strs, const string &sep) {
   string ret = "";
   size_t i;
   for (i = 0; i < strs.size(); ++i) {
@@ -201,4 +212,5 @@ string joinStrings(const vector<string>& strs, const string &sep) {
 
   return ret;
 }
+
 }; // namespace libraft

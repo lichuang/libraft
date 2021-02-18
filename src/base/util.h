@@ -8,6 +8,7 @@
 #include "libraft.h"
 
 namespace libraft {
+
 void limitSize(uint64_t maxSize, EntryVec *entries);
 
 bool isDeepEqualNodes(const vector<uint64_t>& ns1, const vector<uint64_t>& ns2);
@@ -26,6 +27,7 @@ bool isResponseMessage(const MessageType type);
 
 // string util
 string joinStrings(const vector<string>& strs, const string &sep);
+
 }; // namespace libraft
 
 #endif  // __LIBRAFT_UTIL_H__

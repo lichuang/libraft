@@ -31,6 +31,7 @@ struct raft;
 
 typedef void (*stepFun)(raft *, const Message&);
 
+// the Raft State Machine
 struct raft {
   uint64_t id_;
   uint64_t term_;
