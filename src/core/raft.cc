@@ -616,6 +616,7 @@ raft::step(const Message& msg) {
   uint64_t from = msg.from();
 
   if (term == 0) {
+    // ignore term 0 message
   } else if (term > term_) {
     uint64_t leader = from;
     if (type == MsgVote || type == MsgPreVote) {
@@ -725,6 +726,7 @@ raft::step(const Message& msg) {
     }
     break;
   default:
+    // handle msg in different state function
     stateStepFunc_(this, msg);
     break;
   }
@@ -756,7 +758,7 @@ stepLeader(raft *r, const Message& msg) {
     return;
     break;
   case MsgProp:
-    if (msg.entries_size() == 0) {
+    if (msg.entries_size() == 0) {  // received a empty entries MsgProp
       logger->Fatalf(__FILE__, __LINE__, "%x stepped empty MsgProp", r->id_);
     }
     if (r->progressMap_.find(r->id_) == r->progressMap_.end()) {
@@ -1124,10 +1126,12 @@ stepFollower(raft* r, const Message& msg) {
 // configuration of state machine.
 bool
 raft::restore(const Snapshot& snapshot) {
+  // ignore out of time snapshot
   if (snapshot.metadata().index() <= raftLog_->committed_) {
     return false;
   }
 
+  // check if snapshot's [index,term] match log's [index,term]
   if (raftLog_->matchTerm(snapshot.metadata().index(), snapshot.metadata().term())) {
     logger_->Infof(__FILE__, __LINE__, "%x [commit: %llu, lastindex: %llu, lastterm: %llu] fast-forwarded commit to snapshot [index: %llu, term: %llu]",
       id_, raftLog_->committed_, raftLog_->lastIndex(), raftLog_->lastTerm(),
@@ -1135,12 +1139,17 @@ raft::restore(const Snapshot& snapshot) {
     raftLog_->commitTo(snapshot.metadata().index());
     return false;
   }
+
+  // below is the case use snapshot data to restore raft state machine
+
   logger_->Infof(__FILE__, __LINE__, "%x [commit: %llu, lastindex: %llu, lastterm: %llu] starts to restore snapshot [index: %llu, term: %llu]",
     id_, raftLog_->committed_, raftLog_->lastIndex(), raftLog_->lastTerm(),
     snapshot.metadata().index(), snapshot.metadata().term());
+
   raftLog_->restore(snapshot);
   progressMap_.clear();
   int i;
+  // restore node progress
   for (i = 0; i < snapshot.metadata().conf_state().nodes_size(); ++i) {
     uint64_t node = snapshot.metadata().conf_state().nodes(i);
     uint64_t match = 0;
@@ -1165,10 +1174,12 @@ raft::handleSnapshot(const Message& msg) {
   if (restore(msg.snapshot())) {
     logger_->Infof(__FILE__, __LINE__, "%x [commit: %d] restored snapshot [index: %d, term: %d]",
       id_, raftLog_->committed_, sindex, sterm);
+    // if success to restore from snapshot, return the last index
     resp->set_index(raftLog_->lastIndex());
   } else {
     logger_->Infof(__FILE__, __LINE__, "%x [commit: %d] ignored snapshot [index: %d, term: %d]",
       id_, raftLog_->committed_, sindex, sterm);
+    // if failed to restore from snapshot, return the commit index
     resp->set_index(raftLog_->committed_);
   }
   send(resp);
@@ -1176,6 +1187,7 @@ raft::handleSnapshot(const Message& msg) {
 
 void
 raft::handleHeartbeat(const Message& msg) {
+  // commit the msg commit index
   raftLog_->commitTo(msg.commit());
   Message *resp = new Message();
   resp->set_to(msg.from());
@@ -1186,6 +1198,7 @@ raft::handleHeartbeat(const Message& msg) {
 
 void
 raft::handleAppendEntries(const Message& msg) {
+  // is msg already out of date?
   if (msg.index() < raftLog_->committed_) {
     Message *resp = new Message();
     resp->set_to(msg.from());
@@ -1198,6 +1211,7 @@ raft::handleAppendEntries(const Message& msg) {
   EntryVec entries;
   copyEntries(msg, &entries);
   uint64_t lasti;
+  // check if msg append success?
   bool ret = raftLog_->maybeAppend(msg.index(), msg.logterm(), msg.commit(), entries, &lasti);
   if (ret) {
     Message *resp = new Message();
@@ -1309,10 +1323,12 @@ newRaft(const Config *config) {
   int err;
   size_t i;
   
+  // init hs,cs from storage
   err = config->storage->InitialState(&hs, &cs);
   if (!SUCCESS(err)) {
     logger->Fatalf(__FILE__, __LINE__, "storage InitialState fail: %s", GetErrorString(err)); 
   }
+
   if (cs.nodes_size() > 0) {
     if (peers.size() > 0) {
       logger->Fatalf(__FILE__, __LINE__, "cannot specify both newRaft(peers) and ConfState.Nodes)");
@@ -1323,11 +1339,13 @@ newRaft(const Config *config) {
     }
   }
 
+  // init the progressMap_
   raft *r = new raft(config, rl);
   for (i = 0; i < peers.size(); ++i) {
     r->progressMap_[peers[i]] = new Progress(1, r->maxInfilght_, logger);
   }
 
+  // load hardState if needed.
   if (!isHardStateEqual(hs, kEmptyHardState)) {
     r->loadState(hs);
   }
@@ -1335,7 +1353,9 @@ newRaft(const Config *config) {
     rl->appliedTo(config->applied);
   }
 
+  // whenever start a node,change to follower state
   r->becomeFollower(r->term_, kNone);
+
   vector<string> peerStrs;
   map<uint64_t, Progress*>::const_iterator iter;
   char tmp[32];

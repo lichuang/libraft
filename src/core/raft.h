@@ -144,6 +144,7 @@ struct raft {
   // change to leader state
   void becomeLeader();
 
+  // campaign for the new leader
   void campaign(CampaignType t);
 
   // maybeCommit attempts to advance the commit index. Returns true if
@@ -157,8 +158,13 @@ struct raft {
   // append entries to storage
   void appendEntry(EntryVec* entries);
 
+  // handle append entries message
   void handleAppendEntries(const Message& msg);
+
+  // handle heartbeat message
   void handleHeartbeat(const Message& msg);
+
+  // handle snapshot message
   void handleSnapshot(const Message& msg);
 
   // tickElection is run by followers and candidates after r.electionTimeout.
@@ -171,13 +177,18 @@ struct raft {
   // granted peers in cluster
   int  poll(uint64_t id, MessageType t, bool v);
 
+  // raft state machine main routine,handle a message from node
   int  step(const Message& msg);
 
   // promotable indicates whether state machine can be promoted to leader,
   // which is true when its own id is in progress list.  
   bool promotable();
 
+  // restore recovers the state machine from a snapshot. It restores the log and the
+  // configuration of state machine.
+  // return false if snapshot's [index,term] match log's [index,term]
   bool restore(const Snapshot& snapshot);
+
   void delProgress(uint64_t id);
   void addNode(uint64_t id);
   void removeNode(uint64_t id);
@@ -209,7 +220,8 @@ struct raft {
 extern raft* newRaft(const Config *);
 string entryString(const Entry& entry);
 
-// different role's state machine functions
+// different role's state machine functions,after `Raft' change state,
+// `stateStepFunc_' will be set to the proper function
 void stepLeader(raft *r, const Message& msg);
 void stepCandidate(raft* r, const Message& msg);
 void stepFollower(raft* r, const Message& msg);
