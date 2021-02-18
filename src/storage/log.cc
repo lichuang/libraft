@@ -7,34 +7,6 @@
 
 namespace libraft {
 
-// newLog returns log using the given storage. It recovers the log to the state
-// that it just commits and applies the latest snapshot.
-raftLog* newLog(Storage *storage, Logger *logger) {
-  raftLog *log = new raftLog(storage, logger);
-
-  uint64_t firstIndex, lastIndex;
-  int err;
-
-  err = storage->FirstIndex(&firstIndex);
-  if (!SUCCESS(err)) {
-    logger->Fatalf(__FILE__, __LINE__, "get first index err:%s", GetErrorString(err));
-  }
-
-  err = storage->LastIndex(&lastIndex);
-  if (!SUCCESS(err)) {
-    logger->Fatalf(__FILE__, __LINE__, "get last index err:%s", GetErrorString(err));
-  }
-
-  log->unstable_.offset_ = lastIndex + 1;
-  log->unstable_.logger_ = logger;
-
-  // Initialize our committed and applied pointers to the time of the last compaction.
-  log->committed_ = firstIndex - 1;
-  log->applied_    = firstIndex - 1;
-
-  return log;
-}
-
 raftLog::raftLog(Storage *storage, Logger *logger) 
   : storage_(storage),
     committed_(0),
@@ -44,9 +16,12 @@ raftLog::raftLog(Storage *storage, Logger *logger)
 
 // maybeAppend returns false if the entries cannot be appended. Otherwise,
 // it returns last index of new entries.
-bool raftLog::maybeAppend(uint64_t index, uint64_t logTerm, 
-                          uint64_t committed, const EntryVec& entries, uint64_t *lasti) {
+bool
+raftLog::maybeAppend(uint64_t index, uint64_t logTerm, 
+                     uint64_t committed, const EntryVec& entries, uint64_t *lasti) {
   *lasti = 0;
+
+  // check if log index and term match
   if (!matchTerm(index, logTerm)) {
     return false;
   }
@@ -54,8 +29,11 @@ bool raftLog::maybeAppend(uint64_t index, uint64_t logTerm,
   uint64_t lastNewI, ci, offset;
 
   lastNewI = index + (uint64_t)entries.size();
-  ci = findConflict(entries);
 
+  // check if there is conflict entries
+  ci = findConflict(entries);
+  
+  // if conflict entries is already committed
   if (ci != 0 && ci <= committed_) {
     logger_->Fatalf(__FILE__, __LINE__, "entry %llu conflict with committed entry [committed(%llu)]", ci, committed_);
   }
@@ -68,15 +46,18 @@ bool raftLog::maybeAppend(uint64_t index, uint64_t logTerm,
 
   commitTo(min(committed, lastNewI));
   *lasti = lastNewI;
+
   return true;
 }
 
-void raftLog::commitTo(uint64_t tocommit) {
+void
+raftLog::commitTo(uint64_t tocommit) {
   // never decrease commit
   if (committed_ >= tocommit) {
     return;
   }
 
+  // to commit index cannot bigger than last index
   if (lastIndex() < tocommit) {
     logger_->Fatalf(__FILE__, __LINE__, 
       "tocommit(%llu) is out of range [lastIndex(%llu)]. Was the raft log corrupted, truncated, or lost?",
@@ -87,26 +68,32 @@ void raftLog::commitTo(uint64_t tocommit) {
   logger_->Debugf(__FILE__, __LINE__, "commit to %llu", committed_);
 }
 
-void raftLog::appliedTo(uint64_t i) {
+void
+raftLog::appliedTo(uint64_t i) {
   if (i == 0) {
     return;
   }
 
+  // applied index cannot bigger than committed index,
+  // also cannot smaller than already applied index.
   if (committed_ < i || i < applied_) {
     logger_->Fatalf(__FILE__, __LINE__, "applied(%llu) is out of range [prevApplied(%llu), committed(%llu)]", i, applied_, committed_);
   }
   applied_ = i;
 }
 
-void raftLog::stableTo(uint64_t i, uint64_t t) {
+void
+raftLog::stableTo(uint64_t i, uint64_t t) {
   unstable_.stableTo(i, t);
 }
 
-void raftLog::stableSnapTo(uint64_t i) {
+void
+raftLog::stableSnapTo(uint64_t i) {
   unstable_.stableSnapTo(i);
 }
 
-uint64_t raftLog::lastTerm() {
+uint64_t
+raftLog::lastTerm() {
   int err;
   uint64_t t;
 
@@ -118,10 +105,12 @@ uint64_t raftLog::lastTerm() {
   return t;
 }
 
-int raftLog::entries(uint64_t i, uint64_t maxSize, EntryVec *entries) {
+int
+raftLog::entries(uint64_t i, uint64_t maxSize, EntryVec *entries) {
   entries->clear();
   uint64_t lasti = lastIndex();
 
+  // valid index check
   if (i > lasti) {
     return OK;
   }
@@ -130,24 +119,33 @@ int raftLog::entries(uint64_t i, uint64_t maxSize, EntryVec *entries) {
 }
 
 // allEntries returns all entries in the log.
-void raftLog::allEntries(EntryVec *entries) {
+void
+raftLog::allEntries(EntryVec *entries) {
   int err = this->entries(firstIndex(), kNoLimit, entries);
   if (SUCCESS(err)) {
     return;
   }
 
-  if (err == ErrCompacted) {
+  if (err == ErrCompacted) { // try again if there was a racing compaction
     return allEntries(entries);
   }
   logger_->Fatalf(__FILE__, __LINE__, "allEntries fatal: %s", GetErrorString(err));
 }
 
-bool raftLog::isUpToDate(uint64_t lasti, uint64_t term) {
+// isUpToDate determines if the given (lastIndex,term) log is more up-to-date
+// by comparing the index and term of the last entries in the existing logs.
+// If the logs have last entries with different terms, then the log with the
+// later term is more up-to-date. If the logs end with the same term, then
+// whichever log has the larger lastIndex is more up-to-date. If the logs are
+// the same, the given log is up-to-date.
+bool
+raftLog::isUpToDate(uint64_t lasti, uint64_t term) {
   uint64_t lastT = lastTerm();
   return term > lastT || (term == lastT && lasti >= lastIndex());
 }
 
-bool raftLog::maybeCommit(uint64_t maxIndex, uint64_t term) {
+bool
+raftLog::maybeCommit(uint64_t maxIndex, uint64_t term) {
   uint64_t t;
   int err = this->term(maxIndex, &t);
   if (maxIndex > committed_ && zeroTermOnErrCompacted(t, err) == term) {
@@ -157,7 +155,8 @@ bool raftLog::maybeCommit(uint64_t maxIndex, uint64_t term) {
   return false;
 }
 
-void raftLog::restore(const Snapshot& snapshot) {
+void
+raftLog::restore(const Snapshot& snapshot) {
   logger_->Infof(__FILE__, __LINE__, "log [%s] starts to restore snapshot [index: %llu, term: %llu]", 
     String().c_str(), snapshot.metadata().index(), snapshot.metadata().term());
   committed_ = snapshot.metadata().index();
@@ -166,7 +165,8 @@ void raftLog::restore(const Snapshot& snapshot) {
 
 // append entries to unstable storage and return last index
 // fatal if the first index of entries < committed_
-uint64_t raftLog::append(const EntryVec& entries) {
+uint64_t
+raftLog::append(const EntryVec& entries) {
   if (entries.empty()) {
     return lastIndex();
   }
@@ -213,7 +213,8 @@ uint64_t raftLog::findConflict(const EntryVec& entries) {
   return 0;
 }
 
-void raftLog::unstableEntries(EntryVec *entries) {
+void
+raftLog::unstableEntries(EntryVec *entries) {
   entries->clear();
   size_t i;
   for (i = 0; i < unstable_.entries_.size(); ++i) {
@@ -224,7 +225,8 @@ void raftLog::unstableEntries(EntryVec *entries) {
 // nextEntries returns all the available entries for execution.
 // If applied is smaller than the index of snapshot, it returns all committed
 // entries after the index of snapshot.
-void raftLog::nextEntries(EntryVec* entries) {
+void
+raftLog::nextEntries(EntryVec* entries) {
   entries->clear();
   uint64_t offset = max(applied_ + 1, firstIndex());
   if (committed_ + 1 > offset) {
@@ -235,7 +237,8 @@ void raftLog::nextEntries(EntryVec* entries) {
   }
 }
 
-string raftLog::String() {
+string
+raftLog::String() {
   char tmp[200];
   snprintf(tmp, sizeof(tmp), "committed=%llu, applied=%llu, unstable.offset=%llu, len(unstable.Entries)=%lu",
     committed_, applied_, unstable_.offset_, unstable_.entries_.size());
@@ -245,20 +248,28 @@ string raftLog::String() {
 
 // hasNextEntries returns if there is any available entries for execution. This
 // is a fast check without heavy raftLog.slice() in raftLog.nextEnts().
-bool raftLog::hasNextEntries() {
+bool
+raftLog::hasNextEntries() {
   return committed_ + 1 > max(applied_ + 1, firstIndex());
 }
 
-int raftLog::snapshot(Snapshot **snapshot) {
+int
+raftLog::snapshot(Snapshot **snapshot) {
+  // first check unstable storage
   if (unstable_.snapshot_ != NULL) {
     *snapshot = unstable_.snapshot_;
     return OK;
   }
 
+  // then get snapshot from storage
   return storage_->GetSnapshot(snapshot);
 }
 
-uint64_t raftLog::zeroTermOnErrCompacted(uint64_t t, int err) {
+// check err code, if success return term,
+// return 0 if error code is ErrCompacted
+// others Fatal
+uint64_t
+raftLog::zeroTermOnErrCompacted(uint64_t t, int err) {
   if (SUCCESS(err)) {
     return t;
   }
@@ -271,7 +282,8 @@ uint64_t raftLog::zeroTermOnErrCompacted(uint64_t t, int err) {
   return 0;
 }
 
-bool raftLog::matchTerm(uint64_t i, uint64_t term) {
+bool
+raftLog::matchTerm(uint64_t i, uint64_t term) {
   int err;
   uint64_t t;
 
@@ -283,7 +295,10 @@ bool raftLog::matchTerm(uint64_t i, uint64_t term) {
   return t == term;
 }
 
-int raftLog::term(uint64_t i, uint64_t *t) {
+// get term of index, the term is saved in *t
+// if returned term is 0,means that index is not valid.
+int
+raftLog::term(uint64_t i, uint64_t *t) {
   uint64_t dummyIndex;
   int err = OK;
 
@@ -294,25 +309,28 @@ int raftLog::term(uint64_t i, uint64_t *t) {
     return OK;
   }
 
+  // first check in unstable storage
   bool ok = unstable_.maybeTerm(i, t);
   if (ok) {
-    goto out;
+    return err;
   }
 
+  // then check in stable storage
   err = storage_->Term(i, t);
   if (SUCCESS(err)) {
-    goto out;
+    return err;
   }
 
   if (err == ErrCompacted || err == ErrUnavailable) {
-    goto out;
+    return err;
   }
   logger_->Fatalf(__FILE__, __LINE__, "term err:%s", GetErrorString(err));
-out:
+
   return err;
 }
 
-uint64_t raftLog::firstIndex() {
+uint64_t
+raftLog::firstIndex() {
   uint64_t i;
   int err;
 
@@ -329,7 +347,8 @@ uint64_t raftLog::firstIndex() {
   return i;
 }
 
-uint64_t raftLog::lastIndex() {
+uint64_t 
+raftLog::lastIndex() {
   uint64_t i;
   int err;
 
@@ -350,6 +369,7 @@ uint64_t raftLog::lastIndex() {
 int raftLog::slice(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec* entries) {
   int err;
 
+  // first check if index out of bounds
   err = mustCheckOutOfBounds(lo, hi);
   if (!SUCCESS(err)) {
     return err;
@@ -359,6 +379,7 @@ int raftLog::slice(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec* entries
     return OK;
   }
 
+  // if lo index in unstable storage
   if (lo < unstable_.offset_) {
     err = storage_->Entries(lo, min(hi,unstable_.offset_), maxSize, entries);
     if (err == ErrCompacted) {
@@ -374,6 +395,7 @@ int raftLog::slice(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec* entries
     }
   }
 
+  // if hi index not in unstable storage
   if (hi > unstable_.offset_) {
     EntryVec unstable;
     unstable_.slice(max(lo, unstable_.offset_), hi, &unstable);
@@ -388,7 +410,8 @@ int raftLog::slice(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec* entries
   return OK;
 }
 
-int raftLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
+int 
+raftLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
   if (lo > hi) {
     logger_->Fatalf(__FILE__, __LINE__, "invalid slice %llu > %llu", lo, hi);
   }
@@ -404,6 +427,36 @@ int raftLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
   }
 
   return OK;
+}
+
+// newLog returns log using the given storage. It recovers the log to the state
+// that it just commits and applies the latest snapshot.
+raftLog* 
+newLog(Storage *storage, Logger *logger) {
+  raftLog *log = new raftLog(storage, logger);
+
+  uint64_t firstIndex, lastIndex;
+  int err;
+
+  // init the first and last log index
+  err = storage->FirstIndex(&firstIndex);
+  if (!SUCCESS(err)) {
+    logger->Fatalf(__FILE__, __LINE__, "get first index err:%s", GetErrorString(err));
+  }
+
+  err = storage->LastIndex(&lastIndex);
+  if (!SUCCESS(err)) {
+    logger->Fatalf(__FILE__, __LINE__, "get last index err:%s", GetErrorString(err));
+  }
+
+  log->unstable_.offset_ = lastIndex + 1;
+  log->unstable_.logger_ = logger;
+
+  // Initialize our committed and applied pointers to the time of the last compaction.
+  log->committed_ = firstIndex - 1;
+  log->applied_   = firstIndex - 1;
+
+  return log;
 }
 
 }; // namespace libraft
