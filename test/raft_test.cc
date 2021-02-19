@@ -3559,23 +3559,19 @@ TEST(raftTests, TestLeaderAppResp) {
     uint64_t windex;
     uint64_t wcommit;
     
-    tmp(uint64_t i, bool reject, uint64_t match, uint64_t next, int num, uint64_t index, uint64_t commit)
-      : index(i), reject(reject), match(match), next(next), msgNum(num), windex(index), wcommit(commit) {
-    }
+  } tests[] = {
+    // stale resp; no replies
+    {.index=3, .reject=true,  .match=0, .next=3, .msgNum=0, .windex=0, .wcommit=0},
+    // denied resp; leader does not commit; decrease next and send probing msg
+    {.index=2, .reject=true,  .match=0, .next=2, .msgNum=1, .windex=1, .wcommit=0},
+    // accept resp; leader commits; broadcast with commit index
+    {.index=2, .reject=false, .match=2, .next=4, .msgNum=2, .windex=2, .wcommit=2},
+    // ignore heartbeat replies
+    {.index=0, .reject=false, .match=0, .next=3, .msgNum=0, .windex=0, .wcommit=0},
   };
 
-  vector<tmp> tests;
-  // stale resp; no replies
-  tests.push_back(tmp(3, true, 0, 3, 0, 0, 0));
-  // denied resp; leader does not commit; decrease next and send probing msg
-  tests.push_back(tmp(2, true, 0, 2, 1, 1, 0));
-  // accept resp; leader commits; broadcast with commit index
-  tests.push_back(tmp(2, false, 2, 4, 2, 2, 2));
-  // ignore heartbeat replies
-  tests.push_back(tmp(0, false, 0, 3, 0, 0, 0));
-
-  size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  int i;
+  for (i = 0; i < (int)(sizeof(tests)/sizeof(tests[0])); ++i) {
  		// sm term is 1 after it becomes the leader.
 		// thus the last log term must be 1 to be committed.
     tmp &t = tests[i];
@@ -3599,7 +3595,8 @@ TEST(raftTests, TestLeaderAppResp) {
       entry.set_index(2);
       entry.set_term(1);
       entries.push_back(entry);
-      s->entries_ = entries;
+
+      tmp_s->entries_ = entries;
       r->raftLog_ = newLog(tmp_s, &kDefaultLogger);
       r->raftLog_->unstable_.offset_ = 3;
     }
@@ -3634,6 +3631,7 @@ TEST(raftTests, TestLeaderAppResp) {
       EXPECT_EQ(msg->commit(), t.wcommit);
     }
   }
+
 }
 
 // When the leader receives a heartbeat tick, it should
