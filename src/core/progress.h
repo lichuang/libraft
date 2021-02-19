@@ -9,6 +9,7 @@
 
 namespace libraft {
 
+// inflights is a sliding window for the inflight messages.
 struct inflights {
   // the starting index in the buffer
   int start_;
@@ -43,28 +44,34 @@ struct inflights {
   }
 };
 
+// State defines how the leader should interact with the follower.
 enum ProgressState {
+  // When in ProgressStateProbe, leader sends at most one replication message
+  // per heartbeat interval. It also probes actual progress of the follower.  
   ProgressStateProbe     = 0,
+
+  // When in ProgressStateReplicate, leader optimistically increases next
+  // to the latest entry sent after sending replication message. This is
+  // an optimized state for fast replicating log entries to the follower.  
   ProgressStateReplicate = 1,
+
+  // When in ProgressStateSnapshot, leader should have sent out snapshot
+  // before and stops sending any replication message.  
   ProgressStateSnapshot  = 2 
 };
 
 // Progress represents a follower’s progress in the view of the leader. Leader maintains
 // progresses of all followers, and sends entries to the follower based on its progress.
 struct Progress {
-  uint64_t match_, next_;
+  // for each follower,match_ is the highest log entry known to be replicated.
+  // (initialized to 0, increases monotonically)
+  uint64_t match_;
+  
+  // for each follower, next_ is the next log entry known to be replicated.
+  // (initialized to leader last log index + 1)  
+  uint64_t next_;
 
   // State defines how the leader should interact with the follower.
-  //
-  // When in ProgressStateProbe, leader sends at most one replication message
-  // per heartbeat interval. It also probes actual progress of the follower.
-  //
-  // When in ProgressStateReplicate, leader optimistically increases next
-  // to the latest entry sent after sending replication message. This is
-  // an optimized state for fast replicating log entries to the follower.
-  //
-  // When in ProgressStateSnapshot, leader should have sent out snapshot
-  // before and stops sending any replication message.
   ProgressState state_;
 
   // Paused is used in ProgressStateProbe.
@@ -95,11 +102,15 @@ struct Progress {
   // When a leader receives a reply, the previous inflights should
   // be freed by calling inflights.freeTo with the index of the last
   // received entry.
-  inflights ins_;
+  inflights inflights_;
+
   Logger* logger_;
 
   const char* stateString();
+
+  // reset progress state and sliding window
   void resetState(ProgressState state);
+
   void becomeProbe();
   void becomeReplicate();
   void becomeSnapshot(uint64_t snapshoti);
@@ -111,10 +122,12 @@ struct Progress {
   void resume();
   bool isPaused();
   bool needSnapshotAbort();
-  string string();
+  string String();
 
   Progress(uint64_t next, int maxInfilght, Logger *logger);
   ~Progress();
 };
+
 }; // namespace libraft
+
 #endif  // __LIBRAFT_PROGRESS_H__

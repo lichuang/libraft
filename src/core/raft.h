@@ -49,7 +49,7 @@ struct raft {
   StateType state_;
   map<uint64_t, bool> votes_;
 
-  // save every out msg in outMsgs_,then msgs will be moved to `Ready' struct
+  // save every outbound msg in outMsgs_,then msgs will be moved to `Ready' struct
   MessageVec outMsgs_;
 
   // current leader id, default is kNone.

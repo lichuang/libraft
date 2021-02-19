@@ -50,7 +50,7 @@ TEST(raftFlowController, TestMsgAppFlowControlFull) {
   }
 
   // ensure 1
-  EXPECT_TRUE(pr2->ins_.full());
+  EXPECT_TRUE(pr2->inflights_.full());
 
   // ensure 2
   for (i = 0; i < 10; ++i) {
@@ -136,7 +136,7 @@ TEST(raftFlowController, TestMsgAppFlowControlMoveForward) {
     EXPECT_EQ((int)msgs.size(), 1);
 
     // ensure 1
-    EXPECT_TRUE(pr2->ins_.full());
+    EXPECT_TRUE(pr2->inflights_.full());
 
     // ensure 2
     int j;
@@ -151,7 +151,7 @@ TEST(raftFlowController, TestMsgAppFlowControlMoveForward) {
         r->step(msg);
       }
 
-      EXPECT_TRUE(pr2->ins_.full());
+      EXPECT_TRUE(pr2->inflights_.full());
     }
   }
 }
@@ -189,7 +189,7 @@ TEST(raftFlowController, TestMsgAppFlowControlRecvHeartbeat) {
   }
 
   for (i = 1; i < 5; ++i) {
-    EXPECT_TRUE(pr2->ins_.full());
+    EXPECT_TRUE(pr2->inflights_.full());
 
     // recv tt msgHeartbeatResp and expect one free slot
     int j;
@@ -204,7 +204,7 @@ TEST(raftFlowController, TestMsgAppFlowControlRecvHeartbeat) {
       }
       MessageVec msgs;
       r->readMessages(&msgs);
-      EXPECT_FALSE(pr2->ins_.full());
+      EXPECT_FALSE(pr2->inflights_.full());
     }
 
     // one slot

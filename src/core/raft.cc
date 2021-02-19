@@ -244,10 +244,10 @@ raft::sendAppend(uint64_t to) {
     uint64_t sindex = snapshot->metadata().index();
     uint64_t sterm = snapshot->metadata().term();
     logger_->Debugf(__FILE__, __LINE__, "%x [firstindex: %llu, commit: %llu] sent snapshot[index: %llu, term: %llu] to %x [%s]",
-      id_, raftLog_->firstIndex(), raftLog_->committed_, sindex, sterm, to, pr->string().c_str());
+      id_, raftLog_->firstIndex(), raftLog_->committed_, sindex, sterm, to, pr->String().c_str());
     // change to snapshot state
     pr->becomeSnapshot(sindex);
-    logger_->Debugf(__FILE__, __LINE__, "%x paused sending replication messages to %x [%s]", id_, to, pr->string().c_str());
+    logger_->Debugf(__FILE__, __LINE__, "%x paused sending replication messages to %x [%s]", id_, to, pr->String().c_str());
   } else {
     // else,send Append Msg
     msg->set_type(MsgApp);
@@ -266,7 +266,7 @@ raft::sendAppend(uint64_t to) {
       case ProgressStateReplicate:
         last = entries[entries.size() - 1].index();
         pr->optimisticUpdate(last);
-        pr->ins_.add(last);
+        pr->inflights_.add(last);
         break;
       case ProgressStateProbe:
         pr->pause();
@@ -855,7 +855,7 @@ stepLeader(raft *r, const Message& msg) {
         r->id_, msg.rejecthint(), from, index);
       if (pr->maybeDecrTo(index, msg.rejecthint())) {
         logger->Debugf(__FILE__, __LINE__, "%x decreased progress of %x to [%s]",
-          r->id_, from, pr->string().c_str());
+          r->id_, from, pr->String().c_str());
         if (pr->state_ == ProgressStateReplicate) {
           pr->becomeProbe();
         }
@@ -868,10 +868,10 @@ stepLeader(raft *r, const Message& msg) {
           pr->becomeReplicate();
         } else if (pr->state_ == ProgressStateSnapshot && pr->needSnapshotAbort()) {
           logger->Debugf(__FILE__, __LINE__, "%x snapshot aborted, resumed sending replication messages to %x [%s]",
-            r->id_, from, pr->string().c_str());
+            r->id_, from, pr->String().c_str());
           pr->becomeProbe();
         } else if (pr->state_ == ProgressStateReplicate) {
-          pr->ins_.freeTo(index);
+          pr->inflights_.freeTo(index);
         }
         if (r->maybeCommit()) {
           r->bcastAppend();
@@ -894,8 +894,8 @@ stepLeader(raft *r, const Message& msg) {
     pr->resume();
 
     // free one slot for the full inflights window to allow progress.
-    if (pr->state_ == ProgressStateReplicate && pr->ins_.full()) {
-      pr->ins_.freeFirstOne();
+    if (pr->state_ == ProgressStateReplicate && pr->inflights_.full()) {
+      pr->inflights_.freeFirstOne();
     }
     if (pr->match_ < r->raftLog_->lastIndex()) {
       r->sendAppend(from);
@@ -931,12 +931,12 @@ stepLeader(raft *r, const Message& msg) {
     if (!msg.reject()) {
       pr->becomeProbe();
       logger->Debugf(__FILE__, __LINE__, "%x snapshot succeeded, resumed sending replication messages to %x [%s]",
-        r->id_, from, pr->string().c_str());
+        r->id_, from, pr->String().c_str());
     } else {
       pr->snapshotFailure();
       pr->becomeProbe();
       logger->Debugf(__FILE__, __LINE__, "%x snapshot failed, resumed sending replication messages to %x [%s]",
-        r->id_, from, pr->string().c_str());
+        r->id_, from, pr->String().c_str());
     }
     // If snapshot finish, wait for the msgAppResp from the remote node before sending
     // out the next msgApp.
@@ -950,7 +950,7 @@ stepLeader(raft *r, const Message& msg) {
       pr->becomeProbe();
     }
     logger->Debugf(__FILE__, __LINE__, "%x failed to send message to %x because it is unreachable [%s]",
-      r->id_, msg.from(), pr->string().c_str());
+      r->id_, msg.from(), pr->String().c_str());
     break;
   case MsgTransferLeader:
     leadTransferee = msg.from();
@@ -1126,7 +1126,7 @@ stepFollower(raft* r, const Message& msg) {
 // configuration of state machine.
 bool
 raft::restore(const Snapshot& snapshot) {
-  // ignore out of time snapshot
+  // ignore outdated snapshot
   if (snapshot.metadata().index() <= raftLog_->committed_) {
     return false;
   }
@@ -1158,7 +1158,7 @@ raft::restore(const Snapshot& snapshot) {
       match = next - 1;
     }
     setProgress(node, match, next);
-    logger_->Infof(__FILE__, __LINE__, "%x restored progress of %x [%s]", id_, node, progressMap_[node]->string().c_str());
+    logger_->Infof(__FILE__, __LINE__, "%x restored progress of %x [%s]", id_, node, progressMap_[node]->String().c_str());
   }
   return true;
 }
@@ -1198,7 +1198,7 @@ raft::handleHeartbeat(const Message& msg) {
 
 void
 raft::handleAppendEntries(const Message& msg) {
-  // is msg already out of date?
+  // is msg already outdated?
   if (msg.index() < raftLog_->committed_) {
     Message *resp = new Message();
     resp->set_to(msg.from());

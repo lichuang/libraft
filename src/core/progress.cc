@@ -13,21 +13,23 @@ Progress::Progress(uint64_t next, int maxInfilght, Logger *logger)
     paused_(false),  
     pendingSnapshot_(0),
     recentActive_(false),
-    ins_(inflights(maxInfilght, logger)),
+    inflights_(inflights(maxInfilght, logger)),
     logger_(logger) {
 }
 
 Progress::~Progress() {
 }
 
-void Progress::resetState(ProgressState state) {
+void
+Progress::resetState(ProgressState state) {
   paused_ = false;
   pendingSnapshot_ = 0;
   state_ = state;
-  ins_.reset();
+  inflights_.reset();
 }
 
-void Progress::becomeProbe() {
+void
+Progress::becomeProbe() {
   // If the original state is ProgressStateSnapshot, progress knows that
   // the pending snapshot has been sent to this peer successfully, then
   // probes from pendingSnapshot + 1.
@@ -41,19 +43,22 @@ void Progress::becomeProbe() {
   }
 }
 
-void Progress::becomeReplicate() {
+void
+Progress::becomeReplicate() {
   resetState(ProgressStateReplicate);
   next_ = match_ + 1;
 }
 
-void Progress::becomeSnapshot(uint64_t snapshoti) {
+void
+Progress::becomeSnapshot(uint64_t snapshoti) {
   resetState(ProgressStateSnapshot);
   pendingSnapshot_ = snapshoti;
 }
 
 // maybeUpdate returns false if the given n index comes from an outdated message.
 // Otherwise it updates the progress and returns true.
-bool Progress::maybeUpdate(uint64_t n) {
+bool
+Progress::maybeUpdate(uint64_t n) {
   bool updated = false;
   if (match_ < n) {
     match_ = n;
@@ -66,17 +71,20 @@ bool Progress::maybeUpdate(uint64_t n) {
   return updated;
 }
 
-void Progress::optimisticUpdate(uint64_t n) {
+void
+Progress::optimisticUpdate(uint64_t n) {
   next_ = n + 1;
 }
 
-void Progress::snapshotFailure() {
+void
+Progress::snapshotFailure() {
   pendingSnapshot_ = 0;
 }
 
 // maybeDecrTo returns false if the given to index comes from an out of order message.
 // Otherwise it decreases the progress next index to min(rejected, last) and returns true.
-bool Progress::maybeDecrTo(uint64_t rejected, uint64_t last) {
+bool
+Progress::maybeDecrTo(uint64_t rejected, uint64_t last) {
   if (state_ == ProgressStateReplicate) {
     // the rejection must be stale if the progress has matched and "rejected"
     // is smaller than "match".
@@ -101,11 +109,13 @@ bool Progress::maybeDecrTo(uint64_t rejected, uint64_t last) {
   return true;
 }
 
-void Progress::pause() {
+void
+Progress::pause() {
   paused_ = true;
 }
 
-void Progress::resume() {
+void
+Progress::resume() {
   paused_ = false;
 }
 
@@ -127,12 +137,13 @@ const char* Progress::stateString() {
 // paused. A node may be paused because it has rejected recent
 // MsgApps, is currently waiting for a snapshot, or has reached the
 // MaxInflightMsgs limit.
-bool Progress::isPaused() {
+bool
+Progress::isPaused() {
   switch (state_) {
   case ProgressStateProbe:
     return paused_;
   case ProgressStateReplicate:
-    return ins_.full();
+    return inflights_.full();
   case ProgressStateSnapshot:
     return true;
   }
@@ -140,18 +151,21 @@ bool Progress::isPaused() {
 
 // needSnapshotAbort returns true if snapshot progress's Match
 // is equal or higher than the pendingSnapshot.
-bool Progress::needSnapshotAbort() {
+bool
+Progress::needSnapshotAbort() {
   return state_ == ProgressStateSnapshot && match_ >= pendingSnapshot_;
 }
 
-string Progress::string() {
+string 
+Progress::String() {
   char tmp[500];
   snprintf(tmp, sizeof(tmp), "next = %llu, match = %llu, state = %s, waiting = %d, pendingSnapshot = %llu",
     next_, match_, stateString(), isPaused(), pendingSnapshot_);
   return std::string(tmp);
 }
 
-void inflights::add(uint64_t infight) {
+void 
+inflights::add(uint64_t infight) {
   if (full()) {
     logger_->Fatalf(__FILE__, __LINE__, "cannot add into a full inflights");
   }
@@ -173,7 +187,8 @@ void inflights::add(uint64_t infight) {
 // grow the inflight buffer by doubling up to inflights.size. We grow on demand
 // instead of preallocating to inflights.size to handle systems which have
 // thousands of Raft groups per process.
-void inflights::growBuf() {
+void 
+inflights::growBuf() {
   uint32_t newSize = buffer_.size() * 2;
   if (newSize == 0) {
     newSize = 1;
@@ -185,7 +200,8 @@ void inflights::growBuf() {
 }
 
 // freeTo frees the inflights smaller or equal to the given `to` flight.
-void inflights::freeTo(uint64_t to) {
+void 
+inflights::freeTo(uint64_t to) {
   if (count_ == 0 || to < buffer_[start_]) {
     return;
   }
@@ -214,15 +230,18 @@ void inflights::freeTo(uint64_t to) {
   }
 }
 
-void inflights::freeFirstOne() {
+void 
+inflights::freeFirstOne() {
   freeTo(buffer_[start_]);
 }
 
-bool inflights::full() {
+bool 
+inflights::full() {
   return count_ == size_;
 }
 
-void inflights::reset() {
+void 
+inflights::reset() {
   count_ = 0;
   start_ = 0;
 }
