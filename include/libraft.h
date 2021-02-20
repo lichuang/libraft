@@ -176,9 +176,9 @@ public:
 	// snapshot and call Snapshot later.
   virtual int GetSnapshot(Snapshot **snapshot) = 0;
 
-  virtual int SetHardState(const HardState& ) = 0;
-  virtual int Append(const EntryVec& entries) = 0;
-  virtual int CreateSnapshot(uint64_t i, ConfState *cs, const string& data, Snapshot *ss) = 0;
+  //int SetHardState(const HardState& );
+  //virtual int Append(const EntryVec& entries) = 0;
+  //virtual int CreateSnapshot(uint64_t i, ConfState *cs, const string& data, Snapshot *ss) = 0;
 };
 
 class Logger {

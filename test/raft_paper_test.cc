@@ -91,7 +91,7 @@ Message acceptAndReply(Message *msg) {
   return m;
 }
 
-void commitNoopEntry(raft *r, Storage *s) {
+void commitNoopEntry(raft *r, MemoryStorage *s) {
   EXPECT_EQ(r->state_, StateLeader);
   r->bcastAppend();
   // simulate the response of MsgApp
@@ -669,7 +669,7 @@ TEST(raftPaperTests, TestLeaderStartReplication) {
   peers.push_back(1);
   peers.push_back(2);
   peers.push_back(3);
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
@@ -741,7 +741,7 @@ TEST(raftPaperTests, TestLeaderCommitEntry) {
   peers.push_back(1);
   peers.push_back(2);
   peers.push_back(3);
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
@@ -855,7 +855,7 @@ TEST(raftPaperTests, TestLeaderAcknowledgeCommit) {
     tmp &t = tests[i];
     vector<uint64_t> peers;
     idsBySize(t.size, &peers);
-    Storage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
     raft *r = newTestRaft(1, peers, 10, 1, s);
 		r->becomeCandidate();
 		r->becomeLeader();
@@ -933,7 +933,7 @@ TEST(raftPaperTests, TestLeaderCommitPrecedingEntries) {
     peers.push_back(1);
     peers.push_back(2);
     peers.push_back(3);
-    Storage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
     EntryVec appEntries = t;
     s->Append(appEntries);
     raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -1142,7 +1142,7 @@ TEST(raftPaperTests, TestFollowerCheckMsgApp) {
     peers.push_back(1);
     peers.push_back(2);
     peers.push_back(3);
-    Storage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
     EntryVec ents = entries;
     s->Append(ents);
     raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -1282,7 +1282,7 @@ TEST(raftPaperTests, TestFollowerAppendEntries) {
 		peers.push_back(1);
 		peers.push_back(2);
 		peers.push_back(3);
-		Storage *s = new MemoryStorage(&kDefaultLogger);
+		MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
 
 		EntryVec appEntries;
 		Entry entry;
@@ -1480,7 +1480,7 @@ TEST(raftPaperTests, TestLeaderSyncFollowerLog) {
 		peers.push_back(2);
 		peers.push_back(3);
 
-		Storage *leaderStorage = new MemoryStorage(&kDefaultLogger);
+		MemoryStorage *leaderStorage = new MemoryStorage(&kDefaultLogger);
 		EntryVec appEntries = ents;
     leaderStorage->Append(appEntries);
 		raft *leader = newTestRaft(1, peers, 10, 1, leaderStorage);
@@ -1492,7 +1492,7 @@ TEST(raftPaperTests, TestLeaderSyncFollowerLog) {
       leader->loadState(hs);
     }
 
-		Storage *followerStorage = new MemoryStorage(&kDefaultLogger);
+		MemoryStorage *followerStorage = new MemoryStorage(&kDefaultLogger);
     followerStorage->Append(t);
 		raft *follower = newTestRaft(2, peers, 10, 1, followerStorage);
 
@@ -1749,7 +1749,7 @@ TEST(raftPaperTests, TestVoter) {
     vector<uint64_t> peers;
     peers.push_back(1);
     peers.push_back(2);
-    Storage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
     s->Append(t.ents);
     raft *r = newTestRaft(1, peers, 10, 1, s);
 
@@ -1810,7 +1810,7 @@ TEST(raftPaperTests, TestLeaderOnlyCommitsLogFromCurrentTerm) {
     tmp& t = tests[i];
     EntryVec ents = entries;
 
-		Storage *s = new MemoryStorage(&kDefaultLogger);
+		MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
     s->Append(ents);
 		vector<uint64_t> peers;
 		peers.push_back(1);

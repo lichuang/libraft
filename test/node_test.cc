@@ -37,7 +37,7 @@ TEST(nodeTests, TestNodePropose) {
   vector<ReadState*> readStates;
   NodeImpl *n = new NodeImpl();
   n->logger_ = &kDefaultLogger;
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -193,7 +193,7 @@ TEST(nodeTests, TestNodeProposeConfig) {
 
   NodeImpl *n = new NodeImpl();
   n->logger_ = &kDefaultLogger;
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -230,7 +230,7 @@ TEST(nodeTests, TestNodeProposeConfig) {
 
 // TestNodeProposeAddDuplicateNode ensures that two proposes to add the same node should
 // not affect the later propose to add new node.
-void applyReadyEntries(Ready* ready, EntryVec* readyEntries, Storage *s, NodeImpl *n) {
+void applyReadyEntries(Ready* ready, EntryVec* readyEntries, MemoryStorage *s, NodeImpl *n) {
   if (ready == NULL) {
     n->Advance();
     return;
@@ -256,7 +256,7 @@ void applyReadyEntries(Ready* ready, EntryVec* readyEntries, Storage *s, NodeImp
 TEST(nodeTests, TestNodeProposeAddDuplicateNode) {
   NodeImpl *n = new NodeImpl();
   n->logger_ = &kDefaultLogger;
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);

@@ -22,7 +22,7 @@ void preVoteConfig(Config *c) {
 }
 
 raftStateMachine* entsWithConfig(ConfigFun fun, const vector<uint64_t>& terms) {
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
 
   vector<Entry> entries;
   size_t i;
@@ -49,7 +49,7 @@ raftStateMachine* entsWithConfig(ConfigFun fun, const vector<uint64_t>& terms) {
 // to the given value but no log entries (indicating that it voted in
 // the given term but has not received any logs).
 raftStateMachine* votedWithConfig(ConfigFun fun, uint64_t vote, uint64_t term) {
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   HardState hs;
   hs.set_vote(vote);
   hs.set_term(term);
@@ -3962,7 +3962,7 @@ TEST(raftTests, TestRecvMsgUnreachable) {
 	vector<uint64_t> peers;
 	peers.push_back(1);
 	peers.push_back(2);
-	Storage *s = new MemoryStorage(&kDefaultLogger);
+	MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
 	s->Append(prevEntries);
 	raft *r = newTestRaft(1, peers, 10, 1, s);
 	r->becomeCandidate();
