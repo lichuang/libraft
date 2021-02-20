@@ -1306,7 +1306,6 @@ raft::resetPendingConf() {
   pendingConf_ = false;
 }
 
-//TODO:
 static int 
 validateConfig(Config *config) {
   if (config->id == kEmptyPeerId) {

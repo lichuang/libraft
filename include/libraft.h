@@ -221,12 +221,12 @@ struct Config {
   // candidate and start an election. ElectionTick must be greater than
   // HeartbeatTick. We suggest ElectionTick = 10 * HeartbeatTick to avoid
   // unnecessary leader switching.
-  int               electionTick;
+  int               electionTick = 10;
 
   // heartbeatTick is the number of Node.Tick invocations that must pass between
   // heartbeats. That is, a leader sends heartbeat messages to maintain its
   // leadership every HeartbeatTick ticks.
-  int               heartbeatTick;
+  int               heartbeatTick = 1;
 
   // storage is the storage for raft. raft generates entries and states to be
   // stored in storage. raft reads the persisted entries and states out of
@@ -245,14 +245,14 @@ struct Config {
   // operation). On the other side, it might affect the throughput during normal
   // replication. Note: math.MaxUint64 for unlimited, 0 for at most one entry per
   // message.
-  uint64_t          maxSizePerMsg = 1024;
+  uint64_t          maxSizePerMsg = 1024 * 1024;
 
   // maxInflightMsgs limits the max number of in-flight append messages during
   // optimistic replication phase. The application transportation layer usually
   // has its own sending buffer over TCP/UDP. Setting MaxInflightMsgs to avoid
   // overflowing that sending buffer. TODO (xiangli): feedback to application to
   // limit the proposal rate?
-  uint64_t          maxInflightMsgs = 100;
+  uint64_t          maxInflightMsgs = 1024;
 
   // checkQuorum specifies if the leader should check quorum activity. Leader
   // steps down when quorum is not active for an electionTimeout.
