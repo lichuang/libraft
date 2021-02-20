@@ -99,7 +99,7 @@ raftLog::lastTerm() {
 
   err = term(lastIndex(), &t);
   if (!SUCCESS(err)) {
-    logger_->Fatalf(__FILE__, __LINE__, "unexpected error when getting the last term (%s)", GetErrorString(err));
+    logger_->Fatalf(__FILE__, __LINE__, "unexpected error when getting the last term (%s)", kErrString[err]);
   }
 
   return t;
@@ -129,7 +129,7 @@ raftLog::allEntries(EntryVec *entries) {
   if (err == ErrCompacted) { // try again if there was a racing compaction
     return allEntries(entries);
   }
-  logger_->Fatalf(__FILE__, __LINE__, "allEntries fatal: %s", GetErrorString(err));
+  logger_->Fatalf(__FILE__, __LINE__, "allEntries fatal: %s", kErrString[err]);
 }
 
 // isUpToDate determines if the given (lastIndex,term) log is more up-to-date
@@ -232,7 +232,7 @@ raftLog::nextEntries(EntryVec* entries) {
   if (committed_ + 1 > offset) {
     int err = slice(offset, committed_ + 1, kNoLimit, entries);  
     if (!SUCCESS(err)) {
-      logger_->Fatalf(__FILE__, __LINE__, "unexpected error when getting unapplied entries (%s)", GetErrorString(err));
+      logger_->Fatalf(__FILE__, __LINE__, "unexpected error when getting unapplied entries (%s)", kErrString[err]);
     }
   }
 }
@@ -278,7 +278,7 @@ raftLog::zeroTermOnErrCompacted(uint64_t t, int err) {
     return 0;
   }
 
-  logger_->Fatalf(__FILE__, __LINE__, "unexpected error: %s", GetErrorString(err));
+  logger_->Fatalf(__FILE__, __LINE__, "unexpected error: %s", kErrString[err]);
   return 0;
 }
 
@@ -323,7 +323,7 @@ raftLog::term(uint64_t i, uint64_t *t) {
   if (err == ErrCompacted || err == ErrUnavailable) {
     return err;
   }
-  logger_->Fatalf(__FILE__, __LINE__, "term err:%s", GetErrorString(err));
+  logger_->Fatalf(__FILE__, __LINE__, "term err:%s", kErrString[err]);
 
   return err;
 }
@@ -340,7 +340,7 @@ raftLog::firstIndex() {
 
   err = storage_->FirstIndex(&i);
   if (!SUCCESS(err)) {
-    logger_->Fatalf(__FILE__, __LINE__, "firstIndex error:%s", GetErrorString(err));
+    logger_->Fatalf(__FILE__, __LINE__, "firstIndex error:%s", kErrString[err]);
   }
 
   return i;
@@ -358,7 +358,7 @@ raftLog::lastIndex() {
 
   err = storage_->LastIndex(&i);
   if (!SUCCESS(err)) {
-    logger_->Fatalf(__FILE__, __LINE__, "lastIndex error:%s", GetErrorString(err));
+    logger_->Fatalf(__FILE__, __LINE__, "lastIndex error:%s", kErrString[err]);
   }
 
   return i;
@@ -386,7 +386,7 @@ int raftLog::slice(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec* entries
     } else if (err == ErrUnavailable) {
       logger_->Fatalf(__FILE__, __LINE__, "entries[%llu:%llu) is unavailable from storage", lo, min(hi, unstable_.offset_));
     } else if (!SUCCESS(err)) {
-      logger_->Fatalf(__FILE__, __LINE__, "storage entries err:%s", GetErrorString(err));
+      logger_->Fatalf(__FILE__, __LINE__, "storage entries err:%s", kErrString[err]);
     }
 
     if ((uint64_t)entries->size() < min(hi, unstable_.offset_) - lo) {
@@ -440,12 +440,12 @@ newLog(Storage *storage, Logger *logger) {
   // init the first and last log index
   err = storage->FirstIndex(&firstIndex);
   if (!SUCCESS(err)) {
-    logger->Fatalf(__FILE__, __LINE__, "get first index err:%s", GetErrorString(err));
+    logger->Fatalf(__FILE__, __LINE__, "get first index err:%s", kErrString[err]);
   }
 
   err = storage->LastIndex(&lastIndex);
   if (!SUCCESS(err)) {
-    logger->Fatalf(__FILE__, __LINE__, "get last index err:%s", GetErrorString(err));
+    logger->Fatalf(__FILE__, __LINE__, "get last index err:%s", kErrString[err]);
   }
 
   log->unstable_.offset_ = lastIndex + 1;

@@ -10,6 +10,7 @@
 #include "libraft.h"
 
 namespace libraft {
+
 #define doLog(c) va_list args; \
                  va_start(args, fmt); \
                  log(c, file, line, fmt, args); \

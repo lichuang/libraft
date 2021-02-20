@@ -106,6 +106,8 @@ struct raftLog {
   uint64_t zeroTermOnErrCompacted(uint64_t t, int err);
 };
 
+// newLog returns log using the given storage. It recovers the log to the state
+// that it just commits and applies the latest snapshot.
 extern raftLog* newLog(Storage *storage, Logger *logger);
 
 }; // namespace libraft

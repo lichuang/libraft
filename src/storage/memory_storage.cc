@@ -72,8 +72,10 @@ MemoryStorage::Term(uint64_t i, uint64_t *term) {
 }
 
 int
-MemoryStorage::Entries(uint64_t lo, uint64_t hi, uint64_t maxSize, vector<Entry> *entries) {
+MemoryStorage::Entries(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec *entries) {
   Mutex mutex(&locker_);
+
+  // first check validity of index
   uint64_t offset = entries_[0].index();
   if (lo <= offset) {
     return ErrCompacted;
@@ -81,6 +83,7 @@ MemoryStorage::Entries(uint64_t lo, uint64_t hi, uint64_t maxSize, vector<Entry>
   if (hi > lastIndex() + 1) {
     return ErrUnavailable;
   }
+  
   // only contains dummy entries.
   if (entries_.size() == 1) {
     return ErrUnavailable;

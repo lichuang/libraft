@@ -445,8 +445,8 @@ TEST(raftPaperTests, TestFollowerVote) {
 	};
 
 	vector<tmp> tests;
-  tests.push_back(tmp(kNone, 1, false));
-  tests.push_back(tmp(kNone, 2, false));
+  tests.push_back(tmp(kEmptyPeerId, 1, false));
+  tests.push_back(tmp(kEmptyPeerId, 2, false));
   tests.push_back(tmp(1, 1, false));
   tests.push_back(tmp(2, 2, false));
   tests.push_back(tmp(1, 2, true));
@@ -615,7 +615,7 @@ void testNonleadersElectionTimeoutNonconflict(StateType state) {
       raft *r = rs[j];
       switch (state) {
       case StateFollower:
-        r->becomeFollower(r->term_ + 1,kNone);
+        r->becomeFollower(r->term_ + 1,kEmptyPeerId);
         break;
       case StateCandidate:
         r->becomeCandidate();

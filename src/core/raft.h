@@ -52,12 +52,12 @@ struct raft {
   // save every outbound msg in outMsgs_,then msgs will be moved to `Ready' struct
   MessageVec outMsgs_;
 
-  // current leader id, default is kNone.
+  // current leader id, default is kEmptyPeerId.
   uint64_t leader_;
 
   // leadTransferee is id of the leader transfer target when its value is not zero.
   // Follow the procedure defined in raft thesis 3.10.
-  // default is kNone.
+  // default is kEmptyPeerId.
   uint64_t leadTransferee_;
 
   // New configuration is ignored if there exists unapplied configuration.
@@ -217,7 +217,7 @@ struct raft {
   void resetPendingConf();
 };
 
-extern raft* newRaft(const Config *);
+extern raft* newRaft(Config *);
 string entryString(const Entry& entry);
 
 // different role's state machine functions,after `Raft' change state,

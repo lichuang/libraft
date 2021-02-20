@@ -24,7 +24,7 @@ NodeImpl::NodeImpl()
   : stopped_(false)
   , raft_(NULL)
   , logger_(NULL)
-  , leader_(kNone)
+  , leader_(kEmptyPeerId)
   , prevSoftState_(kEmptySoftState)
   , prevHardState_(kEmptyHardState)
   , waitAdvanced_(false)
@@ -68,7 +68,7 @@ NodeImpl::ProposeConfChange(const ConfChange& cc, Ready **ready) {
   string data;
   if (!cc.SerializeToString(&data)) {
     logger_->Errorf(__FILE__, __LINE__, "ConfChange SerializeToString error");
-    return ErrSeriaFail;
+    return ErrSerializeFail;
   }
 
   Message msg;
@@ -161,7 +161,7 @@ NodeImpl::stateMachine(const Message& msg, Ready **ready) {
   }
   if (leader_ != raft_->leader_) {
     if (raft_->hasLeader()) {
-      if (leader_ == kNone) {
+      if (leader_ == kEmptyPeerId) {
         logger_->Infof(__FILE__, __LINE__, "raft.node: %x elected leader %x at term %llu",
           raft_->id_, raft_->leader_, raft_->term_);
       } else {
@@ -217,7 +217,7 @@ NodeImpl::stateMachine(const Message& msg, Ready **ready) {
 
 void 
 NodeImpl::handleConfChange() {
-  if (confChange_.nodeid() == kNone) {
+  if (confChange_.nodeid() == kEmptyPeerId) {
     raft_->resetPendingConf();
     goto addnodes;
   }
@@ -337,14 +337,17 @@ NodeImpl::readyContainUpdate() {
 // StartNode returns a new Node given configuration and a list of raft peers.
 // It appends a ConfChangeAddNode entry for each given peer to the initial log.
 Node* 
-StartNode(const Config* config, const vector<Peer>& peers) {
+StartNode(Config* config, const vector<Peer>& peers) {
   NodeImpl* node = new NodeImpl();
   node->logger_ = config->logger;
   raft *r = newRaft(config);
   
+  if (r == NULL) {
+    return NULL;
+  }
 	// become the follower at term 1 and apply initial configuration
 	// entries of term 1
-  r->becomeFollower(1, kNone);
+  r->becomeFollower(1, kEmptyPeerId);
 
   size_t i;
   for (i = 0; i < peers.size(); ++i) {
@@ -397,9 +400,12 @@ StartNode(const Config* config, const vector<Peer>& peers) {
 // The current membership of the cluster will be restored from the Storage.
 // If the caller has an existing state machine, pass in the last log index that
 // has been applied to it; otherwise use zero.
-Node* 
-RestartNode(const Config *config) {
+Node*
+RestartNode(Config *config) {
   raft *r = newRaft(config);
+  if (r == NULL) {
+    return NULL;
+  }
   NodeImpl* node = new NodeImpl();
   node->logger_ = config->logger;
   node->raft_ = r;

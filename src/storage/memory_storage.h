@@ -10,6 +10,8 @@
 
 namespace libraft {
 
+// MemoryStorage implements the Storage interface backed by an
+// in-memory array.
 class MemoryStorage : public Storage {
 public:
   MemoryStorage(Logger *logger);
@@ -19,7 +21,7 @@ public:
   int FirstIndex(uint64_t *index);
   int LastIndex(uint64_t *index);
   int Term(uint64_t i, uint64_t *term);
-  int Entries(uint64_t lo, uint64_t hi, uint64_t maxSize, vector<Entry> *entries);
+  int Entries(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec *entries);
   int GetSnapshot(Snapshot **snapshot);
   int SetHardState(const HardState& );
 
@@ -35,10 +37,15 @@ private:
 public:
   HardState hardState_;
   Snapshot  *snapShot_;
+  
   // ents[i] has raft log position i+snapshot.Metadata.Index
   EntryVec entries_;
 
+	// Protects access to all fields. Most methods of MemoryStorage are
+	// run on the raft goroutine, but Append() is run on an application
+	// goroutine.
   Locker locker_;
+
   Logger *logger_;
 };
 

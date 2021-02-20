@@ -663,7 +663,7 @@ void testVoteFromAnyState(MessageType vt) {
       EXPECT_EQ(r->term_, origTerm);
       // if st == StateFollower or StatePreCandidate, r hasn't voted yet.
       // In StateCandidate or StateLeader, it's voted for itself.
-      EXPECT_FALSE(r->vote_ != kNone && r->vote_ != 1);
+      EXPECT_FALSE(r->vote_ != kEmptyPeerId && r->vote_ != 1);
     }
   }
 }
@@ -2593,25 +2593,25 @@ void testRecvMsgVote(MessageType type) {
 
   vector<tmp> tests;
   
-  tests.push_back(tmp(StateFollower, 0, 0, kNone, true));
-  tests.push_back(tmp(StateFollower, 0, 1, kNone, true));
-  tests.push_back(tmp(StateFollower, 0, 2, kNone, true));
-  tests.push_back(tmp(StateFollower, 0, 3, kNone, false));
+  tests.push_back(tmp(StateFollower, 0, 0, kEmptyPeerId, true));
+  tests.push_back(tmp(StateFollower, 0, 1, kEmptyPeerId, true));
+  tests.push_back(tmp(StateFollower, 0, 2, kEmptyPeerId, true));
+  tests.push_back(tmp(StateFollower, 0, 3, kEmptyPeerId, false));
 
-  tests.push_back(tmp(StateFollower, 1, 0, kNone, true));
-  tests.push_back(tmp(StateFollower, 1, 1, kNone, true));
-  tests.push_back(tmp(StateFollower, 1, 2, kNone, true));
-  tests.push_back(tmp(StateFollower, 1, 3, kNone, false));
+  tests.push_back(tmp(StateFollower, 1, 0, kEmptyPeerId, true));
+  tests.push_back(tmp(StateFollower, 1, 1, kEmptyPeerId, true));
+  tests.push_back(tmp(StateFollower, 1, 2, kEmptyPeerId, true));
+  tests.push_back(tmp(StateFollower, 1, 3, kEmptyPeerId, false));
 
-  tests.push_back(tmp(StateFollower, 2, 0, kNone, true));
-  tests.push_back(tmp(StateFollower, 2, 1, kNone, true));
-  tests.push_back(tmp(StateFollower, 2, 2, kNone, false));
-  tests.push_back(tmp(StateFollower, 2, 3, kNone, false));
+  tests.push_back(tmp(StateFollower, 2, 0, kEmptyPeerId, true));
+  tests.push_back(tmp(StateFollower, 2, 1, kEmptyPeerId, true));
+  tests.push_back(tmp(StateFollower, 2, 2, kEmptyPeerId, false));
+  tests.push_back(tmp(StateFollower, 2, 3, kEmptyPeerId, false));
 
-  tests.push_back(tmp(StateFollower, 3, 0, kNone, true));
-  tests.push_back(tmp(StateFollower, 3, 1, kNone, true));
-  tests.push_back(tmp(StateFollower, 3, 2, kNone, false));
-  tests.push_back(tmp(StateFollower, 3, 3, kNone, false));
+  tests.push_back(tmp(StateFollower, 3, 0, kEmptyPeerId, true));
+  tests.push_back(tmp(StateFollower, 3, 1, kEmptyPeerId, true));
+  tests.push_back(tmp(StateFollower, 3, 2, kEmptyPeerId, false));
+  tests.push_back(tmp(StateFollower, 3, 3, kEmptyPeerId, false));
 
   tests.push_back(tmp(StateFollower, 3, 2, 2, false));
   tests.push_back(tmp(StateFollower, 3, 2, 1, true));
@@ -2726,7 +2726,7 @@ TEST(raftTests, TestAllServerStepdown) {
 
     switch (t.state) {
     case StateFollower:
-      r->becomeFollower(1, kNone);
+      r->becomeFollower(1, kEmptyPeerId);
       break;
     case StatePreCandidate:
       r->becomePreCandidate();
@@ -2761,7 +2761,7 @@ TEST(raftTests, TestAllServerStepdown) {
 
       uint64_t leader = 2;
       if (type == MsgVote) {
-        leader = kNone;
+        leader = kEmptyPeerId;
       }
       EXPECT_EQ(r->leader_, leader);
     }
@@ -3384,7 +3384,7 @@ TEST(raftTests, TestReadOnlyOptionLeaseWithoutCheckQuorum) {
     net->send(&msgs);
   }
   ReadState *s = b->readStates_[0];
-  EXPECT_EQ(s->index_, kNone);
+  EXPECT_EQ(s->index_, kEmptyPeerId);
   EXPECT_EQ(s->requestCtx_, ctx);
 }
 
@@ -4546,7 +4546,7 @@ TEST(raftTests, TestCommitAfterRemoveNode) {
 
 void checkLeaderTransferState(raft *r, StateType state, uint64_t leader) {
   EXPECT_FALSE(r->state_ != state || r->leader_ != leader);
-  EXPECT_EQ(r->leadTransferee_, kNone);
+  EXPECT_EQ(r->leadTransferee_, kEmptyPeerId);
 }
 
 // TestLeaderTransferToUpToDateNode verifies transferring should succeed

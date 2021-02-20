@@ -8,6 +8,7 @@
 #include "base/util.h"
 #include "core/raft.h"
 #include "core/read_only.h"
+#include "base/default_logger.h"
 
 namespace libraft {
 
@@ -69,8 +70,8 @@ raft::raft(const Config *config, raftLog *log)
     raftLog_(log),
     maxInfilght_(config->maxInflightMsgs),
     maxMsgSize_(config->maxSizePerMsg),
-    leader_(kNone),
-    leadTransferee_(kNone),
+    leader_(kEmptyPeerId),
+    leadTransferee_(kEmptyPeerId),
     readOnly_(new readOnly(config->readOnlyOption, config->logger)),
     heartbeatTimeout_(config->heartbeatTick),
     electionTimeout_(config->electionTick),
@@ -124,7 +125,7 @@ raft::checkQuorumActive() {
 
 bool
 raft::hasLeader() {
-  return leader_ != kNone;
+  return leader_ != kEmptyPeerId;
 }
 
 void
@@ -232,7 +233,7 @@ raft::sendAppend(uint64_t to) {
         return;
       }
 
-      logger_->Fatalf(__FILE__, __LINE__, "get snapshot err: %s", GetErrorString(err));
+      logger_->Fatalf(__FILE__, __LINE__, "get snapshot err: %s", kErrString[err]);
     }
   
     if (isEmptySnapshot(snapshot)) {
@@ -355,9 +356,9 @@ void
 raft::reset(uint64_t term) {
   if (term_ != term) {
     term_ = term;
-    vote_ = kNone;
+    vote_ = kEmptyPeerId;
   }
-  leader_ = kNone;
+  leader_ = kEmptyPeerId;
 
   electionElapsed_ = 0;
   heartbeatElapsed_ = 0;
@@ -425,7 +426,7 @@ raft::tickHeartbeat() {
       step(msg);
     }
     // If current leader cannot transfer leadership in electionTimeout, it becomes leader again.
-    if (state_ == StateLeader && leadTransferee_ != kNone) {
+    if (state_ == StateLeader && leadTransferee_ != kEmptyPeerId) {
       abortLeaderTransfer();
     }
   }
@@ -517,7 +518,7 @@ raft::becomeLeader() {
   int err = raftLog_->entries(raftLog_->committed_ + 1, kNoLimit, &entries);
   // fatal if leader get committed entries fail
   if (!SUCCESS(err)) {
-    logger_->Fatalf(__FILE__, __LINE__, "unexpected error getting uncommitted entries (%s)", GetErrorString(err));
+    logger_->Fatalf(__FILE__, __LINE__, "unexpected error getting uncommitted entries (%s)", kErrString[err]);
   }
 
   int n = numOfPendingConf(entries);
@@ -621,7 +622,7 @@ raft::step(const Message& msg) {
     uint64_t leader = from;
     if (type == MsgVote || type == MsgPreVote) {
       bool force = (msg.context() == kCampaignString[CampaignTransfer]);
-      bool inLease = (checkQuorum_ && leader_ != kNone && electionElapsed_ < electionTimeout_);
+      bool inLease = (checkQuorum_ && leader_ != kEmptyPeerId && electionElapsed_ < electionTimeout_);
       if (!force && inLease) {
         // If a server receives a RequestVote request within the minimum election timeout
         // of hearing from a current leader, it does not update its term or grant its vote
@@ -630,7 +631,7 @@ raft::step(const Message& msg) {
           msg.logterm(), msg.index(), term, electionTimeout_ - electionElapsed_);
         return OK;
       }
-      leader = kNone;
+      leader = kEmptyPeerId;
     }
     if (type == MsgPreVote) {
       // Never change our term in response to a PreVote
@@ -681,7 +682,7 @@ raft::step(const Message& msg) {
     if (state_ != StateLeader) {
       err = raftLog_->slice(raftLog_->applied_ + 1, raftLog_->committed_ + 1, kNoLimit, &entries);
       if (!SUCCESS(err)) {
-        logger_->Fatalf(__FILE__, __LINE__, "unexpected error getting unapplied entries (%s)", GetErrorString(err));
+        logger_->Fatalf(__FILE__, __LINE__, "unexpected error getting unapplied entries (%s)", kErrString[err]);
       }
       n = numOfPendingConf(entries);
       if (n != 0 && raftLog_->committed_ > raftLog_->applied_) {
@@ -703,7 +704,7 @@ raft::step(const Message& msg) {
   case MsgPreVote:
     // The m.Term > r.Term clause is for MsgPreVote. For MsgVote m.Term should
     // always equal r.Term.
-    if ((vote_ == kNone || term > term_ || vote_ == from) && raftLog_->isUpToDate(msg.index(), msg.logterm())) {
+    if ((vote_ == kEmptyPeerId || term > term_ || vote_ == from) && raftLog_->isUpToDate(msg.index(), msg.logterm())) {
       logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] cast %s for %x [logterm: %llu, index: %llu] at term %llu",
         id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, kMsgString[type], from, msg.logterm(), msg.index(), term_);
       respMsg = new Message();
@@ -753,7 +754,7 @@ stepLeader(raft *r, const Message& msg) {
   case MsgCheckQuorum:
     if (!r->checkQuorumActive()) {
       logger->Warningf(__FILE__, __LINE__, "%x stepped down to follower since quorum is not active", r->id_);
-      r->becomeFollower(r->term_, kNone);
+      r->becomeFollower(r->term_, kEmptyPeerId);
     }
     return;
     break;
@@ -767,7 +768,7 @@ stepLeader(raft *r, const Message& msg) {
       // drop any new proposals.
       return;
     }
-    if (r->leadTransferee_ != kNone) {
+    if (r->leadTransferee_ != kEmptyPeerId) {
       logger->Debugf(__FILE__, __LINE__,
         "%x [term %d] transfer leadership to %x is in progress; dropping proposal",
         r->id_, r->term_, r->leadTransferee_);
@@ -815,7 +816,7 @@ stepLeader(raft *r, const Message& msg) {
         if (r->checkQuorum_) {
           ri = r->raftLog_->committed_;
         }
-        if (msg.from() == kNone || msg.from() == r->id_) { // from local member
+        if (msg.from() == kEmptyPeerId || msg.from() == r->id_) { // from local member
           r->readStates_.push_back(new ReadState(r->raftLog_->committed_, msg.entries(0).data())); 
         } else {
           n = cloneMessage(msg);
@@ -912,7 +913,7 @@ stepLeader(raft *r, const Message& msg) {
     r->readOnly_->advance(msg, &rss);
     for (i = 0; i < rss.size(); ++i) {
       req = rss[i]->req_;
-      if (req->from() == kNone || req->from() == r->id_) {
+      if (req->from() == kEmptyPeerId || req->from() == r->id_) {
         r->readStates_.push_back(new ReadState(rss[i]->index_, req->entries(0).data()));
       } else {
         respMsg = new Message();
@@ -955,7 +956,7 @@ stepLeader(raft *r, const Message& msg) {
   case MsgTransferLeader:
     leadTransferee = msg.from();
     lastLeadTransferee = r->leadTransferee_;
-    if (lastLeadTransferee != kNone) {
+    if (lastLeadTransferee != kEmptyPeerId) {
       if (lastLeadTransferee == leadTransferee) {
         logger->Infof(__FILE__, __LINE__,
           "%x [term %llu] transfer leadership to %x is in progress, ignores request to same node %x",
@@ -1021,7 +1022,7 @@ stepCandidate(raft* r, const Message& msg) {
         r->bcastAppend();
       }
     } else if (r->quorum() == (int)r->votes_.size() - granted) {
-      r->becomeFollower(r->term_, kNone);
+      r->becomeFollower(r->term_, kEmptyPeerId);
     }
     return;
   }
@@ -1054,7 +1055,7 @@ stepFollower(raft* r, const Message& msg) {
 
   switch (type) {
   case MsgProp:
-    if (r->leader_ == kNone) {
+    if (r->leader_ == kEmptyPeerId) {
       return;
     }
     n = cloneMessage(msg);
@@ -1077,7 +1078,7 @@ stepFollower(raft* r, const Message& msg) {
     r->handleSnapshot(msg);
     break;
   case MsgTransferLeader:
-    if (r->leader_ == kNone) {
+    if (r->leader_ == kEmptyPeerId) {
       logger->Infof(__FILE__, __LINE__,
         "%x no leader at term %llu; dropping leader transfer msg",
         r->id_, r->term_);
@@ -1103,7 +1104,7 @@ stepFollower(raft* r, const Message& msg) {
     }
     break;
   case MsgReadIndex:
-    if (r->leader_ == kNone) {
+    if (r->leader_ == kEmptyPeerId) {
       logger->Infof(__FILE__, __LINE__, "%x no leader at term %llu; dropping index reading msg", r->id_, r->term_);
       return;
     }
@@ -1252,7 +1253,7 @@ raft::delProgress(uint64_t id) {
 
 void
 raft::abortLeaderTransfer() {
-  leadTransferee_ = kNone;
+  leadTransferee_ = kEmptyPeerId;
 }
 
 void
@@ -1306,14 +1307,40 @@ raft::resetPendingConf() {
 }
 
 //TODO:
-static void 
-validateConfig(const Config *config) {
+static int 
+validateConfig(Config *config) {
+  if (config->id == kEmptyPeerId) {
+    printf("[FATAL] cannot use none as id\n");
+    return -1;
+  }
+  if (config->heartbeatTick >= config->electionTick) {
+    printf("[FATAL] election tick must be greater than heartbeat tick\n");
+    return -1;
+  }
+  if (config->heartbeatTick <= 0) {
+    printf("[FATAL] heartbeat tick must be greater than 0\n");
+    return -1;
+  }
+  if (config->maxSizePerMsg <= 0) {
+    printf("[FATAL] max inflight messages must be greater than 0\n");
+    return -1;
+  }  
+  if (config->storage == NULL) {
+    printf("[FATAL] config storage cannot be nil\n");
+    return -1;
+  }
+  if (config->logger == NULL) {
+    config->logger = new DefaultLogger();
+  }
 
+  return 0;
 }
 
 raft* 
-newRaft(const Config *config) {
-  validateConfig(config);
+newRaft(Config *config) {
+  if (validateConfig(config) < 0) {
+    return NULL;
+  }
 
   raftLog *rl = newLog(config->storage, config->logger);
   HardState hs;
@@ -1326,7 +1353,7 @@ newRaft(const Config *config) {
   // init hs,cs from storage
   err = config->storage->InitialState(&hs, &cs);
   if (!SUCCESS(err)) {
-    logger->Fatalf(__FILE__, __LINE__, "storage InitialState fail: %s", GetErrorString(err)); 
+    logger->Fatalf(__FILE__, __LINE__, "storage InitialState fail: %s", kErrString[err]); 
   }
 
   if (cs.nodes_size() > 0) {
@@ -1354,7 +1381,7 @@ newRaft(const Config *config) {
   }
 
   // whenever start a node,change to follower state
-  r->becomeFollower(r->term_, kNone);
+  r->becomeFollower(r->term_, kEmptyPeerId);
 
   vector<string> peerStrs;
   map<uint64_t, Progress*>::const_iterator iter;
