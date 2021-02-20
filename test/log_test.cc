@@ -12,22 +12,23 @@
 using namespace libraft;
 
 TEST(logTests, TestFindConflict) {
-  EntryVec entries;
+  EntryVec previousEnts;
 
+  // first fill up previous entries
   {
     Entry entry;
 
     entry.set_index(1);
     entry.set_term(1);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
 
     entry.set_index(2);
     entry.set_term(2);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
 
     entry.set_index(3);
     entry.set_term(3);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
   }
 
   struct tmp {
@@ -37,6 +38,7 @@ TEST(logTests, TestFindConflict) {
     tmp(uint64_t conflict) : wconflict(conflict){}
   };
 
+  // then add test cases
   vector<tmp> tests;
   // no conflict, empty ent
   {
@@ -228,7 +230,7 @@ TEST(logTests, TestFindConflict) {
     MemoryStorage s(&kDefaultLogger);
     raftLog *log = newLog(&s, &kDefaultLogger);
     
-    log->append(entries);
+    log->append(previousEnts);
 
     uint64_t conflict = log->findConflict(test.entries);
     EXPECT_EQ(conflict, test.wconflict);
@@ -238,22 +240,22 @@ TEST(logTests, TestFindConflict) {
 }
 
 TEST(logTests, TestIsUpToDate) {
-  EntryVec entries;
+  EntryVec previousEnts;
 
   {
     Entry entry;
 
     entry.set_index(1);
     entry.set_term(1);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
 
     entry.set_index(2);
     entry.set_term(2);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
 
     entry.set_index(3);
     entry.set_term(3);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
   }
 
   struct tmp {
@@ -267,7 +269,7 @@ TEST(logTests, TestIsUpToDate) {
 
   MemoryStorage s(&kDefaultLogger);
   raftLog *log = newLog(&s, &kDefaultLogger);
-  log->append(entries);
+  log->append(previousEnts);
 
   vector<tmp> tests;
   // greater term, ignore lastIndex
@@ -293,18 +295,18 @@ TEST(logTests, TestIsUpToDate) {
 }
 
 TEST(logTests, TestAppend) {
-  EntryVec entries;
+  EntryVec previousEnts;
 
   {
     Entry entry;
 
     entry.set_index(1);
     entry.set_term(1);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
 
     entry.set_index(2);
     entry.set_term(2);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
   }
 
   struct tmp {
@@ -392,7 +394,7 @@ TEST(logTests, TestAppend) {
   for (i = 0; i < tests.size(); ++i) {
     const tmp &test = tests[i];
     MemoryStorage s(&kDefaultLogger);
-    s.Append(entries);
+    s.Append(previousEnts);
     raftLog *log = newLog(&s, &kDefaultLogger);
     
     uint64_t index = log->append(test.entries);
@@ -417,7 +419,7 @@ TEST(logTests, TestAppend) {
 // If the given (index, term) does not match with the existing log:
 //  return false
 TEST(logTests, TestLogMaybeAppend) {
-  EntryVec entries;
+  EntryVec previousEnts;
   uint64_t lastindex = 3;
   uint64_t lastterm = 3;
   uint64_t commit = 1;
@@ -427,15 +429,15 @@ TEST(logTests, TestLogMaybeAppend) {
 
     entry.set_index(1);
     entry.set_term(1);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
 
     entry.set_index(2);
     entry.set_term(2);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
 
     entry.set_index(3);
     entry.set_term(3);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
   }
   struct tmp {
     uint64_t logTerm;
@@ -596,7 +598,7 @@ TEST(logTests, TestLogMaybeAppend) {
     const tmp &test = tests[i];
     MemoryStorage s(&kDefaultLogger);
     raftLog *log = newLog(&s, &kDefaultLogger);
-    log->append(entries);
+    log->append(previousEnts);
     log->committed_ = commit;
 
     uint64_t glasti;
@@ -821,18 +823,18 @@ TEST(logTests, TestNextEnts) {
 // TestUnstableEnts ensures unstableEntries returns the unstable part of the
 // entries correctly.
 TEST(logTests, TestUnstableEnts) {
-  EntryVec entries;
+  EntryVec previousEnts;
 
   {
     Entry entry;
 
     entry.set_index(1);
     entry.set_term(1);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
 
     entry.set_index(2);
     entry.set_term(2);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
   }
   struct tmp {
     uint64_t unstable;
@@ -848,7 +850,7 @@ TEST(logTests, TestUnstableEnts) {
   }
   {
     tmp t(1);
-    t.entries = entries;
+    t.entries = previousEnts;
     tests.push_back(t);
   }
 
@@ -860,7 +862,7 @@ TEST(logTests, TestUnstableEnts) {
     MemoryStorage s(&kDefaultLogger);
     {
       EntryVec ents;
-      ents.insert(ents.end(), entries.begin(),  entries.begin() + t.unstable - 1);
+      ents.insert(ents.end(), previousEnts.begin(),  previousEnts.begin() + t.unstable - 1);
       s.Append(ents);
     }
 
@@ -868,7 +870,7 @@ TEST(logTests, TestUnstableEnts) {
     raftLog *log = newLog(&s, &kDefaultLogger);    
     {
       EntryVec ents;
-      ents.insert(ents.end(), entries.begin() + t.unstable - 1, entries.end());
+      ents.insert(ents.end(), previousEnts.begin() + t.unstable - 1, previousEnts.end());
       log->append(ents);
     }
 
@@ -881,7 +883,7 @@ TEST(logTests, TestUnstableEnts) {
     }
     EXPECT_TRUE(isDeepEqualEntries(unstableEntries, t.entries)) << "i: " << i << ", size:" << unstableEntries.size();
 
-    uint64_t w = entries[entries.size() - 1].index() + 1;
+    uint64_t w = previousEnts[previousEnts.size() - 1].index() + 1;
     EXPECT_EQ(log->unstable_.offset_, w);
 
     delete log;
@@ -889,7 +891,7 @@ TEST(logTests, TestUnstableEnts) {
 }
 
 TEST(logTests, TestCommitTo) {
-  EntryVec entries;
+  EntryVec previousEnts;
   uint64_t commit = 2;
 
   {
@@ -897,15 +899,15 @@ TEST(logTests, TestCommitTo) {
 
     entry.set_index(1);
     entry.set_term(1);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
 
     entry.set_index(2);
     entry.set_term(2);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
 
     entry.set_index(3);
     entry.set_term(3);
-    entries.push_back(entry);
+    previousEnts.push_back(entry);
   }
   struct tmp {
     uint64_t commit, wcommit;
@@ -927,7 +929,7 @@ TEST(logTests, TestCommitTo) {
     MemoryStorage s(&kDefaultLogger);
     raftLog *log = newLog(&s, &kDefaultLogger);
 
-    log->append(entries);
+    log->append(previousEnts);
     log->committed_ = commit;
     log->commitTo(t.commit);
     EXPECT_EQ(log->committed_, t.wcommit);
@@ -1161,10 +1163,10 @@ TEST(logTests, TestLogRestore) {
 
   raftLog *log = newLog(&s, &kDefaultLogger);
 
-  EntryVec all;
-  log->allEntries(&all);
+  EntryVec allEntries;
+  log->allEntries(&allEntries);
 
-  EXPECT_TRUE(all.empty());
+  EXPECT_TRUE(allEntries.empty());
   EXPECT_EQ(log->firstIndex(), index + 1);
   EXPECT_EQ(log->committed_, index);
   EXPECT_EQ(log->unstable_.offset_, index + 1);
