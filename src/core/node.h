@@ -15,14 +15,15 @@ enum NodeMessageType {
   ConfChangeMessage = 2,
   TickMessage       = 3,
   ReadyMessage      = 4,
-  NoneMessage       = 6
+  NoneMessage       = 5
 };
 
 struct raft;
+class Logger;
 
 class NodeImpl : public Node {
 public:
-  NodeImpl();
+  NodeImpl(Logger*, raft*);
   ~NodeImpl();
 
   virtual void Tick(Ready **ready);

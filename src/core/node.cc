@@ -20,10 +20,11 @@ isEmptySoftState(const SoftState& ss) {
   return isSoftStateEqual(ss, kEmptySoftState);
 }
 
-NodeImpl::NodeImpl()
-  : stopped_(false)
-  , raft_(NULL)
-  , logger_(NULL)
+NodeImpl::NodeImpl(Logger* logger, raft* r)
+  : Node()
+  , stopped_(false)
+  , raft_(r)
+  , logger_(logger)
   , leader_(kEmptyPeerId)
   , prevSoftState_(kEmptySoftState)
   , prevHardState_(kEmptyHardState)
@@ -35,10 +36,13 @@ NodeImpl::NodeImpl()
   , havePrevLastUnstableIndex_(false)
   , prevSnapshotIndex_(0)
   , confState_(NULL) {
+  // init prev softState
+  r->softState(&prevSoftState_);
 }
 
 NodeImpl::~NodeImpl() {
   delete raft_;
+  delete logger_;
 }
 
 void 
@@ -338,8 +342,6 @@ NodeImpl::readyContainUpdate() {
 // It appends a ConfChangeAddNode entry for each given peer to the initial log.
 Node* 
 StartNode(Config* config, const vector<Peer>& peers) {
-  NodeImpl* node = new NodeImpl();
-  node->logger_ = config->logger;
   raft *r = newRaft(config);
   
   if (r == NULL) {
@@ -390,10 +392,7 @@ StartNode(Config* config, const vector<Peer>& peers) {
     r->addNode(peer.Id);
   }
 
-  node->raft_ = r;
-  r->softState(&node->prevSoftState_);
-
-  return node;
+  return new NodeImpl(config->logger, r);
 }
 
 // RestartNode is similar to StartNode but does not take a list of peers.
@@ -406,12 +405,8 @@ RestartNode(Config *config) {
   if (r == NULL) {
     return NULL;
   }
-  NodeImpl* node = new NodeImpl();
-  node->logger_ = config->logger;
-  node->raft_ = r;
-  r->softState(&node->prevSoftState_);
 
-  return node;
+  return new NodeImpl(config->logger, r);
 }
 
 }; // namespace libraft

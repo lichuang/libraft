@@ -27,6 +27,8 @@ public:
   DefaultLogger() : panic_(false) {
   }
 
+  virtual ~DefaultLogger() {}
+  
   void Debugf(const char *file, int line, const char *fmt, ...) {
     doLog("D");
   }

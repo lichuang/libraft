@@ -35,13 +35,12 @@ TEST(nodeTests, TestNodeStepUnblock) {
 TEST(nodeTests, TestNodePropose) {
   msgs.clear();
   vector<ReadState*> readStates;
-  NodeImpl *n = new NodeImpl();
-  n->logger_ = &kDefaultLogger;
+  
   MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  n->raft_ = r;
+  NodeImpl *n = new NodeImpl(&kDefaultLogger, r);  
 
   readStates.push_back(new ReadState(1, "somedata"));
   r->readStates_ = readStates;
@@ -191,13 +190,11 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
 TEST(nodeTests, TestNodeProposeConfig) {
   msgs.clear();
 
-  NodeImpl *n = new NodeImpl();
-  n->logger_ = &kDefaultLogger;
   MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  n->raft_ = r;
+  NodeImpl *n = new NodeImpl(&kDefaultLogger, r); 
 
   Ready *ready;
   n->Campaign(&ready);
@@ -254,13 +251,11 @@ void applyReadyEntries(Ready* ready, EntryVec* readyEntries, MemoryStorage *s, N
 }
 
 TEST(nodeTests, TestNodeProposeAddDuplicateNode) {
-  NodeImpl *n = new NodeImpl();
-  n->logger_ = &kDefaultLogger;
   MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  n->raft_ = r;
+  NodeImpl *n = new NodeImpl(&kDefaultLogger, r); 
 
   Ready *ready;
   EntryVec readyEntries;

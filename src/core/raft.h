@@ -95,6 +95,8 @@ struct raft {
 
   raft(const Config *, raftLog *);
 
+  ~raft();
+  
   // called by Node in each `Tick'
   void tick();
 

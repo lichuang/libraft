@@ -188,6 +188,8 @@ public:
   virtual void Warningf(const char *file, int line, const char *fmt, ...) = 0;
   virtual void Errorf(const char *file, int line, const char *fmt, ...) = 0;
   virtual void Fatalf(const char *file, int line, const char *fmt, ...) = 0;
+
+  virtual ~Logger() {}
 };
 
 // ReadOnlyOption specifies how the read only request is processed.
@@ -232,6 +234,8 @@ struct Config {
   // stored in storage. raft reads the persisted entries and states out of
   // Storage when it needs. raft reads out the previous state and configuration
   // out of storage when restarting.
+  // when node end up, storage will be destroyed.
+  // if it is NULL, use `MemoryStorage' by default.
   Storage*          storage = NULL;
 
   // applied is the last applied index. It should only be set when restarting
@@ -265,7 +269,8 @@ struct Config {
 
   // logger is the logger used for raft log. For multinode which can host
   // multiple raft group, each raft group can have its own logger.
-  // if it is NULL, use DefaultLogger by default.
+  // when node end up, storage will be destroyed.
+  // if it is NULL, use `DefaultLogger' by default.
   Logger*           logger = NULL;            
 
   ReadOnlyOption    readOnlyOption;

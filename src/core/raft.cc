@@ -9,6 +9,7 @@
 #include "core/raft.h"
 #include "core/read_only.h"
 #include "base/default_logger.h"
+#include "storage/memory_storage.h"
 
 namespace libraft {
 
@@ -80,6 +81,11 @@ raft::raft(const Config *config, raftLog *log)
     logger_(config->logger),
     stateStepFunc_(NULL) {
   srand((unsigned)time(NULL));
+}
+
+raft::~raft() {
+  delete readOnly_;  
+  delete raftLog_;
 }
 
 void
@@ -1323,15 +1329,15 @@ validateConfig(Config *config) {
   if (config->maxSizePerMsg <= 0) {
     printf("[FATAL] max inflight messages must be greater than 0\n");
     return -1;
-  }  
-  if (config->storage == NULL) {
-    printf("[FATAL] config storage cannot be nil\n");
-    return -1;
   }
   if (config->logger == NULL) {
     config->logger = new DefaultLogger();
+    printf("[WANR] logger is NULL, use DefaultLogger by default\n");
   }
-
+  if (config->storage == NULL) {
+    config->storage = new MemoryStorage(config->logger);
+    printf("[WANR] storage is NULL, use MemoryStorage by default\n");
+  }
   return 0;
 }
 
