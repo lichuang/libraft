@@ -169,183 +169,116 @@ TEST(logTests, TestAppend) {
 //  2.Append any new entries not already in the log
 // If the given (index, term) does not match with the existing log:
 //  return false
-TEST(logTests, TestLogMaybeAppend) {
-  EntryVec previousEnts;
+TEST(logTests, TestLogMaybeAppend) {  
   uint64_t lastindex = 3;
   uint64_t lastterm = 3;
   uint64_t commit = 1;
 
-  {
-    Entry entry;
+  // first fill up previous entries
+  EntryVec previousEnts = {
+    initEntry(1,1),
+    initEntry(2,2),
+    initEntry(3,3),
+  };
 
-    entry.set_index(1);
-    entry.set_term(1);
-    previousEnts.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(2);
-    previousEnts.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(3);
-    previousEnts.push_back(entry);
-  }
   struct tmp {
     uint64_t logTerm;
     uint64_t index;
     uint64_t commited;
     EntryVec entries;
 
-    uint64_t lasti;
+    uint64_t wlasti;
     bool wappend;
     uint64_t wcommit;
     bool wpanic;
-
-    tmp(uint64_t logterm, uint64_t index, uint64_t commited,
-        uint64_t lasti, bool append, uint64_t commit, bool panic)
-      : logTerm(logterm), index(index), commited(commited),
-        lasti(lasti), wappend(append), wcommit(commit), wpanic(panic) {}
+  } tests[] = {
+    // not match: term is different
+    {
+      .logTerm = lastterm - 1, .index = lastindex, .commited = lastindex,
+      .entries = {initEntry(lastindex + 1, 4),},
+      .wlasti = 0, .wappend = false, .wcommit = commit, .wpanic = false
+    },
+    // not match: index out of bound
+    {
+      .logTerm = lastterm, .index = lastindex + 1, .commited = lastindex,
+      .entries = {initEntry(lastindex + 2, 4),},
+      .wlasti = 0, .wappend = false, .wcommit = commit, .wpanic = false
+    },
+    // match with the last existing entry
+    {
+      .logTerm = lastterm, .index = lastindex, .commited = lastindex,
+      .entries = {},
+      .wlasti = lastindex, .wappend = true, .wcommit = lastindex, .wpanic = false
+    },
+    {
+      // do not increase commit higher than lastnewi
+      .logTerm = lastterm, .index = lastindex, .commited = lastindex + 1,
+      .entries = {},
+      .wlasti = lastindex, .wappend = true, .wcommit = lastindex, .wpanic = false
+    },     
+    {
+      // commit up to the commit in the message
+      .logTerm = lastterm, .index = lastindex, .commited = lastindex - 1,
+      .entries = {},
+      .wlasti = lastindex, .wappend = true, .wcommit = lastindex - 1, .wpanic = false
+    },
+    {
+      // commit do not decrease
+      .logTerm = lastterm, .index = lastindex, .commited = 0,
+      .entries = {},
+      .wlasti = lastindex, .wappend = true, .wcommit = commit, .wpanic = false
+    },
+    {
+      // commit do not decrease
+      .logTerm = 0, .index = 0, .commited = lastindex,
+      .entries = {},
+      .wlasti = 0, .wappend = true, .wcommit = commit, .wpanic = false
+    },
+    {
+      .logTerm = lastterm, .index = lastindex, .commited = lastindex,
+      .entries = {initEntry(lastindex + 1, 4)},
+      .wlasti = lastindex + 1, .wappend = true, .wcommit = lastindex, .wpanic = false
+    },
+    {
+      // do not increase commit higher than lastnewi
+      .logTerm = lastterm, .index = lastindex, .commited = lastindex + 2,
+      .entries = {initEntry(lastindex + 1, 4)},
+      .wlasti = lastindex + 1, .wappend = true, .wcommit = lastindex + 1, .wpanic = false
+    },
+    {
+      // do not increase commit higher than lastnewi
+      .logTerm = lastterm, .index = lastindex, .commited = lastindex + 2,
+      .entries = {initEntry(lastindex + 1, 4), initEntry(lastindex + 2, 4)},
+      .wlasti = lastindex + 2, .wappend = true, .wcommit = lastindex + 2, .wpanic = false
+    },    
+    // match with the the entry in the middle
+    {
+      .logTerm = lastterm - 1, .index = lastindex - 1, .commited = lastindex,
+      .entries = {initEntry(lastindex, 4)},
+      .wlasti = lastindex, .wappend = true, .wcommit = lastindex, .wpanic = false
+    },  
+    {
+      .logTerm = lastterm - 2, .index = lastindex - 2, .commited = lastindex,
+      .entries = {initEntry(lastindex - 1, 4)},
+      .wlasti = lastindex - 1, .wappend = true, .wcommit = lastindex - 1, .wpanic = false
+    }, 
+    /* this case will FATAL the lib
+    // conflict with existing committed entry
+    {
+      .logTerm = lastterm - 3, .index = lastindex - 3, .commited = lastindex,
+      .entries = {initEntry(lastindex - 1, 4)},
+      .wlasti = lastindex - 2, .wappend = true, .wcommit = lastindex - 2, .wpanic = true
+    },
+    */  
+    {
+      .logTerm = lastterm - 2, .index = lastindex - 2, .commited = lastindex,
+      .entries = {initEntry(lastindex - 1, 4), initEntry(lastindex, 4)},
+      .wlasti = lastindex, .wappend = true, .wcommit = lastindex, .wpanic = false
+    },                  
   };
 
-  vector<tmp> tests;
-  // not match: term is different
-  {
-    tmp t(lastterm - 1, lastindex, lastindex, 0, false, commit, false);
-    Entry entry;
-
-    entry.set_index(lastindex + 1);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  // not match: index out of bound
-  {
-    tmp t(lastterm, lastindex + 1, lastindex, 0, false, commit, false);
-    Entry entry;
-
-    entry.set_index(lastindex + 2);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  // match with the last existing entry
-  {
-    tmp t(lastterm, lastindex, lastindex, lastindex, true, lastindex, false);
-
-    tests.push_back(t);
-  }
-  {
-    // do not increase commit higher than lastnewi
-    tmp t(lastterm, lastindex, lastindex + 1, lastindex, true, lastindex, false);
-
-    tests.push_back(t);
-  }
-  {
-    // commit up to the commit in the message
-    tmp t(lastterm, lastindex, lastindex - 1, lastindex, true, lastindex - 1, false);
-
-    tests.push_back(t);
-  }
-  {
-    // commit do not decrease
-    tmp t(lastterm, lastindex, 0, lastindex, true, commit, false);
-
-    tests.push_back(t);
-  }
-  {
-    // commit do not decrease
-    tmp t(0, 0, lastindex, 0, true, commit, false);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(lastterm, lastindex, lastindex, lastindex + 1, true, lastindex, false);
-
-    Entry entry;
-
-    entry.set_index(lastindex + 1);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  {
-    // do not increase commit higher than lastnewi
-    tmp t(lastterm, lastindex, lastindex + 2, lastindex + 1, true, lastindex + 1, false);
-
-    Entry entry;
-
-    entry.set_index(lastindex + 1);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  {
-    tmp t(lastterm, lastindex, lastindex + 2, lastindex + 2, true, lastindex + 2, false);
-
-    Entry entry;
-
-    entry.set_index(lastindex + 1);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    entry.set_index(lastindex + 2);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  // match with the the entry in the middle
-  {
-    tmp t(lastterm-1, lastindex-1, lastindex, lastindex, true, lastindex, false);
-
-    Entry entry;
-
-    entry.set_index(lastindex);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(lastterm-2, lastindex-2, lastindex, lastindex-1, true, lastindex-1, false);
-
-    Entry entry;
-
-    entry.set_index(lastindex-1);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  // conflict with existing committed entry
-  /*
-  {
-    tmp t(lastterm-3, lastindex-3, lastindex, lastindex-2, true, lastindex-2, true);
-
-    Entry entry;
-
-    entry.set_index(lastindex-2);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  */
-  {
-    tmp t(lastterm-2, lastindex-2, lastindex, lastindex, true, lastindex, false);
-
-    Entry entry;
-
-    entry.set_index(lastindex-1);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    entry.set_index(lastindex);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
   size_t i = 0;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
     MemoryStorage s(&kDefaultLogger);
     raftLog *log = newLog(&s, &kDefaultLogger);
@@ -356,9 +289,9 @@ TEST(logTests, TestLogMaybeAppend) {
     bool ok  = log->maybeAppend(test.index, test.logTerm, test.commited, test.entries, &glasti);
     uint64_t gcommit = log->committed_;
 
-    EXPECT_EQ(glasti, test.lasti);
+    EXPECT_EQ(glasti, test.wlasti);
     EXPECT_EQ(ok, test.wappend) << "i: " << i;
-    EXPECT_EQ(gcommit, test.wcommit);
+    EXPECT_EQ(gcommit, test.wcommit) << "i: " << i;
     if (glasti > 0 && test.entries.size() != 0) {
       EntryVec ret_entries;
       int err = log->slice(log->lastIndex() - test.entries.size() + 1, log->lastIndex() + 1, kNoLimit, &ret_entries);
@@ -380,26 +313,16 @@ TEST(logTests, TestCompactionSideEffects) {
   size_t i;
   
   for (i = 1; i <= unstableIndex; ++i) {
-    EntryVec entries;
-    Entry entry;
-    
-    entry.set_index(i);
-    entry.set_term(i);
-    entries.push_back(entry);
-
-    s.Append(entries);
+    s.Append({ 
+      initEntry(i,i) 
+    });
   }
 
   raftLog *log = newLog(&s, &kDefaultLogger);
   for (i = unstableIndex; i < lastIndex; ++i) {
-    EntryVec entries;
-    Entry entry;
-    
-    entry.set_index(i + 1);
-    entry.set_term(i + 1);
-    entries.push_back(entry);
-
-    log->append(entries);
+    log->append({ 
+      initEntry(i+1,i+1) 
+    });
   }
 
   bool ok = log->maybeCommit(lastIndex, lastTerm);
@@ -429,16 +352,10 @@ TEST(logTests, TestCompactionSideEffects) {
   EXPECT_EQ((int)unstableEntries[0].index(), 751);
 
   uint64_t prev = log->lastIndex();
-  {
-    EntryVec entries;
-    Entry entry;
-    
-    entry.set_index(log->lastIndex() + 1);
-    entry.set_term(log->lastIndex() + 1);
-    entries.push_back(entry);
+  log->append({ 
+    initEntry(log->lastIndex() + 1, log->lastIndex() + 1) 
+  });
 
-    log->append(entries);
-  } 
   EXPECT_EQ(log->lastIndex(), prev + 1);
 
   {
@@ -456,38 +373,24 @@ TEST(logTests, TestHasNextEnts) {
   sn.mutable_metadata()->set_index(3);
   sn.mutable_metadata()->set_term(1);
 
-  EntryVec entries;
-  {
-    Entry entry;
-    
-    entry.set_index(4);
-    entry.set_term(1);
-    entries.push_back(entry);
-    
-    entry.set_index(5);
-    entry.set_term(1);
-    entries.push_back(entry);
-    
-    entry.set_index(6);
-    entry.set_term(1);
-    entries.push_back(entry);
-  }
+  EntryVec entries = {
+    initEntry(4,1),
+    initEntry(5,1),
+    initEntry(6,1),
+  };
+
   struct tmp {
     uint64_t applied;
     bool hasNext;
-
-    tmp(uint64_t applied, bool hasnext)
-      : applied(applied), hasNext(hasnext) {}
+  } tests[] = {
+    { .applied = 0, .hasNext = true },
+    { .applied = 3, .hasNext = true },
+    { .applied = 4, .hasNext = true },
+    { .applied = 5, .hasNext = false },
   };
 
-  vector<tmp> tests;
-  tests.push_back(tmp(0, true));
-  tests.push_back(tmp(3, true));
-  tests.push_back(tmp(4, true));
-  tests.push_back(tmp(5, false));
-
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     MemoryStorage s(&kDefaultLogger);
     s.ApplySnapshot(sn);
     raftLog *log = newLog(&s, &kDefaultLogger);
@@ -507,22 +410,12 @@ TEST(logTests, TestNextEnts) {
   sn.mutable_metadata()->set_index(3);
   sn.mutable_metadata()->set_term(1);
 
-  EntryVec entries;
-  {
-    Entry entry;
-    
-    entry.set_index(4);
-    entry.set_term(1);
-    entries.push_back(entry);
-    
-    entry.set_index(5);
-    entry.set_term(1);
-    entries.push_back(entry);
-    
-    entry.set_index(6);
-    entry.set_term(1);
-    entries.push_back(entry);
-  }
+  EntryVec entries = {
+    initEntry(4,1),
+    initEntry(5,1),
+    initEntry(6,1),
+  };
+
   struct tmp {
     uint64_t applied;
     EntryVec entries;
