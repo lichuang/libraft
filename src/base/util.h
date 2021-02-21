@@ -25,6 +25,9 @@ MessageType voteRespMsgType(int t);
 bool isLoaclMessage(const MessageType type);
 bool isResponseMessage(const MessageType type);
 
+string entryStr(const Entry& entry);
+string entryVecDebugString(const EntryVec& entries);
+
 // string util
 string joinStrings(const vector<string>& strs, const string &sep);
 

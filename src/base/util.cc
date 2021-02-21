@@ -200,6 +200,22 @@ voteRespMsgType(int t) {
 }
 
 string 
+entryStr(const Entry& entry) {
+  char tmp[100];
+  snprintf(tmp, sizeof(tmp), "(%llu,%llu)", entry.index(), entry.term());
+  return string(tmp);
+}
+
+string 
+entryVecDebugString(const EntryVec& entries) {
+  string str;
+  for (size_t i = 0; i < entries.size(); ++i) {
+    str += entryStr(entries[i]) + ";";
+  }
+  return str;
+}
+
+string 
 joinStrings(const vector<string>& strs, const string &sep) {
   string ret = "";
   size_t i;

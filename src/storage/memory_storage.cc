@@ -7,11 +7,17 @@
 
 namespace libraft {
 
-MemoryStorage::MemoryStorage(Logger *logger) 
+MemoryStorage::MemoryStorage(Logger *logger, EntryVec* entries) 
   : snapShot_(new Snapshot())
   , logger_(logger) {
-  // When starting from scratch populate the list with a dummy entry at term zero.
-  entries_.push_back(Entry());
+  if (entries == NULL) {
+    // When starting from scratch populate the list with a dummy entry at term zero.
+    entries_.push_back(Entry());
+  } else {        
+    for (size_t i = 0; i < entries->size(); ++i) {
+      entries_.push_back((*entries)[i]);
+    }
+  }
 }
 
 MemoryStorage::~MemoryStorage() {
@@ -162,25 +168,35 @@ MemoryStorage::Append(const EntryVec& entries) {
   }
 
   Mutex mutex(&locker_);
-  size_t i;
-  EntryVec appendEntries = entries;
+  size_t i;  
 
   uint64_t first = firstIndex();
-  uint64_t last  = appendEntries[0].index() + appendEntries.size() - 1;
+  uint64_t last  = entries[0].index() + entries.size() - 1;
 
+  // shortcut if there is no new entry.
   if (last < first) {
     return OK;
   }
 
+  EntryVec appendEntries;
   // truncate compacted entries
-  if (first > appendEntries[0].index()) {
-    uint64_t index = first - appendEntries[0].index();
-    appendEntries.erase(appendEntries.begin(), appendEntries.begin() + index);
+  if (first > entries[0].index()) {
+    uint64_t index = first - entries[0].index();
+    appendEntries = EntryVec(entries.begin() + index, entries.end());
+  } else {
+    appendEntries = entries;
   }
 
   uint64_t offset = appendEntries[0].index() - entries_[0].index();
+  // TODO: optimize vector copy
   if (entries_.size() > offset) {
-    entries_.erase(entries_.begin(), entries_.begin() + offset);
+    EntryVec tmp_ents;
+    //tmp_ents.push_back(Entry());
+    for (i = 0; i < offset; ++i) {
+      tmp_ents.push_back(entries_[i]);
+    }
+    entries_.clear();
+    entries_ = tmp_ents;
     for (i = 0; i < appendEntries.size(); ++i) {
       entries_.push_back(appendEntries[i]);
     }

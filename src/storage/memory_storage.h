@@ -14,7 +14,7 @@ namespace libraft {
 // in-memory array.
 class MemoryStorage : public Storage {
 public:
-  MemoryStorage(Logger *logger);
+  MemoryStorage(Logger *logger, EntryVec* entries = NULL);
   virtual ~MemoryStorage();
 
   int InitialState(HardState *, ConfState *);

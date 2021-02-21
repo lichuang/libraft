@@ -32,8 +32,7 @@ TEST(memoryStorageTests, TestStorageTerm) {
   size_t i = 0;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
-    MemoryStorage s(&kDefaultLogger);
-    s.entries_ = entries;
+    MemoryStorage s(&kDefaultLogger, &entries);
     uint64_t term;
     int err = s.Term(test.i, &term);
     EXPECT_EQ(err, test.werr) << "i: " << i;
@@ -103,9 +102,8 @@ TEST(memoryStorageTests, TestStorageEntries) {
   size_t i = 0;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
-    MemoryStorage s(&kDefaultLogger);
+    MemoryStorage s(&kDefaultLogger, &entries);
     EntryVec ret;
-    s.entries_ = entries;
 
     int err = s.Entries(test.lo, test.hi, test.maxsize, &ret);
     EXPECT_EQ(err, test.werr) << "i: " << i;
@@ -120,8 +118,7 @@ TEST(memoryStorageTests, TestStorageLastIndex) {
     initEntry(5,5),
   };
 
-  MemoryStorage s(&kDefaultLogger);
-  s.entries_ = entries;
+  MemoryStorage s(&kDefaultLogger, &entries);
 
   uint64_t last;
   int err = s.LastIndex(&last);
@@ -142,8 +139,7 @@ TEST(memoryStorageTests, TestStorageFirstIndex) {
     initEntry(5,5),
   };
 
-  MemoryStorage s(&kDefaultLogger);
-  s.entries_ = entries;
+  MemoryStorage s(&kDefaultLogger, &entries);
 
   {
     uint64_t first;
@@ -171,8 +167,7 @@ TEST(memoryStorageTests, TestStorageCompact) {
     initEntry(5,5),
   };
 
-  MemoryStorage s(&kDefaultLogger);
-  s.entries_ = entries;
+  MemoryStorage s(&kDefaultLogger, &entries);
 
   struct tmp {
     uint64_t i;
@@ -190,8 +185,7 @@ TEST(memoryStorageTests, TestStorageCompact) {
   size_t i = 0;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
-    MemoryStorage tmp_s(&kDefaultLogger);
-    tmp_s.entries_ = entries;
+    MemoryStorage tmp_s(&kDefaultLogger, &entries);
     
     int err = tmp_s.Compact(test.i);
     EXPECT_EQ(err, test.werr);
@@ -201,4 +195,140 @@ TEST(memoryStorageTests, TestStorageCompact) {
   }
 }
 
-//TODO:TestStorageCreateSnapshot
+static inline Snapshot
+initSnapshot(const string& data, uint64_t index, uint64_t term, const ConfState& cs) {
+  Snapshot ss;
+  SnapshotMetadata *metadata = ss.mutable_metadata();
+
+  metadata->set_index(index);
+  metadata->set_term(term);
+  *(metadata->mutable_conf_state()) = cs;
+  ss.set_data(data);
+
+  return ss;
+}
+
+TEST(memoryStorageTests, TestStorageCreateSnapshot) {
+  EntryVec entries = {
+    initEntry(3,3),
+    initEntry(4,4),
+    initEntry(5,5),
+  };
+  ConfState cs;
+  cs.add_nodes(1);
+  cs.add_nodes(2);
+  cs.add_nodes(3);
+
+  string data = "data";
+
+  struct tmp {
+    uint64_t i;
+    int werr;
+    Snapshot wsnap;
+  } tests[] = {
+    { .i = 4, .werr = OK, .wsnap = initSnapshot(data, 4, 4, cs), },
+    { .i = 5, .werr = OK, .wsnap = initSnapshot(data, 5, 5, cs), },
+  };
+
+  size_t i = 0;
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
+    const tmp &test = tests[i];
+    MemoryStorage tmp_s(&kDefaultLogger, &entries);
+    Snapshot ss;
+
+    int err = tmp_s.CreateSnapshot(test.i, &cs, data, &ss);
+    EXPECT_EQ(err, test.werr);
+    EXPECT_TRUE(isDeepEqualSnapshot(&ss, &test.wsnap));
+  }
+}
+
+TEST(memoryStorageTests, TestStorageAppend) {
+  EntryVec entries = {
+    initEntry(3,3),
+    initEntry(4,4),
+    initEntry(5,5),
+  };
+
+  struct tmp {
+    EntryVec entries;
+    int werr;
+    EntryVec wentries;
+  } tests[] = {
+    { 
+      .entries = {initEntry(1,1), initEntry(2,2), },
+      .werr = OK,
+      .wentries = {initEntry(3,3), initEntry(4,4), initEntry(5,5)},
+    },    
+    { 
+      .entries = {initEntry(3,3), initEntry(4,4), initEntry(5,5)},
+      .werr = OK,
+      .wentries = {initEntry(3,3), initEntry(4,4), initEntry(5,5)},
+    },
+    { 
+      .entries = {initEntry(3,3), initEntry(4,6), initEntry(5,6)},
+      .werr = OK,
+      .wentries = {initEntry(3,3), initEntry(4,6), initEntry(5,6)},
+    },    
+    { 
+      .entries = {initEntry(3,3), initEntry(4,4), initEntry(5,5), initEntry(6,5)},
+      .werr = OK,
+      .wentries = {initEntry(3,3), initEntry(4,4), initEntry(5,5), initEntry(6,5)},
+    },
+    // truncate incoming entries, truncate the existing entries and append    
+    { 
+      .entries = {initEntry(2,3), initEntry(3,3), initEntry(4,5)},
+      .werr = OK,
+      .wentries = {initEntry(3,3), initEntry(4,5),},
+    }, 
+    // truncate the existing entries and append
+    { 
+      .entries = {initEntry(4,5)},
+      .werr = OK,
+      .wentries = {initEntry(3,3), initEntry(4,5),},
+    },   
+    // direct append
+    { 
+      .entries = {initEntry(6,5)},
+      .werr = OK,
+      .wentries = {initEntry(3,3), initEntry(4,4),initEntry(5,5),initEntry(6,5),},
+    },           
+  };
+
+  size_t i = 0;
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
+    const tmp &test = tests[i];
+    MemoryStorage tmp_s(&kDefaultLogger, &entries);    
+
+    int err = tmp_s.Append(test.entries);
+    EXPECT_EQ(err, test.werr);
+    EXPECT_TRUE(isDeepEqualEntries(test.wentries, tmp_s.entries_)) << "i: " << i << ",diff:" << entryVecDebugString(test.wentries) << " to " << entryVecDebugString(tmp_s.entries_);
+  }
+}
+
+TEST(memoryStorageTests, TestStorageApplySnapshot) {
+  ConfState cs;
+  cs.add_nodes(1);
+  cs.add_nodes(2);
+  cs.add_nodes(3);
+
+  string data = "data";
+
+  Snapshot tests[] = {
+    initSnapshot(data, 4, 4, cs),
+    initSnapshot(data, 3, 3, cs),
+  };
+
+  MemoryStorage s(&kDefaultLogger);
+
+  {
+    //Apply Snapshot successful
+    Snapshot tt = tests[0];
+    EXPECT_EQ(OK, s.ApplySnapshot(tt));
+  }
+
+  {
+    //Apply Snapshot fails due to ErrSnapOutOfDate
+    Snapshot tt = tests[1];
+    EXPECT_EQ(ErrSnapOutOfDate, s.ApplySnapshot(tt));
+  }  
+}
