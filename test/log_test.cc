@@ -419,34 +419,15 @@ TEST(logTests, TestNextEnts) {
   struct tmp {
     uint64_t applied;
     EntryVec entries;
-
-    tmp(uint64_t applied)
-      : applied(applied) {}
+  } tests[] = {
+    {.applied = 0, .entries = EntryVec(entries.begin(), entries.begin() + 2)},
+    {.applied = 3, .entries = EntryVec(entries.begin(), entries.begin() + 2)},
+    {.applied = 4, .entries = EntryVec(entries.begin() + 1, entries.begin() + 2)},
+    {.applied = 5, .entries = {}},
   };
 
-  vector<tmp> tests;
-  {
-    tmp t(0);
-    t.entries.insert(t.entries.begin(), entries.begin(), entries.begin() + 2);
-    tests.push_back(t);
-  }
-  {
-    tmp t(3);
-    t.entries.insert(t.entries.begin(), entries.begin(), entries.begin() + 2);
-    tests.push_back(t);
-  }
-  {
-    tmp t(4);
-    t.entries.insert(t.entries.begin(), entries.begin() + 1, entries.begin() + 2);
-    tests.push_back(t);
-  }
-  {
-    tmp t(5);
-    tests.push_back(t);
-  }
-
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     MemoryStorage s(&kDefaultLogger);
     s.ApplySnapshot(sn);
     raftLog *log = newLog(&s, &kDefaultLogger);
@@ -461,62 +442,36 @@ TEST(logTests, TestNextEnts) {
     EXPECT_TRUE(isDeepEqualEntries(nextEntries, tests[i].entries));
 
     delete log;
-  }
+  } 
 }
 
 // TestUnstableEnts ensures unstableEntries returns the unstable part of the
 // entries correctly.
 TEST(logTests, TestUnstableEnts) {
-  EntryVec previousEnts;
+  EntryVec previousEnts = {
+    initEntry(1, 1),
+    initEntry(2, 2),
+  };
 
-  {
-    Entry entry;
-
-    entry.set_index(1);
-    entry.set_term(1);
-    previousEnts.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(2);
-    previousEnts.push_back(entry);
-  }
   struct tmp {
     uint64_t unstable;
     EntryVec entries;
-
-    tmp(uint64_t unstable) : unstable(unstable) {}
+  } tests[] = {
+    {.unstable = 3, .entries = {}},
+    {.unstable = 1, .entries = EntryVec(previousEnts)},
   };
 
-  vector<tmp> tests;
-  {
-    tmp t(3);
-    tests.push_back(t);
-  }
-  {
-    tmp t(1);
-    t.entries = previousEnts;
-    tests.push_back(t);
-  }
-
   size_t i = 0;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
 
     // append stable entries to storage
     MemoryStorage s(&kDefaultLogger);
-    {
-      EntryVec ents;
-      ents.insert(ents.end(), previousEnts.begin(),  previousEnts.begin() + t.unstable - 1);
-      s.Append(ents);
-    }
+    s.Append(EntryVec(previousEnts.begin(), previousEnts.begin() + t.unstable - 1));    
 
     // append unstable entries to raftlog
-    raftLog *log = newLog(&s, &kDefaultLogger);    
-    {
-      EntryVec ents;
-      ents.insert(ents.end(), previousEnts.begin() + t.unstable - 1, previousEnts.end());
-      log->append(ents);
-    }
+    raftLog *log = newLog(&s, &kDefaultLogger); 
+    log->append(EntryVec(previousEnts.begin() + t.unstable - 1, previousEnts.end()));
 
     EntryVec unstableEntries;
     log->unstableEntries(&unstableEntries);
@@ -535,39 +490,24 @@ TEST(logTests, TestUnstableEnts) {
 }
 
 TEST(logTests, TestCommitTo) {
-  EntryVec previousEnts;
   uint64_t commit = 2;
+  EntryVec previousEnts = {
+    initEntry(1,1),
+    initEntry(2,2),
+    initEntry(3,3),
+  };
 
-  {
-    Entry entry;
-
-    entry.set_index(1);
-    entry.set_term(1);
-    previousEnts.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(2);
-    previousEnts.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(3);
-    previousEnts.push_back(entry);
-  }
   struct tmp {
     uint64_t commit, wcommit;
     bool panic;
-
-    tmp(uint64_t commit, uint64_t wcommit, bool panic)
-      : commit(commit), wcommit(wcommit), panic(panic) {}
+  } tests[] = {
+    {.commit = 3, .wcommit = 3, .panic = false},
+    {.commit = 1, .wcommit = 2, .panic = false},  // never decrease
+    //{.commit = 4, .wcommit = 0, .panic = true},   // commit out of range -> panic
   };
 
-  vector<tmp> tests;
-  tests.push_back(tmp(3,3,false));
-  tests.push_back(tmp(1,2,false));  // never decrease
-  //tests.push_back(tmp(4,0,true));   // commit out of range -> panic
-
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
 
     MemoryStorage s(&kDefaultLogger);
@@ -582,34 +522,22 @@ TEST(logTests, TestCommitTo) {
 }
 
 TEST(logTests, TestStableTo) {
-  EntryVec entries;
-
-  {
-    Entry entry;
-
-    entry.set_index(1);
-    entry.set_term(1);
-    entries.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(2);
-    entries.push_back(entry);
-  }
-  struct tmp {
-    uint64_t stablei, stablet, wunstable;
-
-    tmp(uint64_t stablei, uint64_t stablet, uint64_t wunstable)
-      : stablei(stablei), stablet(stablet), wunstable(wunstable) {}
+  EntryVec entries = {
+    initEntry(1,1),
+    initEntry(2,2),
   };
 
-  vector<tmp> tests;
-  tests.push_back(tmp(1,1,2));
-  tests.push_back(tmp(2,2,3));
-  tests.push_back(tmp(2,1,1));  // bad term
-  tests.push_back(tmp(3,1,1));  // bad index
+  struct tmp {
+    uint64_t stablei, stablet, wunstable;
+  } tests[] = {
+    {.stablei = 1, .stablet = 1, .wunstable = 2},
+    {.stablei = 2, .stablet = 2, .wunstable = 3},
+    {.stablei = 2, .stablet = 1, .wunstable = 1}, // bad term
+    {.stablei = 3, .stablet = 1, .wunstable = 1}, // bad index
+  };
 
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
 
     MemoryStorage s(&kDefaultLogger);
@@ -628,87 +556,59 @@ TEST(logTests, TestStableToWithSnap) {
   struct tmp {
     uint64_t stablei, stablet, wunstable;
     EntryVec entries;
-
-    tmp(uint64_t stablei, uint64_t stablet, uint64_t wunstable)
-      : stablei(stablei), stablet(stablet), wunstable(wunstable) {}
+  } tests[] = {
+    {
+      .stablei = snapi + 1, .stablet = snapt, .wunstable = snapi + 1,
+      .entries = {},
+    },
+    {
+      .stablei = snapi, .stablet = snapt + 1, .wunstable = snapi + 1,
+      .entries = {},
+    },
+    {
+      .stablei = snapi - 1, .stablet = snapt, .wunstable = snapi + 1,
+      .entries = {},
+    },  
+    {
+      .stablei = snapi + 1, .stablet = snapt + 1, .wunstable = snapi + 1,
+      .entries = {},
+    }, 
+    {
+      .stablei = snapi, .stablet = snapt + 1, .wunstable = snapi + 1,
+      .entries = {},
+    },           
+    {
+      .stablei = snapi - 1, .stablet = snapt + 1, .wunstable = snapi + 1,
+      .entries = {},
+    },     
+    {
+      .stablei = snapi + 1, .stablet = snapt, .wunstable = snapi + 2,
+      .entries = {initEntry(snapi + 1, snapt)},
+    },      
+    {
+      .stablei = snapi, .stablet = snapt, .wunstable = snapi + 1,
+      .entries = {initEntry(snapi + 1, snapt)},
+    },     
+    {
+      .stablei = snapi - 1, .stablet = snapt, .wunstable = snapi + 1,
+      .entries = {initEntry(snapi + 1, snapt)},
+    },   
+    {
+      .stablei = snapi + 1, .stablet = snapt + 1, .wunstable = snapi + 1,
+      .entries = {initEntry(snapi + 1, snapt)},
+    },       
+    {
+      .stablei = snapi, .stablet = snapt + 1, .wunstable = snapi + 1,
+      .entries = {initEntry(snapi + 1, snapt)},
+    },    
+    {
+      .stablei = snapi - 1, .stablet = snapt + 1, .wunstable = snapi + 1,
+      .entries = {initEntry(snapi + 1, snapt)},
+    },     
   };
 
-  vector<tmp> tests;
-  {
-    tmp t(snapi + 1, snapt, snapi + 1);
-    tests.push_back(t);
-  }
-  {
-    tmp t(snapi, snapt + 1, snapi + 1);
-    tests.push_back(t);
-  }
-  {
-    tmp t(snapi - 1, snapt, snapi + 1);
-    tests.push_back(t);
-  }
-  {
-    tmp t(snapi + 1, snapt + 1, snapi + 1);
-    tests.push_back(t);
-  }
-  {
-    tmp t(snapi, snapt + 1, snapi + 1);
-    tests.push_back(t);
-  }
-  {
-    tmp t(snapi - 1, snapt + 1, snapi + 1);
-    tests.push_back(t);
-  }
-  {
-    tmp t(snapi + 1, snapt, snapi + 2);
-    Entry entry;
-    entry.set_index(snapi + 1);
-    entry.set_term(snapt);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  {
-    tmp t(snapi, snapt, snapi + 1);
-    Entry entry;
-    entry.set_index(snapi + 1);
-    entry.set_term(snapt);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  {
-    tmp t(snapi - 1, snapt, snapi + 1);
-    Entry entry;
-    entry.set_index(snapi + 1);
-    entry.set_term(snapt);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  {
-    tmp t(snapi + 1, snapt + 1, snapi + 1);
-    Entry entry;
-    entry.set_index(snapi + 1);
-    entry.set_term(snapt);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  {
-    tmp t(snapi, snapt + 1, snapi + 1);
-    Entry entry;
-    entry.set_index(snapi + 1);
-    entry.set_term(snapt);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  {
-    tmp t(snapi - 1, snapt + 1, snapi + 1);
-    Entry entry;
-    entry.set_index(snapi + 1);
-    entry.set_term(snapt);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-
   size_t i = 0;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
 
     MemoryStorage s(&kDefaultLogger);
@@ -733,46 +633,39 @@ TEST(logTests, TestCompaction) {
     vector<uint64_t> compact;
     vector<int> wleft;
     bool wallow;
-
-    tmp(uint64_t i, bool allow)
-      : lastIndex(i), wallow(allow) {}
+  } tests[] = {
+    // out of upper bound
+    /* this case will fatal the library
+    {
+      .lastIndex  = 1000,
+      .compact    = {1001,},
+      .wleft      = {-1},
+      .wallow     = false,
+    },
+    */
+    {
+      .lastIndex  = 1000,
+      .compact    = {300,500,800,900},
+      .wleft      = {700,500,200,100},
+      .wallow     = true,
+    },
+    // out of lower bound 
+    {
+      .lastIndex  = 1000,
+      .compact    = {300,299},
+      .wleft      = {700,-1},
+      .wallow     = false,
+    },    
   };
 
-  vector<tmp> tests;
-  {
-    // out of upper bound
-    tmp t(1000, false);
-    t.compact.push_back(1001);
-    t.wleft.push_back(-1);
-
-    //tests.push_back(t);
-  }
-  {
-    // out of upper bound
-    tmp t(1000, true);
-    t.compact.push_back(300);
-    t.compact.push_back(500);
-    t.compact.push_back(800);
-    t.compact.push_back(900);
-    t.wleft.push_back(700);
-    t.wleft.push_back(500);
-    t.wleft.push_back(200);
-    t.wleft.push_back(100);
-
-    tests.push_back(t);
-  }
-
-  size_t i = 0;
-  for (i = 0; i < tests.size(); ++i) {
+  size_t i = 0, j = 0;
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
-    size_t j = 0;
 
     MemoryStorage s(&kDefaultLogger);
     EntryVec entries;
     for (j = 1; j <= t.lastIndex; ++j) {
-      Entry entry;
-      entry.set_index(j);
-      entries.push_back(entry);
+      entries.push_back(initEntry(j));
     }
     s.Append(entries);
 
@@ -783,12 +676,12 @@ TEST(logTests, TestCompaction) {
     for (j = 0; j < t.compact.size(); ++j) {
       int err = s.Compact(t.compact[j]);
       if (!SUCCESS(err)) {
-        EXPECT_TRUE(t.wallow);
+        EXPECT_FALSE(t.wallow) << i << "." << j << " allow = " << false << ",want " << t.wallow;
         continue;
       }
-      EntryVec all;
-      log->allEntries(&all);
-      EXPECT_EQ(t.wleft[j], (int)all.size());
+      EntryVec allEntries;
+      log->allEntries(&allEntries);
+      EXPECT_EQ(t.wleft[j], (int)allEntries.size());
     }
     delete log;
   }
@@ -837,9 +730,7 @@ TEST(logTests, TestIsOutOfBounds) {
   size_t i = 0;
   EntryVec entries;
   for (i = 1; i <= num; ++i) {
-    Entry entry;
-    entry.set_index(i + offset);
-    entries.push_back(entry);
+    entries.push_back(initEntry(i+offset));
   }
   log->append(entries);
 
@@ -849,21 +740,34 @@ TEST(logTests, TestIsOutOfBounds) {
     uint64_t lo, hi;
     bool wpanic;
     bool errCompacted;
-
-    tmp(uint64_t lo, uint64_t hi, bool panic, bool err)
-      : lo(lo), hi(hi), wpanic(panic), errCompacted(err) {
-    }
+  } tests[] = {
+    {
+      .lo = first - 2, .hi = first + 1,
+      .wpanic = false, .errCompacted = true,
+    },
+    {
+      .lo = first - 1, .hi = first + 1,
+      .wpanic = false, .errCompacted = true,
+    },   
+    {
+      .lo = first, .hi = first,
+      .wpanic = false, .errCompacted = false,
+    },
+    {
+      .lo = first + num / 2, .hi = first + num / 2,
+      .wpanic = false, .errCompacted = false,
+    },
+    {
+      .lo = first + num - 1, .hi = first + num - 1,
+      .wpanic = false, .errCompacted = false,
+    },  
+    {
+      .lo = first + num, .hi = first + num,
+      .wpanic = false, .errCompacted = false,
+    },                
   };
 
-  vector<tmp> tests;
-  tests.push_back(tmp(first - 2, first + 1, false, true));
-  tests.push_back(tmp(first - 1, first + 1, false, true));
-  tests.push_back(tmp(first,     first    , false, false));
-  tests.push_back(tmp(first + num/2, first + num/2, false, false));
-  tests.push_back(tmp(first + num - 1, first + num - 1, false, false));
-  tests.push_back(tmp(first + num, first + num, false, false));
-
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
 
     int err = log->mustCheckOutOfBounds(t.lo, t.hi);
@@ -890,28 +794,21 @@ TEST(logTests, TestTerm) {
   size_t i = 0;
   EntryVec entries;
   for (i = 1; i < num; ++i) {
-    Entry entry;
-    entry.set_index(i + offset);
-    entry.set_term(i);
-    entries.push_back(entry);
+    entries.push_back(initEntry(i + offset, i));
   }
   log->append(entries);
 
   struct tmp {
     uint64_t index, w;
-
-    tmp(uint64_t index, uint64_t w)
-      : index(index), w(w) {}
+  } tests[] = {
+    {.index = offset - 1, .w = 0},
+    {.index = offset,     .w = 1},
+    {.index = offset + num / 2, .w = num / 2},
+    {.index = offset + num - 1, .w = num - 1},
+    {.index = offset + num, .w = 0},    
   };
 
-  vector<tmp> tests;
-  tests.push_back(tmp(offset - 1, 0));
-  tests.push_back(tmp(offset,     1));
-  tests.push_back(tmp(offset + num/2, num/2));
-  tests.push_back(tmp(offset + num - 1, num - 1));
-  tests.push_back(tmp(offset + num, 0));
-
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
     uint64_t tm;
     int err = log->term(t.index, &tm);
@@ -945,21 +842,17 @@ TEST(logTests, TestTermWithUnstableSnapshot) {
 
   struct tmp {
     uint64_t index, w;
-
-    tmp(uint64_t index, uint64_t w)
-      : index(index), w(w) {}
+  } tests[] = {
+    // cannot get term from storage
+    {.index = storagesnapi, .w = 0},
+    // cannot get term from the gap between storage ents and unstable snapshot
+    {.index = storagesnapi + 1, .w = 0},
+    {.index = unstablesnapi - 1, .w = 0},
+    // get term from unstable snapshot index
+    {.index = unstablesnapi, .w = 1},
   };
 
-  vector<tmp> tests;
-  // cannot get term from storage
-  tests.push_back(tmp(storagesnapi, 0));
-  // cannot get term from the gap between storage ents and unstable snapshot
-  tests.push_back(tmp(storagesnapi + 1, 0));
-  tests.push_back(tmp(unstablesnapi - 1, 0));
-  // get term from unstable snapshot index
-  tests.push_back(tmp(unstablesnapi, 1));
-
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
     uint64_t tm;
     int err = log->term(t.index, &tm);
@@ -991,10 +884,7 @@ TEST(logTests, TestSlice) {
   size_t i = 0;
   EntryVec entries;
   for (i = 1; i < num; ++i) {
-    Entry entry;
-    entry.set_index(i + offset);
-    entry.set_term(i + offset);
-    entries.push_back(entry);
+    entries.push_back(initEntry(i + offset, i + offset));
   }
   log->append(entries);
 
@@ -1002,141 +892,72 @@ TEST(logTests, TestSlice) {
     uint64_t from, to, limit;
     EntryVec entries;
     bool wpanic;
-
-    tmp(uint64_t from, uint64_t to, uint64_t limit, bool panic)
-      : from(from), to(to), limit(limit), wpanic(panic) {}
+  } tests[] = {
+    // test no limit
+    {
+      .from = offset - 1, .to = offset + 1, .limit = kNoLimit,
+      .entries = {},
+      .wpanic = false,      
+    },
+    {
+      .from = offset, .to = offset + 1, .limit = kNoLimit,
+      .entries = {},
+      .wpanic = false,      
+    },    
+    {
+      .from = half - 1, .to = half + 1, .limit = kNoLimit,
+      .entries = {initEntry(half - 1, half - 1), initEntry(half, half)},
+      .wpanic = false,      
+    },    
+    {
+      .from = half, .to = half + 1, .limit = kNoLimit,
+      .entries = {initEntry(half, half),},
+      .wpanic = false,      
+    },    
+    {
+      .from = last - 1, .to = last, .limit = kNoLimit,
+      .entries = {initEntry(last - 1, last - 1),},
+      .wpanic = false,      
+    },  
+    // test limit  
+    {
+      .from = half - 1, .to = half + 1, .limit = 0,
+      .entries = {initEntry(half - 1, half - 1),},
+      .wpanic = false,      
+    },   
+    {
+      .from = half - 1, .to = half + 1, .limit = halfe.ByteSizeLong() + 1,
+      .entries = {initEntry(half - 1, half - 1),},
+      .wpanic = false,      
+    },     
+    {
+      .from = half - 2, .to = half + 1, .limit = halfe.ByteSizeLong() + 1,
+      .entries = {initEntry(half - 2, half - 2),},
+      .wpanic = false,      
+    },   
+    {
+      .from = half - 1, .to = half + 1, .limit = halfe.ByteSizeLong() * 2,
+      .entries = {initEntry(half - 1, half - 1), initEntry(half, half),},
+      .wpanic = false,      
+    },     
+    {
+      .from = half - 1, .to = half + 2, .limit = halfe.ByteSizeLong() * 3,
+      .entries = {initEntry(half - 1, half - 1), initEntry(half, half), initEntry(half + 1, half + 1),},
+      .wpanic = false,      
+    },      
+    {
+      .from = half, .to = half + 2, .limit = halfe.ByteSizeLong(),
+      .entries = {initEntry(half, half),},
+      .wpanic = false,      
+    },   
+    {
+      .from = half, .to = half + 2, .limit = halfe.ByteSizeLong() * 2,
+      .entries = {initEntry(half, half), initEntry(half + 1, half + 1),},
+      .wpanic = false,      
+    },       
   };
 
-  vector<tmp> tests;
-  // test no limit
-  {
-    tmp t(offset - 1, offset + 1, kNoLimit, false);
-    tests.push_back(t);
-  }
-  {
-    tmp t(offset, offset + 1, kNoLimit, false);
-    tests.push_back(t);
-  }
-  {
-    tmp t(half - 1, half + 1, kNoLimit, false);
-    Entry entry;
-
-    entry.set_index(half - 1);
-    entry.set_term(half - 1);
-    t.entries.push_back(entry);
-
-    entry.set_index(half);
-    entry.set_term(half);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(half, half + 1, kNoLimit, false);
-    Entry entry;
-
-    entry.set_index(half);
-    entry.set_term(half);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(last - 1, last, kNoLimit, false);
-    Entry entry;
-
-    entry.set_index(last - 1);
-    entry.set_term(last - 1);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  // test limit
-  {
-    tmp t(half - 1, half + 1, 0, false);
-    Entry entry;
-
-    entry.set_index(half - 1);
-    entry.set_term(half - 1);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(half - 1, half + 1, halfe.ByteSizeLong() + 1, false);
-    Entry entry;
-
-    entry.set_index(half - 1);
-    entry.set_term(half - 1);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(half - 2, half + 1, halfe.ByteSizeLong() + 1, false);
-    Entry entry;
-
-    entry.set_index(half - 2);
-    entry.set_term(half - 2);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(half - 1, half + 1, halfe.ByteSizeLong() * 2, false);
-    Entry entry;
-
-    entry.set_index(half - 1);
-    entry.set_term(half - 1);
-    t.entries.push_back(entry);
-
-    entry.set_index(half);
-    entry.set_term(half);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  {
-    tmp t(half - 1, half + 2, halfe.ByteSizeLong() * 3, false);
-    Entry entry;
-
-    entry.set_index(half - 1);
-    entry.set_term(half - 1);
-    t.entries.push_back(entry);
-
-    entry.set_index(half);
-    entry.set_term(half);
-    t.entries.push_back(entry);
-
-    entry.set_index(half + 1);
-    entry.set_term(half + 1);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(half, half + 2, halfe.ByteSizeLong(), false);
-    Entry entry;
-
-    entry.set_index(half);
-    entry.set_term(half);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-  {
-    tmp t(half, half + 2, halfe.ByteSizeLong() * 2, false);
-    Entry entry;
-
-    entry.set_index(half);
-    entry.set_term(half);
-    t.entries.push_back(entry);
-
-    entry.set_index(half + 1);
-    entry.set_term(half + 1);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
-
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
     EntryVec ents;
 
@@ -1144,7 +965,7 @@ TEST(logTests, TestSlice) {
 
     EXPECT_FALSE(t.from <= offset && err != ErrCompacted);
     EXPECT_FALSE(t.from > offset && !SUCCESS(err)) << "i: " << i;
-    EXPECT_TRUE(isDeepEqualEntries(ents, t.entries)) << "i: " << i << ",size: " << ents.size();
+    EXPECT_TRUE(isDeepEqualEntries(ents, t.entries)) << i << " from " << t.from << " to " << t.to;
   }
 
   delete log;
