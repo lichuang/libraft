@@ -92,4 +92,14 @@ extern void nextEnts(raft *r, MemoryStorage *s, EntryVec *entries);
 extern string raftLogString(raftLog *log);
 extern void idsBySize(int size, vector<uint64_t>* ids);
 
+static inline Entry 
+initEntry(uint64_t index=0, uint64_t term=0) { 
+  Entry entry;
+  entry.set_index(index);
+  entry.set_term(term);
+  return entry;
+}
+
+#define SIZEOF_ARRAY(array) sizeof(array) / sizeof(array[0])
+
 #endif  // __LIBRAFT_RAFT_TEST_UTIL_H__

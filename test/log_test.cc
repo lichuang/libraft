@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include "libraft.h"
+#include "raft_test_util.h"
 #include "base/default_logger.h"
 #include "base/util.h"
 #include "storage/log.h"
@@ -12,220 +13,37 @@
 using namespace libraft;
 
 TEST(logTests, TestFindConflict) {
-  EntryVec previousEnts;
-
   // first fill up previous entries
-  {
-    Entry entry;
-
-    entry.set_index(1);
-    entry.set_term(1);
-    previousEnts.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(2);
-    previousEnts.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(3);
-    previousEnts.push_back(entry);
-  }
-
-  struct tmp {
-    uint64_t wconflict;
-    EntryVec entries;
-
-    tmp(uint64_t conflict) : wconflict(conflict){}
+  EntryVec previousEnts = {
+    initEntry(1,1),
+    initEntry(2,2),
+    initEntry(3,3),
   };
 
   // then add test cases
-  vector<tmp> tests;
-  // no conflict, empty ent
-  {
-    tmp t(0);
-    tests.push_back(t);
-  }
-  // no conflict
-  {
-    tmp t(0);
-    Entry entry;
-
-    entry.set_index(1);
-    entry.set_term(1);
-    t.entries.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(2);
-    t.entries.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(3);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(0);
-    Entry entry;
-
-    entry.set_index(2);
-    entry.set_term(2);
-    t.entries.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(3);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(0);
-    Entry entry;
-
-    entry.set_index(3);
-    entry.set_term(3);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  // no conflict, but has new entries
-  {
-    tmp t(4);
-    Entry entry;
-
-    entry.set_index(1);
-    entry.set_term(1);
-    t.entries.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(2);
-    t.entries.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(3);
-    t.entries.push_back(entry);
-
-    entry.set_index(4);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    entry.set_index(5);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(4);
-    Entry entry;
-
-    entry.set_index(2);
-    entry.set_term(2);
-    t.entries.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(3);
-    t.entries.push_back(entry);
-
-    entry.set_index(4);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    entry.set_index(5);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(4);
-    Entry entry;
-
-    entry.set_index(3);
-    entry.set_term(3);
-    t.entries.push_back(entry);
-
-    entry.set_index(4);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    entry.set_index(5);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(4);
-    Entry entry;
-
-    entry.set_index(4);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    entry.set_index(5);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  // conflicts with existing entries
-  {
-    tmp t(1);
-    Entry entry;
-
-    entry.set_index(1);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(2);
-    Entry entry;
-
-    entry.set_index(2);
-    entry.set_term(1);
-    t.entries.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    entry.set_index(4);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  {
-    tmp t(3);
-    Entry entry;
-
-    entry.set_index(3);
-    entry.set_term(1);
-    t.entries.push_back(entry);
-
-    entry.set_index(4);
-    entry.set_term(2);
-    t.entries.push_back(entry);
-
-    entry.set_index(5);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-
-    entry.set_index(6);
-    entry.set_term(4);
-    t.entries.push_back(entry);
-    tests.push_back(t);
-  }
+  struct tmp {
+    uint64_t wconflict;
+    EntryVec entries;
+  } tests[] = {
+    // no conflict, empty ent
+    {.wconflict = 0,},
+    // no conflict
+    {.wconflict = 0, .entries = {initEntry(1,1), initEntry(2, 2), initEntry(3,3)}},
+    {.wconflict = 0, .entries = {initEntry(2,2), initEntry(3,3)}},
+    {.wconflict = 0, .entries = {initEntry(3,3)}},
+    // no conflict, but has new entries
+    {.wconflict = 4, .entries = {initEntry(1,1), initEntry(2, 2), initEntry(3,3), initEntry(4,4), initEntry(5,4)}},
+    {.wconflict = 4, .entries = {initEntry(2, 2), initEntry(3,3), initEntry(4,4), initEntry(5,4)}},
+    {.wconflict = 4, .entries = {initEntry(3,3), initEntry(4,4), initEntry(5,4)}},
+    {.wconflict = 4, .entries = {initEntry(4,4), initEntry(5,4)}},
+    // conflicts with existing entries
+    {.wconflict = 1, .entries = {initEntry(1,4), initEntry(2,4)}},  
+    {.wconflict = 2, .entries = {initEntry(2,1), initEntry(3,4), initEntry(4,4)}},
+    {.wconflict = 3, .entries = {initEntry(3,1), initEntry(4,2), initEntry(5,4), initEntry(6,4)}},  
+  };
 
   size_t i = 0;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); i++) {
     const tmp &test = tests[i];
     MemoryStorage s(&kDefaultLogger);
     raftLog *log = newLog(&s, &kDefaultLogger);
@@ -240,52 +58,39 @@ TEST(logTests, TestFindConflict) {
 }
 
 TEST(logTests, TestIsUpToDate) {
-  EntryVec previousEnts;
-
-  {
-    Entry entry;
-
-    entry.set_index(1);
-    entry.set_term(1);
-    previousEnts.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(2);
-    previousEnts.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(3);
-    previousEnts.push_back(entry);
-  }
-
-  struct tmp {
-    uint64_t lastindex;
-    uint64_t term;
-    bool isUpToDate;
-
-    tmp(uint64_t last, uint64_t term, bool uptodate)
-      : lastindex(last), term(term), isUpToDate(uptodate){}
+  // first fill up previous entries
+  EntryVec previousEnts = {
+    initEntry(1,1),
+    initEntry(2,2),
+    initEntry(3,3),
   };
 
   MemoryStorage s(&kDefaultLogger);
   raftLog *log = newLog(&s, &kDefaultLogger);
   log->append(previousEnts);
 
-  vector<tmp> tests;
-  // greater term, ignore lastIndex
-  tests.push_back(tmp(log->lastIndex() - 1, 4, true));
-  tests.push_back(tmp(log->lastIndex()    , 4, true));
-  tests.push_back(tmp(log->lastIndex() + 1, 4, true));
-  // smaller term, ignore lastIndex
-  tests.push_back(tmp(log->lastIndex() - 1, 2, false));
-  tests.push_back(tmp(log->lastIndex()    , 2, false));
-  tests.push_back(tmp(log->lastIndex() + 1, 2, false));
-  // equal term, equal or lager lastIndex wins
-  tests.push_back(tmp(log->lastIndex() - 1, 3, false));
-  tests.push_back(tmp(log->lastIndex()    , 3, true));
-  tests.push_back(tmp(log->lastIndex() + 1, 3, true));
+  // then add test cases
+  struct tmp {
+    uint64_t lastindex;
+    uint64_t term;
+    bool isUpToDate;
+  } tests[] = {
+    // greater term, ignore lastIndex
+    {.lastindex = log->lastIndex() - 1, .term = 4, .isUpToDate = true},
+    {.lastindex = log->lastIndex(),     .term = 4, .isUpToDate = true},
+    {.lastindex = log->lastIndex() + 1, .term = 4, .isUpToDate = true},
+    // smaller term, ignore lastIndex
+    {.lastindex = log->lastIndex() - 1, .term = 2, .isUpToDate = false},
+    {.lastindex = log->lastIndex(),     .term = 2, .isUpToDate = false},
+    {.lastindex = log->lastIndex() + 1, .term = 2, .isUpToDate = false},
+    // equal term, equal or lager lastIndex wins
+    {.lastindex = log->lastIndex() - 1, .term = 3, .isUpToDate = false},
+    {.lastindex = log->lastIndex(),     .term = 3, .isUpToDate = true},
+    {.lastindex = log->lastIndex() + 1, .term = 3, .isUpToDate = true},
+  };
+
   size_t i = 0;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
     bool isuptodate = log->isUpToDate(test.lastindex, test.term);
     EXPECT_EQ(isuptodate, test.isUpToDate) << "i: " << i;
@@ -295,103 +100,49 @@ TEST(logTests, TestIsUpToDate) {
 }
 
 TEST(logTests, TestAppend) {
-  EntryVec previousEnts;
-
-  {
-    Entry entry;
-
-    entry.set_index(1);
-    entry.set_term(1);
-    previousEnts.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(2);
-    previousEnts.push_back(entry);
-  }
-
-  struct tmp {
-    uint64_t windex, wunstable;
-    EntryVec entries, wentries;
-
-    tmp(uint64_t index, uint64_t unstable) : windex(index), wunstable(unstable){}
+  // first fill up previous entries
+  EntryVec previousEnts = {
+    initEntry(1,1),
+    initEntry(2,2),
   };
-  vector<tmp> tests;
-  {
-    tmp t(2, 3);
-    Entry entry;
-    entry.set_index(1);
-    entry.set_term(1);
-    t.wentries.push_back(entry);
-    entry.set_index(2);
-    entry.set_term(2);
-    t.wentries.push_back(entry);
-    tests.push_back(t);
-  }
-  {
-    tmp t(3, 3);
-    Entry entry;
 
-    entry.set_index(3);
-    entry.set_term(2);
-    t.entries.push_back(entry);
+  // then add test cases
+  struct tmp {
+    EntryVec entries;
+    uint64_t windex;
+    EntryVec wentries;
+    uint64_t wunstable;       
+  } tests[] = {
+    {
+      .entries = {}, 
+      .windex = 2, 
+      .wentries = {initEntry(1,1), initEntry(2,2)}, 
+      .wunstable = 3,
+    },
+    {
+      .entries = {initEntry(3,2)}, 
+      .windex = 3, 
+      .wentries = {initEntry(1,1), initEntry(2,2), initEntry(3,2)},
+      .wunstable = 3,
+    },
+    // conflicts with index 1
+    {
+      .entries = {initEntry(1,2)}, 
+      .windex = 1, 
+      .wentries = {initEntry(1,2),},
+      .wunstable = 1,
+    },
+    // conflicts with index 2
+    {
+      .entries = {initEntry(2,3), initEntry(3,3)}, 
+      .windex = 3, 
+      .wentries = {initEntry(1,1), initEntry(2,3), initEntry(3,3)},
+      .wunstable = 2,
+    },    
+  };
 
-    entry.set_index(1);
-    entry.set_term(1);
-    t.wentries.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(2);
-    t.wentries.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(2);
-    t.wentries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  // conflicts with index 1
-  {
-    tmp t(1, 1);
-    Entry entry;
-
-    entry.set_index(1);
-    entry.set_term(2);
-    t.entries.push_back(entry);
-
-    entry.set_index(1);
-    entry.set_term(2);
-    t.wentries.push_back(entry);
-
-    tests.push_back(t);
-  }
-  // conflicts with index 2
-  {
-    tmp t(3, 2);
-    Entry entry;
-
-    entry.set_index(2);
-    entry.set_term(3);
-    t.entries.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(3);
-    t.entries.push_back(entry);
-
-    entry.set_index(1);
-    entry.set_term(1);
-    t.wentries.push_back(entry);
-
-    entry.set_index(2);
-    entry.set_term(3);
-    t.wentries.push_back(entry);
-
-    entry.set_index(3);
-    entry.set_term(3);
-    t.wentries.push_back(entry);
-    tests.push_back(t);
-  }
   size_t i = 0;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
     MemoryStorage s(&kDefaultLogger);
     s.Append(previousEnts);
