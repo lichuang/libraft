@@ -95,11 +95,27 @@ extern string raftLogString(raftLog *log);
 extern void idsBySize(int size, vector<uint64_t>* ids);
 
 static inline Entry 
-initEntry(uint64_t index=0, uint64_t term=0) { 
+initEntry(uint64_t index=0, uint64_t term=0,const string data = "") { 
   Entry entry;
   entry.set_index(index);
   entry.set_term(term);
+  entry.set_data(data);
   return entry;
+}
+
+static inline Message 
+initMessage(uint64_t from=0, uint64_t to=0, const MessageType typ=MsgHup, EntryVec *entries = NULL) { 
+    Message msg;
+    msg.set_from(from);
+    msg.set_to(to);
+    msg.set_type(typ);
+    if (entries != NULL) {
+      uint32_t i;
+      for (i = 0; i < entries->size(); ++i) {
+        *(msg.add_entries()) = (*entries)[i];
+      }
+    }
+    return msg;
 }
 
 #define SIZEOF_ARRAY(array) sizeof(array) / sizeof(array[0])

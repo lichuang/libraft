@@ -75,14 +75,11 @@ TEST(nodeTests, TestNodePropose) {
 // TestNodeReadIndexToOldLeader ensures that raftpb.MsgReadIndex to old leader
 // gets forwarded to the new leader and 'send' method does not attach its term.
 TEST(nodeTests, TestNodeReadIndexToOldLeader) {
-  vector<uint64_t> peers;
+  vector<uint64_t> peers = {1,2,3};
   vector<stateMachine*> sts;
   vector<MemoryStorage*> storages;
-  peers.push_back(1);
-  peers.push_back(2);
-  peers.push_back(3);
-
   raft *a, *b, *c;
+
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
 
@@ -109,70 +106,33 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
 
   // elect a as leader
   {
-    vector<Message> tmp_msgs;
-    Message msg;
-    msg.set_from(1);
-    msg.set_to(1);
-    msg.set_type(MsgHup);
-    tmp_msgs.push_back(msg);
+    vector<Message> tmp_msgs = { initMessage(1,1,MsgHup) };
     net->send(&tmp_msgs);
   }
 
-  EntryVec testEntries;
-  {
-    Entry entry;
-    entry.set_data("testdata");
-    testEntries.push_back(entry);
-  }
+  EntryVec testEntries = {initEntry(0,0,"testdata")};
 
   // send readindex request to b(follower)
-  {
-    Message msg;
-    msg.set_from(2);
-    msg.set_to(2);
-    msg.set_type(MsgReadIndex);
-    *(msg.add_entries()) = testEntries[0];
-    b->step(msg);
-  }
+  b->step(initMessage(2,2,MsgReadIndex,&testEntries));
 
   // verify b(follower) forwards this message to r1(leader) with term not set
   EXPECT_EQ((int)b->outMsgs_.size(), 1);
 
-  Message readIndexMsg1;
-  readIndexMsg1.set_from(2);
-  readIndexMsg1.set_to(1);
-  readIndexMsg1.set_type(MsgReadIndex);
-  *(readIndexMsg1.add_entries()) = testEntries[0];
+  Message readIndexMsg1 = initMessage(2,1,MsgReadIndex, &testEntries);
 
   EXPECT_TRUE(isDeepEqualMessage(*b->outMsgs_[0], readIndexMsg1));
 
   // send readindex request to c(follower)
-  {
-    Message msg;
-    msg.set_from(3);
-    msg.set_to(3);
-    msg.set_type(MsgReadIndex);
-    *(msg.add_entries()) = testEntries[0];
-    c->step(msg);
-  }
+  c->step(initMessage(3,3,MsgReadIndex,&testEntries));
 
   // verify c(follower) forwards this message to r1(leader) with term not set
   EXPECT_EQ((int)c->outMsgs_.size(), 1);
-  Message readIndexMsg2;
-  readIndexMsg2.set_from(3);
-  readIndexMsg2.set_to(1);
-  readIndexMsg2.set_type(MsgReadIndex);
-  *(readIndexMsg2.add_entries()) = testEntries[0];
+  Message readIndexMsg2 = initMessage(3,1,MsgReadIndex, &testEntries);
   EXPECT_TRUE(isDeepEqualMessage(*c->outMsgs_[0], readIndexMsg2));
 
   // now elect c as leader
   {
-    vector<Message> tmp_msgs;
-    Message msg;
-    msg.set_from(3);
-    msg.set_to(3);
-    msg.set_type(MsgHup);
-    tmp_msgs.push_back(msg);
+    vector<Message> tmp_msgs = {initMessage(3,3,MsgHup)};
     net->send(&tmp_msgs);
   }
 
@@ -183,11 +143,7 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
   // verify a(follower) forwards these messages again to c(new leader)
   EXPECT_EQ((int)a->outMsgs_.size(), 2);
 
-  Message readIndexMsg3;
-  readIndexMsg3.set_from(1);
-  readIndexMsg3.set_to(3);
-  readIndexMsg3.set_type(MsgReadIndex);
-  *(readIndexMsg3.add_entries()) = testEntries[0];
+  Message readIndexMsg3 = initMessage(1,3,MsgReadIndex, &testEntries);
   EXPECT_TRUE(isDeepEqualMessage(*a->outMsgs_[0], readIndexMsg3));
   EXPECT_TRUE(isDeepEqualMessage(*a->outMsgs_[1], readIndexMsg3));
 
@@ -201,8 +157,7 @@ TEST(nodeTests, TestNodeProposeConfig) {
 
   Logger *defaultLogger = new DefaultLogger();
   MemoryStorage *s = new MemoryStorage(defaultLogger);
-  vector<uint64_t> peers;
-  peers.push_back(1);
+  vector<uint64_t> peers = {1};
   raft *r = newTestRaft(1, peers, 10, 1, s);
   NodeImpl *n = new NodeImpl(defaultLogger, r); 
 

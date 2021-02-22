@@ -874,9 +874,7 @@ TEST(logTests, TestSlice) {
   uint64_t last = offset + num;
   uint64_t half = offset + num / 2;
 
-  Entry halfe;
-  halfe.set_index(half);
-  halfe.set_term(half);
+  Entry halfe = initEntry(half, half);
 
   Snapshot sn;
   sn.mutable_metadata()->set_index(offset);
@@ -891,6 +889,7 @@ TEST(logTests, TestSlice) {
   for (i = 1; i < num; ++i) {
     entries.push_back(initEntry(i + offset, i + offset));
   }
+  
   log->append(entries);
 
   struct tmp {
@@ -899,63 +898,63 @@ TEST(logTests, TestSlice) {
     bool wpanic;
   } tests[] = {
     // test no limit
-    {
+    { // 0
       .from = offset - 1, .to = offset + 1, .limit = kNoLimit,
       .entries = {},
       .wpanic = false,      
     },
-    {
+    { // 1
       .from = offset, .to = offset + 1, .limit = kNoLimit,
       .entries = {},
       .wpanic = false,      
     },    
-    {
+    { // 2
       .from = half - 1, .to = half + 1, .limit = kNoLimit,
       .entries = {initEntry(half - 1, half - 1), initEntry(half, half)},
       .wpanic = false,      
     },    
-    {
+    { // 3
       .from = half, .to = half + 1, .limit = kNoLimit,
       .entries = {initEntry(half, half),},
       .wpanic = false,      
     },    
-    {
+    { // 4
       .from = last - 1, .to = last, .limit = kNoLimit,
       .entries = {initEntry(last - 1, last - 1),},
       .wpanic = false,      
     },  
     // test limit  
-    {
+    { // 5
       .from = half - 1, .to = half + 1, .limit = 0,
       .entries = {initEntry(half - 1, half - 1),},
       .wpanic = false,      
     },   
-    {
+    { // 6
       .from = half - 1, .to = half + 1, .limit = halfe.ByteSizeLong() + 1,
       .entries = {initEntry(half - 1, half - 1),},
       .wpanic = false,      
     },     
-    {
+    { // 7
       .from = half - 2, .to = half + 1, .limit = halfe.ByteSizeLong() + 1,
       .entries = {initEntry(half - 2, half - 2),},
       .wpanic = false,      
     },   
-    {
+    { // 8
       .from = half - 1, .to = half + 1, .limit = halfe.ByteSizeLong() * 2,
       .entries = {initEntry(half - 1, half - 1), initEntry(half, half),},
       .wpanic = false,      
     },     
-    {
+    { // 9
       .from = half - 1, .to = half + 2, .limit = halfe.ByteSizeLong() * 3,
       .entries = {initEntry(half - 1, half - 1), initEntry(half, half), initEntry(half + 1, half + 1),},
       .wpanic = false,      
     },      
-    {
+    { // 10
       .from = half, .to = half + 2, .limit = halfe.ByteSizeLong(),
       .entries = {initEntry(half, half),},
       .wpanic = false,      
     },   
-    {
+    { // 11
       .from = half, .to = half + 2, .limit = halfe.ByteSizeLong() * 2,
       .entries = {initEntry(half, half), initEntry(half + 1, half + 1),},
       .wpanic = false,      
@@ -969,8 +968,8 @@ TEST(logTests, TestSlice) {
     int err = log->slice(t.from, t.to, t.limit, &ents);
 
     EXPECT_FALSE(t.from <= offset && err != ErrCompacted);
-    EXPECT_FALSE(t.from > offset && !SUCCESS(err)) << "i: " << i;
-    EXPECT_TRUE(isDeepEqualEntries(ents, t.entries)) << i << " from " << t.from << " to " << t.to;
+    EXPECT_FALSE(t.from > offset && !SUCCESS(err)) << "i: " << i;    
+    EXPECT_TRUE(isDeepEqualEntries(ents, t.entries)) << i << " from " << t.from << " to " << t.to << ",diff:" << entryVecDebugString(ents) << " " << entryVecDebugString(t.entries);
   }
 
   delete log;
