@@ -24,7 +24,7 @@ class Logger;
 class NodeImpl : public Node {
 public:
   NodeImpl(Logger*, raft*);
-  ~NodeImpl();
+  virtual ~NodeImpl();
 
   virtual void Tick(Ready **ready);
   virtual int  Campaign(Ready **ready);

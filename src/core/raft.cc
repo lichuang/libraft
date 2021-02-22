@@ -86,6 +86,10 @@ raft::raft(const Config *config, raftLog *log)
 raft::~raft() {
   delete readOnly_;  
   delete raftLog_;
+  uint32_t i;
+  for (i = 0; i < readStates_.size(); ++i) {
+    delete readStates_[i];
+  }
 }
 
 void

@@ -36,11 +36,12 @@ TEST(nodeTests, TestNodePropose) {
   msgs.clear();
   vector<ReadState*> readStates;
   
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  Logger * defaultLogger = new DefaultLogger();
+  MemoryStorage *s = new MemoryStorage(defaultLogger);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  NodeImpl *n = new NodeImpl(&kDefaultLogger, r);  
+  NodeImpl *n = new NodeImpl(defaultLogger, r);  
 
   readStates.push_back(new ReadState(1, "somedata"));
   r->readStates_ = readStates;
@@ -67,6 +68,8 @@ TEST(nodeTests, TestNodePropose) {
   EXPECT_EQ((int)msgs.size(), 1);
   EXPECT_EQ(msgs[0].type(), MsgReadIndex);
   EXPECT_EQ(msgs[0].entries(0).data(), wrequestCtx);
+
+  delete n;
 }
 
 // TestNodeReadIndexToOldLeader ensures that raftpb.MsgReadIndex to old leader
@@ -74,6 +77,7 @@ TEST(nodeTests, TestNodePropose) {
 TEST(nodeTests, TestNodeReadIndexToOldLeader) {
   vector<uint64_t> peers;
   vector<stateMachine*> sts;
+  vector<MemoryStorage*> storages;
   peers.push_back(1);
   peers.push_back(2);
   peers.push_back(3);
@@ -83,18 +87,21 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
 
     a = newTestRaft(1, peers, 10, 1, s);
+    storages.push_back(s);
     sts.push_back(new raftStateMachine(a));
   }
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
 
     b = newTestRaft(2, peers, 10, 1, s);
+    storages.push_back(s);
     sts.push_back(new raftStateMachine(b));
   }
   {
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
 
     c = newTestRaft(3, peers, 10, 1, s);
+    storages.push_back(s);
     sts.push_back(new raftStateMachine(c));
   }
   
@@ -183,6 +190,8 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
   *(readIndexMsg3.add_entries()) = testEntries[0];
   EXPECT_TRUE(isDeepEqualMessage(*a->outMsgs_[0], readIndexMsg3));
   EXPECT_TRUE(isDeepEqualMessage(*a->outMsgs_[1], readIndexMsg3));
+
+  delete net;
 }
 
 // TestNodeProposeConfig ensures that node.ProposeConfChange sends the given configuration proposal

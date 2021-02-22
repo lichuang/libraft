@@ -295,7 +295,6 @@ TEST(raftTests, TestProgressResumeByHeartbeatResp) {
     EXPECT_FALSE(r->progressMap_[2]->paused_);
   }
 
-  delete s;
   delete r;
 }
 
@@ -341,7 +340,6 @@ TEST(raftTests, TestProgressPaused) {
   r->readMessages(&msgs);
   EXPECT_EQ((int)msgs.size(), 1);
 
-  delete s;
   delete r;
 }
 

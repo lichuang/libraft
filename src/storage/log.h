@@ -31,6 +31,8 @@ struct raftLog {
   Logger *logger_;
 
   raftLog(Storage *, Logger *);
+  ~raftLog();
+  
   string String();
 
   // maybeAppend returns false if the entries cannot be appended. Otherwise,

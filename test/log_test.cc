@@ -45,8 +45,8 @@ TEST(logTests, TestFindConflict) {
   size_t i = 0;
   for (i = 0; i < SIZEOF_ARRAY(tests); i++) {
     const tmp &test = tests[i];
-    MemoryStorage s(&kDefaultLogger);
-    raftLog *log = newLog(&s, &kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    raftLog *log = newLog(s, &kDefaultLogger);
     
     log->append(previousEnts);
 
@@ -65,8 +65,8 @@ TEST(logTests, TestIsUpToDate) {
     initEntry(3,3),
   };
 
-  MemoryStorage s(&kDefaultLogger);
-  raftLog *log = newLog(&s, &kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  raftLog *log = newLog(s, &kDefaultLogger);
   log->append(previousEnts);
 
   // then add test cases
@@ -144,10 +144,11 @@ TEST(logTests, TestAppend) {
   size_t i = 0;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
-    MemoryStorage s(&kDefaultLogger);
-    s.Append(previousEnts);
-    raftLog *log = newLog(&s, &kDefaultLogger);
     
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    s->Append(previousEnts);
+    raftLog *log = newLog(s, &kDefaultLogger);
+
     uint64_t index = log->append(test.entries);
 
     EXPECT_EQ(index, test.windex);
@@ -280,8 +281,9 @@ TEST(logTests, TestLogMaybeAppend) {
   size_t i = 0;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
-    MemoryStorage s(&kDefaultLogger);
-    raftLog *log = newLog(&s, &kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    raftLog *log = newLog(s, &kDefaultLogger);
+
     log->append(previousEnts);
     log->committed_ = commit;
 
@@ -309,16 +311,17 @@ TEST(logTests, TestCompactionSideEffects) {
   uint64_t lastIndex = 1000;
   uint64_t unstableIndex = 750;
   uint64_t lastTerm = lastIndex;
-  MemoryStorage s(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    
   size_t i;
   
   for (i = 1; i <= unstableIndex; ++i) {
-    s.Append({ 
+    s->Append({ 
       initEntry(i,i) 
     });
   }
 
-  raftLog *log = newLog(&s, &kDefaultLogger);
+  raftLog *log = newLog(s, &kDefaultLogger);  
   for (i = unstableIndex; i < lastIndex; ++i) {
     log->append({ 
       initEntry(i+1,i+1) 
@@ -331,7 +334,7 @@ TEST(logTests, TestCompactionSideEffects) {
   log->appliedTo(log->committed_);
 
   uint64_t offset = 500;
-  s.Compact(offset);
+  s->Compact(offset);
 
   EXPECT_EQ(log->lastIndex(), lastIndex);
 
@@ -391,9 +394,9 @@ TEST(logTests, TestHasNextEnts) {
 
   size_t i;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
-    MemoryStorage s(&kDefaultLogger);
-    s.ApplySnapshot(sn);
-    raftLog *log = newLog(&s, &kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    s->ApplySnapshot(sn);
+    raftLog *log = newLog(s, &kDefaultLogger);
     
     log->append(entries);
     log->maybeCommit(5, 1);
@@ -428,9 +431,9 @@ TEST(logTests, TestNextEnts) {
 
   size_t i;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
-    MemoryStorage s(&kDefaultLogger);
-    s.ApplySnapshot(sn);
-    raftLog *log = newLog(&s, &kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    s->ApplySnapshot(sn);
+    raftLog *log = newLog(s, &kDefaultLogger);
     
     log->append(entries);
     log->maybeCommit(5, 1);
@@ -466,11 +469,12 @@ TEST(logTests, TestUnstableEnts) {
     const tmp &t = tests[i];
 
     // append stable entries to storage
-    MemoryStorage s(&kDefaultLogger);
-    s.Append(EntryVec(previousEnts.begin(), previousEnts.begin() + t.unstable - 1));    
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    s->Append(EntryVec(previousEnts.begin(), previousEnts.begin() + t.unstable - 1)); 
 
-    // append unstable entries to raftlog
-    raftLog *log = newLog(&s, &kDefaultLogger); 
+    // append unstable entries to raftlog   
+    raftLog *log = newLog(s, &kDefaultLogger);
+
     log->append(EntryVec(previousEnts.begin() + t.unstable - 1, previousEnts.end()));
 
     EntryVec unstableEntries;
@@ -510,8 +514,8 @@ TEST(logTests, TestCommitTo) {
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
 
-    MemoryStorage s(&kDefaultLogger);
-    raftLog *log = newLog(&s, &kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    raftLog *log = newLog(s, &kDefaultLogger);
 
     log->append(previousEnts);
     log->committed_ = commit;
@@ -540,8 +544,8 @@ TEST(logTests, TestStableTo) {
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
 
-    MemoryStorage s(&kDefaultLogger);
-    raftLog *log = newLog(&s, &kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    raftLog *log = newLog(s, &kDefaultLogger);
 
     log->append(entries);
     log->stableTo(t.stablei, t.stablet);
@@ -611,14 +615,15 @@ TEST(logTests, TestStableToWithSnap) {
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
 
-    MemoryStorage s(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
 
     Snapshot sn;
     sn.mutable_metadata()->set_index(snapi);
     sn.mutable_metadata()->set_term(snapt);
-    s.ApplySnapshot(sn);
+    s->ApplySnapshot(sn);
+    
+    raftLog *log = newLog(s, &kDefaultLogger);
 
-    raftLog *log = newLog(&s, &kDefaultLogger);
     log->append(t.entries);
     log->stableTo(t.stablei, t.stablet);
     EXPECT_EQ(log->unstable_.offset_, t.wunstable);
@@ -662,19 +667,19 @@ TEST(logTests, TestCompaction) {
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &t = tests[i];
 
-    MemoryStorage s(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
     EntryVec entries;
     for (j = 1; j <= t.lastIndex; ++j) {
       entries.push_back(initEntry(j));
     }
-    s.Append(entries);
+    s->Append(entries);
 
-    raftLog *log = newLog(&s, &kDefaultLogger);
+    raftLog *log = newLog(s, &kDefaultLogger);
     log->maybeCommit(t.lastIndex, 0);
     log->appliedTo(log->committed_);
 
     for (j = 0; j < t.compact.size(); ++j) {
-      int err = s.Compact(t.compact[j]);
+      int err = s->Compact(t.compact[j]);
       if (!SUCCESS(err)) {
         EXPECT_FALSE(t.wallow) << i << "." << j << " allow = " << false << ",want " << t.wallow;
         continue;
@@ -695,10 +700,10 @@ TEST(logTests, TestLogRestore) {
   sn.mutable_metadata()->set_index(index);
   sn.mutable_metadata()->set_term(term);
 
-  MemoryStorage s(&kDefaultLogger);
-  s.ApplySnapshot(sn);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  s->ApplySnapshot(sn);
 
-  raftLog *log = newLog(&s, &kDefaultLogger);
+  raftLog *log = newLog(s, &kDefaultLogger);
 
   EntryVec allEntries;
   log->allEntries(&allEntries);
@@ -722,10 +727,10 @@ TEST(logTests, TestIsOutOfBounds) {
   Snapshot sn;
   sn.mutable_metadata()->set_index(offset);
 
-  MemoryStorage s(&kDefaultLogger);
-  s.ApplySnapshot(sn);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  s->ApplySnapshot(sn);
 
-  raftLog *log = newLog(&s, &kDefaultLogger);
+  raftLog *log = newLog(s, &kDefaultLogger);
 
   size_t i = 0;
   EntryVec entries;
@@ -786,10 +791,10 @@ TEST(logTests, TestTerm) {
   sn.mutable_metadata()->set_index(offset);
   sn.mutable_metadata()->set_term(1);
 
-  MemoryStorage s(&kDefaultLogger);
-  s.ApplySnapshot(sn);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  s->ApplySnapshot(sn);
 
-  raftLog *log = newLog(&s, &kDefaultLogger);
+  raftLog *log = newLog(s, &kDefaultLogger);
 
   size_t i = 0;
   EntryVec entries;
@@ -827,10 +832,10 @@ TEST(logTests, TestTermWithUnstableSnapshot) {
   sn.mutable_metadata()->set_index(storagesnapi);
   sn.mutable_metadata()->set_term(1);
 
-  MemoryStorage s(&kDefaultLogger);
-  s.ApplySnapshot(sn);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  s->ApplySnapshot(sn);
 
-  raftLog *log = newLog(&s, &kDefaultLogger);
+  raftLog *log = newLog(s, &kDefaultLogger);
   {
     Snapshot tmp_sn;
     tmp_sn.mutable_metadata()->set_index(unstablesnapi);
@@ -876,10 +881,10 @@ TEST(logTests, TestSlice) {
   Snapshot sn;
   sn.mutable_metadata()->set_index(offset);
 
-  MemoryStorage s(&kDefaultLogger);
-  s.ApplySnapshot(sn);
+  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  s->ApplySnapshot(sn);
 
-  raftLog *log = newLog(&s, &kDefaultLogger);
+  raftLog *log = newLog(s, &kDefaultLogger);
 
   size_t i = 0;
   EntryVec entries;

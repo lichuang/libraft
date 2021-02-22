@@ -48,6 +48,7 @@ struct network {
   map<connem, int> dropm;
   map<MessageType, bool> ignorem;
 
+  ~network();
   void send(vector<Message>* msgs);
   void drop(uint64_t from, uint64_t to, int perc);
   void cut(uint64_t one, uint64_t other);
@@ -68,6 +69,7 @@ struct raftStateMachine : public stateMachine {
   virtual int type() { return raftType; }
   virtual void* data() { return raft; }
 
+  Config* config;
   raft *raft;
 };
 

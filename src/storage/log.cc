@@ -14,6 +14,10 @@ raftLog::raftLog(Storage *storage, Logger *logger)
     logger_(logger) {
 }
 
+raftLog::~raftLog() {
+  delete storage_;
+}
+
 // maybeAppend returns false if the entries cannot be appended. Otherwise,
 // it returns last index of new entries.
 bool

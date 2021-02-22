@@ -59,14 +59,20 @@ bool operator < (const connem& c1, const connem& c2) {
 }
 
 raftStateMachine::raftStateMachine(Config *c) {
+  config = c;
   raft = newRaft(c);
 }
 
 raftStateMachine::raftStateMachine(struct raft *r)
-  : raft(r) {
+  : config(NULL),
+    raft(r) {
 }
 
 raftStateMachine::~raftStateMachine() {
+  if (config) {
+    delete config;
+  }
+  
   delete raft;
 }
 
@@ -136,6 +142,24 @@ network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*>& peers)
 
 network* newNetwork(const vector<stateMachine*>& peers) {
   return newNetworkWithConfig(NULL, peers);
+}
+
+network::~network() {
+  {
+    map<uint64_t, stateMachine*>::iterator iter = peers.begin();
+    while (iter != peers.end()) {
+      delete iter->second;
+      ++iter;
+    }
+  }
+  
+  {
+    map<uint64_t, MemoryStorage*>::iterator iter = storage.begin();
+    while (iter != storage.end()) {
+      delete iter->second;
+      ++iter;
+    }
+  }  
 }
 
 void network::send(vector<Message> *msgs) {
