@@ -199,11 +199,12 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
 TEST(nodeTests, TestNodeProposeConfig) {
   msgs.clear();
 
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  Logger *defaultLogger = new DefaultLogger();
+  MemoryStorage *s = new MemoryStorage(defaultLogger);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  NodeImpl *n = new NodeImpl(&kDefaultLogger, r); 
+  NodeImpl *n = new NodeImpl(defaultLogger, r); 
 
   Ready *ready;
   n->Campaign(&ready);
@@ -232,6 +233,8 @@ TEST(nodeTests, TestNodeProposeConfig) {
   EXPECT_EQ((int)msgs.size(), 1);
   EXPECT_EQ(msgs[0].type(), MsgProp);
   EXPECT_EQ(msgs[0].entries(0).data(), ccdata);
+
+  delete n;
 }
 
 // TestNodeProposeAddDuplicateNode ensures that two proposes to add the same node should
@@ -260,11 +263,12 @@ void applyReadyEntries(Ready* ready, EntryVec* readyEntries, MemoryStorage *s, N
 }
 
 TEST(nodeTests, TestNodeProposeAddDuplicateNode) {
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  Logger *defaultLogger = new DefaultLogger();
+  MemoryStorage *s = new MemoryStorage(defaultLogger);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  NodeImpl *n = new NodeImpl(&kDefaultLogger, r); 
+  NodeImpl *n = new NodeImpl(defaultLogger, r); 
 
   Ready *ready;
   EntryVec readyEntries;
@@ -294,4 +298,6 @@ TEST(nodeTests, TestNodeProposeAddDuplicateNode) {
   EXPECT_EQ((int)readyEntries.size(), 4);
   EXPECT_EQ(readyEntries[1].data(), ccdata1);
   EXPECT_EQ(readyEntries[3].data(), ccdata2);
+
+  delete n;
 }
