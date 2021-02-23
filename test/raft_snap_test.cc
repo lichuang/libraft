@@ -26,8 +26,7 @@ Snapshot testingSnap() {
 }
 
 TEST(raftPaperTests, TestSendingSnapshotSetPendingSnapshot) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
+  vector<uint64_t> peers = {1};
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->restore(testingSnap());
@@ -39,23 +38,19 @@ TEST(raftPaperTests, TestSendingSnapshotSetPendingSnapshot) {
   r->progressMap_[2]->next_ = r->raftLog_->firstIndex();
 
   {
-    Message msg;
-    msg.set_from(2);
-    msg.set_to(1);
-    msg.set_index(r->progressMap_[2]->next_ - 1);
+    Message msg = initMessage(2,1,MsgAppResp,NULL, r->progressMap_[2]->next_ - 1);
     msg.set_reject(true);
-    msg.set_type(MsgAppResp);
 
     r->step(msg);
   }
 
   EXPECT_EQ((int)r->progressMap_[2]->pendingSnapshot_, 11);
+
+  delete r;
 }
 
 TEST(raftPaperTests, TestPendingSnapshotPauseReplication) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
+  vector<uint64_t> peers = {1,2};
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->restore(testingSnap());
@@ -65,26 +60,21 @@ TEST(raftPaperTests, TestPendingSnapshotPauseReplication) {
   r->progressMap_[2]->becomeSnapshot(11);
 
   {
-    Message msg;
-    msg.set_from(1);
-    msg.set_to(1);
-    msg.set_type(MsgProp);
+    EntryVec entries = {initEntry(0,0,"somedata")};
 
-    Entry *entry = msg.add_entries();
-    entry->set_data("somedata");
-
+    Message msg = initMessage(1,1,MsgProp,&entries);
     r->step(msg);
   }
 
   MessageVec msgs;
   r->readMessages(&msgs);
   EXPECT_EQ((int)msgs.size(), 0);
+
+  delete r;
 }
 
 TEST(raftPaperTests, TestSnapshotFailure) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
+  vector<uint64_t> peers = {1,2};
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->restore(testingSnap());
@@ -95,24 +85,20 @@ TEST(raftPaperTests, TestSnapshotFailure) {
   r->progressMap_[2]->becomeSnapshot(11);
 
   {
-    Message msg;
-    msg.set_from(2);
-    msg.set_to(1);
+    Message msg = initMessage(2,1,MsgSnapStatus,NULL);
     msg.set_reject(true);
-    msg.set_type(MsgSnapStatus);
-
     r->step(msg);
   }
 
   EXPECT_EQ((int)r->progressMap_[2]->pendingSnapshot_, 0);
   EXPECT_EQ((int)r->progressMap_[2]->next_, 1);
   EXPECT_TRUE(r->progressMap_[2]->paused_);
+
+  delete r;
 }
 
 TEST(raftPaperTests, TestSnapshotSucceed) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
+  vector<uint64_t> peers = {1,2};
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->restore(testingSnap());
@@ -123,24 +109,20 @@ TEST(raftPaperTests, TestSnapshotSucceed) {
   r->progressMap_[2]->becomeSnapshot(11);
 
   {
-    Message msg;
-    msg.set_from(2);
-    msg.set_to(1);
+    Message msg = initMessage(2,1,MsgSnapStatus,NULL);
     msg.set_reject(false);
-    msg.set_type(MsgSnapStatus);
-
     r->step(msg);
   }
 
   EXPECT_EQ((int)r->progressMap_[2]->pendingSnapshot_, 0);
   EXPECT_EQ((int)r->progressMap_[2]->next_, 12);
   EXPECT_TRUE(r->progressMap_[2]->paused_);
+
+  delete r;
 }
 
 TEST(raftPaperTests, TestSnapshotAbort) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
+  vector<uint64_t> peers = {1,2};
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->restore(testingSnap());
@@ -153,15 +135,12 @@ TEST(raftPaperTests, TestSnapshotAbort) {
 	// A successful msgAppResp that has a higher/equal index than the
 	// pending snapshot should abort the pending snapshot.
   {
-    Message msg;
-    msg.set_from(2);
-    msg.set_to(1);
-    msg.set_index(11);
-    msg.set_type(MsgAppResp);
-
+    Message msg = initMessage(2,1,MsgAppResp,NULL,11);
     r->step(msg);
   }
 
   EXPECT_EQ((int)r->progressMap_[2]->pendingSnapshot_, 0);
   EXPECT_EQ((int)r->progressMap_[2]->next_, 12);
+
+  delete r;
 }
