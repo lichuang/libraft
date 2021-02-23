@@ -104,10 +104,11 @@ initEntry(uint64_t index=0, uint64_t term=0,const string data = "") {
 }
 
 static inline Message 
-initMessage(uint64_t from=0, uint64_t to=0, const MessageType typ=MsgHup, EntryVec *entries = NULL) { 
+initMessage(uint64_t from=0, uint64_t to=0, const MessageType typ=MsgHup, EntryVec *entries = NULL, uint64_t index = 0) { 
     Message msg;
     msg.set_from(from);
     msg.set_to(to);
+    msg.set_index(index);
     msg.set_type(typ);
     if (entries != NULL) {
       uint32_t i;

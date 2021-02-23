@@ -90,6 +90,10 @@ raft::~raft() {
   for (i = 0; i < readStates_.size(); ++i) {
     delete readStates_[i];
   }
+  map<uint64_t, Progress*>::const_iterator iter = progressMap_.begin();
+  for (; iter != progressMap_.end(); ++iter) {
+    delete iter->second;
+  }
 }
 
 void
