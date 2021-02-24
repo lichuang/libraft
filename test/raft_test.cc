@@ -68,52 +68,37 @@ raftStateMachine* votedWithConfig(ConfigFun fun, uint64_t vote, uint64_t term) {
 TEST(raftTests, TestProgressBecomeProbe) {
   uint64_t match = 1;
   struct tmp {
-    Progress p;
+    Progress progress;
     uint64_t wnext;
-
-    tmp(Progress p, uint64_t next)
-      : p(p), wnext(next) {
-    }
+  } tests[] = {
+    {
+      .progress = initProgress(5, 256, &kDefaultLogger, ProgressStateReplicate, match),
+      .wnext = 2,
+    },
+    // snapshot finish
+    {
+      .progress = initProgress(5, 256, &kDefaultLogger, ProgressStateSnapshot, match, 10),
+      .wnext = 11,
+    },    
+    // snapshot failure
+    {
+      .progress = initProgress(5, 256, &kDefaultLogger, ProgressStateSnapshot, match, 0),
+      .wnext = 2,
+    },    
   };
 
-  vector<tmp> tests;
-  {
-    Progress p(5, 256, &kDefaultLogger);
-    p.state_ = ProgressStateReplicate;
-    p.match_ = match;
-    tests.push_back(tmp(p, 2));
-  }
-  // snapshot finish
-  {
-    Progress p(5, 256, &kDefaultLogger);
-    p.state_ = ProgressStateSnapshot;
-    p.match_ = match;
-    p.pendingSnapshot_ = 10;
-    tests.push_back(tmp(p, 11));
-  }
-  // snapshot failure
-  {
-    Progress p(5, 256, &kDefaultLogger);
-    p.state_ = ProgressStateSnapshot;
-    p.match_ = match;
-    p.pendingSnapshot_ = 0;
-    tests.push_back(tmp(p, 2));
-  }
-
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp &t = tests[i];
-    t.p.becomeProbe();
-    EXPECT_EQ(t.p.state_, ProgressStateProbe);
-    EXPECT_EQ(t.p.match_, match);
-    EXPECT_EQ(t.p.next_, t.wnext);
+    t.progress.becomeProbe();
+    EXPECT_EQ(t.progress.state_, ProgressStateProbe);
+    EXPECT_EQ(t.progress.match_, match);
+    EXPECT_EQ(t.progress.next_, t.wnext);
   }
 }
 
 TEST(raftTests, TestProgressBecomeReplicate) {
-  Progress p(5, 256, &kDefaultLogger);
-  p.state_ = ProgressStateProbe;
-  p.match_ = 1;
+  Progress p = initProgress(5, 256, &kDefaultLogger, ProgressStateProbe, 1, 0);
 
   p.becomeReplicate();
   EXPECT_EQ(p.state_, ProgressStateReplicate);
@@ -122,9 +107,7 @@ TEST(raftTests, TestProgressBecomeReplicate) {
 }
 
 TEST(raftTests, TestProgressBecomeSnapshot) {
-  Progress p(5, 256, &kDefaultLogger);
-  p.state_ = ProgressStateProbe;
-  p.match_ = 1;
+  Progress p = initProgress(5, 256, &kDefaultLogger, ProgressStateProbe, 1, 0);
 
   p.becomeSnapshot(10);
   EXPECT_EQ(p.state_, ProgressStateSnapshot);
@@ -141,27 +124,30 @@ TEST(raftTests, TestProgressUpdate) {
     uint64_t wm;
     uint64_t wn;
     bool     wok;
-
-    tmp(uint64_t update, uint64_t wm, uint64_t wn, bool ok)
-      : update(update), wm(wm), wn(wn), wok(ok) {
-    }
+  } tests[] = {
+    // do not decrease match, next
+    {
+      .update = prevM - 1, .wm = prevM, .wn = prevN, .wok = false,
+    },
+    // do not decrease next
+    {
+      .update = prevM, .wm = prevM, .wn = prevN, .wok = false,
+    },
+    // increase match, do not decrease next
+    {
+      .update = prevM + 1, .wm = prevM + 1, .wn = prevN, .wok = true,
+    }, 
+    // increase match, next
+    {
+      .update = prevM + 2, .wm = prevM + 2, .wn = prevN + 1, .wok = true,
+    },            
   };
 
-  vector<tmp> tests;
-  // do not decrease match, next
-  tests.push_back(tmp(prevM - 1, prevM, prevN, false));
-  // do not decrease next
-  tests.push_back(tmp(prevM, prevM, prevN, false));
-  // increase match, do not decrease next
-  tests.push_back(tmp(prevM + 1, prevM + 1, prevN, true));
-  // increase match, next
-  tests.push_back(tmp(prevM + 2, prevM + 2, prevN + 1, true));
-
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp &t = tests[i];
-    Progress p(prevN, 256, &kDefaultLogger);
-    p.match_ = prevM;
+
+    Progress p = initProgress(prevN, 256, &kDefaultLogger, ProgressStateProbe, prevM, 0);
 
     bool ok = p.maybeUpdate(t.update);
     EXPECT_EQ(ok, t.wok);
@@ -179,9 +165,10 @@ TEST(raftTests, TestProgressMaybeDecr) {
     uint64_t last;
     bool w;
     uint64_t wn;
-
-    tmp(ProgressState s, uint64_t m, uint64_t n, uint64_t rejected, uint64_t last, bool w, uint64_t wn)
-      : state(s), m(m), n(n), rejected(rejected), last(last), w(w), wn(wn) {}
+  } tests[] = {
+    {
+      
+    }
   };
 
   vector<tmp> tests;

@@ -7,6 +7,7 @@
 
 #include "libraft.h"
 #include "core/raft.h"
+#include "core/progress.h"
 #include "storage/memory_storage.h"
 
 using namespace libraft;
@@ -131,6 +132,16 @@ newSnapshot(uint64_t index = 0, uint64_t term = 0) {
     meta->set_term(term);
   }  
   return s;
+}
+
+static inline Progress
+initProgress(uint64_t next, int maxInfilght, Logger *logger, ProgressState state, uint64_t match, uint64_t pendingSnapshot = 0) { 
+  Progress progress(next, maxInfilght, logger);
+  progress.state_ = state;
+  progress.match_ = match;
+  progress.pendingSnapshot_ = pendingSnapshot;
+
+  return progress;
 }
 
 #define SIZEOF_ARRAY(array) sizeof(array) / sizeof(array[0])
