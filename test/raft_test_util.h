@@ -119,6 +119,20 @@ initMessage(uint64_t from=0, uint64_t to=0, const MessageType typ=MsgHup, EntryV
     return msg;
 }
 
+static inline Snapshot*
+newSnapshot(uint64_t index = 0, uint64_t term = 0) { 
+  Snapshot* s = new Snapshot();
+  SnapshotMetadata *meta = s->mutable_metadata();
+ 
+  if (index != 0) {
+    meta->set_index(index);
+  }
+  if (term != 0) {
+    meta->set_term(term);
+  }  
+  return s;
+}
+
 #define SIZEOF_ARRAY(array) sizeof(array) / sizeof(array[0])
 
 #endif  // __LIBRAFT_RAFT_TEST_UTIL_H__

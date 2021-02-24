@@ -10,7 +10,7 @@ add_executable ( libraft_test
   test/raft_snap_test.cc
   test/raft_test_util.cc
   #test/raft_test.cc 
-  #test/unstable_log_test.cc      
+  test/unstable_log_test.cc      
 )
 
 target_link_libraries (libraft_test PRIVATE raft gtest pthread protobuf gflags)

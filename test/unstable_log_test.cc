@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include "libraft.h"
+#include "raft_test_util.h"
 #include "base/default_logger.h"
 #include "base/util.h"
 #include "storage/unstable_log.h"
@@ -17,59 +18,33 @@ TEST(unstableLogTests, TestUnstableMaybeFirstIndex) {
     Snapshot *snapshot;
     bool wok;
     uint64_t windex;
-
-    tmp(EntryVec ens, uint64_t off, Snapshot *snap, bool w, uint64_t index)
-      : entries(ens), offset(off), snapshot(snap), wok(w), windex(index) {
-    }
+  } tests[] = {
+    // no  snapshot
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = NULL,
+      .wok = false, .windex = 0,
+    },
+    {
+      .entries = {},
+      .offset = 0, .snapshot = NULL,
+      .wok = false, .windex = 0,      
+    },
+    // has snapshot
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .wok = true, .windex = 5,
+    },    
+    {
+      .entries = {},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .wok = true, .windex = 5,
+    },    
   };
 
-  vector<tmp> tests;
-
-  // no  snapshot
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry);
-    tmp t(entries, 5, NULL, false, 0);
-
-    tests.push_back(t);
-  }
-  {
-    EntryVec entries;
-    tmp t(entries, 0, NULL, false, 0);
-
-    tests.push_back(t);
-  }
-  // has snapshot
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry);
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    tmp t(entries, 5, snapshot, true, 5);
-
-    tests.push_back(t);
-  }
-  {
-    EntryVec entries;
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    tmp t(entries, 5, snapshot, true, 5);
-
-    tests.push_back(t);
-  }
-
   size_t i;
-  for (i = 0;i < tests.size(); ++i) {
+  for (i = 0;i < SIZEOF_ARRAY(tests); ++i) {
     unstableLog unstable;
     unstable.entries_ = tests[i].entries;
     unstable.offset_  = tests[i].offset;
@@ -79,6 +54,9 @@ TEST(unstableLogTests, TestUnstableMaybeFirstIndex) {
     uint64_t index;
     bool ok = unstable.maybeFirstIndex(&index);
     EXPECT_EQ(tests[i].wok, ok);
+    if (tests[i].snapshot != NULL) {
+      delete tests[i].snapshot;
+    }
   }
 }
 
@@ -89,60 +67,34 @@ TEST(unstableLogTests, TestMaybeLastIndex) {
     Snapshot *snapshot;
     bool wok;
     uint64_t windex;
-
-    tmp(EntryVec ens, uint64_t off, Snapshot *snap, bool w, uint64_t index)
-      : entries(ens), offset(off), snapshot(snap), wok(w), windex(index) {
-    }
+  } tests[] = {
+    // last in entries
+    {
+      .entries = {initEntry(5,1),},
+      .offset = 5, .snapshot = NULL,
+      .wok = true, .windex = 5,
+    },   
+    {
+      .entries = {initEntry(5,1),},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .wok = true, .windex = 5,
+    },  
+    // last in entries     
+    {
+      .entries = {},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .wok = true, .windex = 4,
+    },   
+    // empty unstable
+    {
+      .entries = {},
+      .offset = 0, .snapshot = NULL,
+      .wok = false, .windex = 0,
+    },         
   };
 
-  vector<tmp> tests;
-
-  // last in entries
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry);
-    tmp t(entries, 5, NULL, true, 5);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry);
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    tmp t(entries, 5, snapshot, true, 5);
-
-    tests.push_back(t);
-  }
-  // last in entries
-  {
-    EntryVec entries;
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    tmp t(entries, 5, snapshot, true, 4);
-
-    tests.push_back(t);
-  }
-  // empty unstable
-  {
-    EntryVec entries;
-    tmp t(entries, 0, NULL, false, 0);
-
-    tests.push_back(t);
-  }
-
   size_t i;
-  for (i = 0;i < tests.size(); ++i) {
+  for (i = 0;i < SIZEOF_ARRAY(tests); ++i) {
     unstableLog unstable;
     unstable.entries_ = tests[i].entries;
     unstable.offset_  = tests[i].offset;
@@ -152,6 +104,10 @@ TEST(unstableLogTests, TestMaybeLastIndex) {
     uint64_t index;
     bool ok = unstable.maybeLastIndex(&index);
     EXPECT_EQ(tests[i].wok, ok);
+
+    if (tests[i].snapshot != NULL) {
+      delete tests[i].snapshot;
+    }    
   }
 }
 
@@ -163,130 +119,63 @@ TEST(unstableLogTests, TestUnstableMaybeTerm) {
     uint64_t index;
     bool wok;
     uint64_t wterm;
-
-    tmp(EntryVec ens, uint64_t off, Snapshot *snap, uint64_t i, bool w, uint64_t t)
-      : entries(ens), offset(off), snapshot(snap), index(i), wok(w), wterm(t) {
-    }
+  } tests[] = {
+    // term from entries
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = NULL,
+      .index = 5, .wok = true, .wterm = 1,
+    },
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = NULL,
+      .index = 6, .wok = false, .wterm = 0,
+    },    
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = NULL,
+      .index = 4, .wok = false, .wterm = 0,
+    },      
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .index = 5, .wok = true, .wterm = 1,
+    },  
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .index = 6, .wok = false, .wterm = 0,
+    },  
+    // term from snapshot  
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .index = 4, .wok = true, .wterm = 1,
+    },
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .index = 3, .wok = false, .wterm = 0,
+    },         
+    {
+      .entries = {},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .index = 5, .wok = false, .wterm = 0,
+    },      
+    {
+      .entries = {},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .index = 4, .wok = true, .wterm = 1,
+    }, 
+    {
+      .entries = {},
+      .offset = 0, .snapshot = NULL,
+      .index = 5, .wok = false, .wterm = 0,
+    },               
   };
 
-  vector<tmp> tests;
-  // term from entries
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry);
-    tmp t(entries, 5, NULL, 5, true, 1);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry);
-    tmp t(entries, 5, NULL, 6, false, 0);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry);
-    tmp t(entries, 5, NULL, 4, false, 0);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry);
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    tmp t(entries, 5, snapshot, 5, true, 1);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry);
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    tmp t(entries, 5, snapshot, 6, false, 0);
-
-    tests.push_back(t);
-  }
-  // term from snapshot
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry);
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    tmp t(entries, 5, snapshot, 4, true, 1);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry);
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    tmp t(entries, 5, snapshot, 3, false, 0);
-
-    tests.push_back(t);
-  }
-  {
-    EntryVec entries;
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    tmp t(entries, 5, snapshot, 5, false, 0);
-
-    tests.push_back(t);
-  }
-  {
-    EntryVec entries;
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    tmp t(entries, 5, snapshot, 4, true, 1);
-
-    tests.push_back(t);
-  }
-  {
-    EntryVec entries;
-    tmp t(entries, 0, NULL, 5, false, 0);
-
-    tests.push_back(t);
-  }
-
   size_t i;
-  for (i = 0;i < tests.size(); ++i) {
+  for (i = 0;i < SIZEOF_ARRAY(tests); ++i) {
     unstableLog unstable;
     unstable.entries_ = tests[i].entries;
     unstable.offset_  = tests[i].offset;
@@ -297,24 +186,18 @@ TEST(unstableLogTests, TestUnstableMaybeTerm) {
     bool ok = unstable.maybeTerm(tests[i].index, &term);
     EXPECT_EQ(tests[i].wok, ok) << "i: " << i << ", index: " << tests[i].index;
     EXPECT_EQ(tests[i].wterm, term);
+
+    if (tests[i].snapshot != NULL) {
+      delete tests[i].snapshot;
+    }      
   }
 }
 
 TEST(unstableLogTests, TestUnstableRestore) {
-  Snapshot *snapshot = new Snapshot();
-  SnapshotMetadata *meta = snapshot->mutable_metadata();
-  meta->set_index(4);
-  meta->set_term(1);
-  Entry entry;
-  entry.set_index(5);
-  entry.set_term(1);
-  EntryVec entries;
-  entries.push_back(entry);
-
   unstableLog unstable;
-  unstable.entries_ = entries;
+  unstable.entries_ = {initEntry(5,1)};;
   unstable.offset_  = 5;
-  unstable.snapshot_  = snapshot;
+  unstable.snapshot_  = newSnapshot(4,1);
   unstable.logger_  = NULL;
 
   Snapshot s;
@@ -328,6 +211,8 @@ TEST(unstableLogTests, TestUnstableRestore) {
   EXPECT_EQ(unstable.offset_, s.metadata().index() + 1);
   EXPECT_EQ((int)unstable.entries_.size(), 0);
   EXPECT_TRUE(isDeepEqualSnapshot(unstable.snapshot_, &s));
+
+  delete unstable.snapshot_;
 }
 
 TEST(unstableLogTests, TestUnstableStableTo) {
@@ -340,157 +225,78 @@ TEST(unstableLogTests, TestUnstableStableTo) {
     uint64_t woffset;
     int wlen;
 
-    tmp(EntryVec ens, uint64_t off, Snapshot *snap, uint64_t index, uint64_t term, uint64_t wo, int wl)
-      : entries(ens), offset(off), snapshot(snap), index(index), term(term), woffset(wo), wlen(wl) {
-    }
+  } tests[] = {
+    {
+      .entries = {},
+      .offset = 0, .snapshot = NULL,
+      .index = 5, .term = 1,
+      .woffset = 0, .wlen = 0,
+    },    
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = NULL,
+      .index = 5, .term = 1,  // stable to the first entry
+      .woffset = 6, .wlen = 0,
+    },    
+    {
+      .entries = {initEntry(5,1), initEntry(6,1)},
+      .offset = 5, .snapshot = NULL,
+      .index = 5, .term = 1,  // stable to the first entry
+      .woffset = 6, .wlen = 1,
+    },  
+    {
+      .entries = {initEntry(6,2)},
+      .offset = 6, .snapshot = NULL,
+      .index = 6, .term = 1,  // stable to the first entry and term mismatch
+      .woffset = 6, .wlen = 1,
+    },       
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = NULL,
+      .index = 4, .term = 1,  // stable to old entry
+      .woffset = 5, .wlen = 1,
+    },       
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = NULL,
+      .index = 4, .term = 2,  // stable to old entry
+      .woffset = 5, .wlen = 1,
+    },
+    // with snapshot      
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .index = 5, .term = 1,  // stable to the first entry
+      .woffset = 6, .wlen = 0,
+    },      
+    {
+      .entries = {initEntry(5,1), initEntry(6,1)},
+      .offset = 5, .snapshot = newSnapshot(4,1),
+      .index = 5, .term = 1,  // stable to the first entry
+      .woffset = 6, .wlen = 1,
+    },  
+    {
+      .entries = {initEntry(6,2)},
+      .offset = 6, .snapshot = newSnapshot(5,1),
+      .index = 6, .term = 1,  // stable to the first entry and term mismatch
+      .woffset = 6, .wlen = 1,
+    }, 
+    {
+      .entries = {initEntry(5,1)},
+      .offset = 5, .snapshot = newSnapshot(5,1),
+      .index = 4, .term = 1,  // stable to snapshot
+      .woffset = 5, .wlen = 1,
+    },           
+    {
+      .entries = {initEntry(5,2)},
+      .offset = 5, .snapshot = newSnapshot(4,2),
+      .index = 4, .term = 1,  // stable to snapshot
+      .woffset = 5, .wlen = 1,
+    },       
   };
 
-  vector<tmp> tests;
-  {
-    EntryVec entries;
-    tmp t(entries, 0, NULL, 5, 1, 0, 0);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry); 
-    // stable to the first entry
-    tmp t(entries, 5, NULL, 5, 1, 6, 0);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry); 
-    entry.set_index(6);
-    entry.set_term(1);
-    entries.push_back(entry); 
-    // stable to the first entry
-    tmp t(entries, 5, NULL, 5, 1, 6, 1);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(6);
-    entry.set_term(2);
-    EntryVec entries;
-    entries.push_back(entry); 
-    // stable to the first entry and term mismatch
-    tmp t(entries, 6, NULL, 6, 1, 6, 1);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry); 
-    // stable to old entry
-    tmp t(entries, 5, NULL, 4, 1, 5, 1);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry); 
-    // stable to old entry
-    tmp t(entries, 5, NULL, 4, 2, 5, 1);
-
-    tests.push_back(t);
-  }
-  // with snapshot
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry); 
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    // stable to the first entry
-    tmp t(entries, 5, snapshot, 5, 1, 6, 0);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry); 
-    entry.set_index(6);
-    entry.set_term(1);
-    entries.push_back(entry); 
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(1);
-    // stable to the first entry
-    tmp t(entries, 5, snapshot, 5, 1, 6, 1);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(6);
-    entry.set_term(2);
-    EntryVec entries;
-    entries.push_back(entry); 
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(5);
-    meta->set_term(1);
-    // stable to the first entry and term mismatch
-    tmp t(entries, 6, snapshot, 6, 1, 6, 1);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(1);
-    EntryVec entries;
-    entries.push_back(entry); 
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(5);
-    meta->set_term(1);
-    // stable to snapshot
-    tmp t(entries, 5, snapshot, 4, 1, 5, 1);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    entry.set_index(5);
-    entry.set_term(2);
-    EntryVec entries;
-    entries.push_back(entry); 
-    Snapshot *snapshot = new Snapshot();
-    SnapshotMetadata *meta = snapshot->mutable_metadata();
-    meta->set_index(4);
-    meta->set_term(2);
-    // stable to snapshot
-    tmp t(entries, 5, snapshot, 4, 1, 5, 1);
-
-    tests.push_back(t);
-  }
   size_t i;
-  for (i = 0;i < tests.size(); ++i) {
+  for (i = 0;i < SIZEOF_ARRAY(tests); ++i) {
     unstableLog unstable;
     unstable.entries_ = tests[i].entries;
     unstable.offset_  = tests[i].offset;
@@ -500,6 +306,10 @@ TEST(unstableLogTests, TestUnstableStableTo) {
     unstable.stableTo(tests[i].index, tests[i].term);
     EXPECT_EQ(unstable.offset_, tests[i].woffset) << "i: " << i << ", woffset: " << tests[i].woffset;
     EXPECT_EQ((int)unstable.entries_.size(), tests[i].wlen);
+
+    if (tests[i].snapshot != NULL) {
+      delete tests[i].snapshot;
+    }     
   }
 }
 
@@ -511,172 +321,49 @@ TEST(unstableLogTests, TestUnstableTruncateAndAppend) {
     EntryVec toappend;
     uint64_t woffset;
     EntryVec wentries;
-
-    tmp(EntryVec ens, uint64_t off, Snapshot *snap, EntryVec append, uint64_t wo, EntryVec wents)
-      : entries(ens), offset(off), snapshot(snap), toappend(append), woffset(wo), wentries(wents) {
-    }
+  } tests[] = {
+    // append to the end
+    {
+      .entries = {initEntry(5,1),},
+      .offset = 5, .snapshot = NULL,
+      .toappend = {initEntry(6,1),initEntry(7,1),},
+      .woffset = 5,
+      .wentries = {initEntry(5,1),initEntry(6,1),initEntry(7,1)},
+    },
+    // replace the unstable entries
+    {
+      .entries = {initEntry(5,1),},
+      .offset = 5, .snapshot = NULL,
+      .toappend = {initEntry(5,2),initEntry(6,2),},
+      .woffset = 5,
+      .wentries = {initEntry(5,2),initEntry(6,2),},
+    },   
+    {
+      .entries = {initEntry(5,1),},
+      .offset = 5, .snapshot = NULL,
+      .toappend = {initEntry(4,2),initEntry(5,2),initEntry(6,2),},
+      .woffset = 4,
+      .wentries = {initEntry(4,2),initEntry(5,2),initEntry(6,2),},
+    }, 
+    // truncate the existing entries and append   
+    {
+      .entries = {initEntry(5,1),initEntry(6,1),initEntry(7,1),},
+      .offset = 5, .snapshot = NULL,
+      .toappend = {initEntry(6,2),},
+      .woffset = 5,
+      .wentries = {initEntry(5,1),initEntry(6,2),},
+    }, 
+    {
+      .entries = {initEntry(5,1),initEntry(6,1),initEntry(7,1),},
+      .offset = 5, .snapshot = NULL,
+      .toappend = {initEntry(7,2),initEntry(8,2),},
+      .woffset = 5,
+      .wentries = {initEntry(5,1),initEntry(6,1),initEntry(7,2),initEntry(8,2),},
+    },            
   };
 
-  vector<tmp> tests;
-  // append to the end
-  {
-    Entry entry;
-    EntryVec entries, append, wents;
-    
-    entry.set_index(5);
-    entry.set_term(1);
-    entries.push_back(entry); 
-    
-    entry.set_index(6);
-    entry.set_term(1);
-    append.push_back(entry);
-    entry.set_index(7);
-    entry.set_term(1);
-    append.push_back(entry);
-
-    entry.set_index(5);
-    entry.set_term(1);
-    wents.push_back(entry);
-    entry.set_index(6);
-    entry.set_term(1);
-    wents.push_back(entry);
-    entry.set_index(7);
-    entry.set_term(1);
-    wents.push_back(entry);
-    tmp t(entries, 5, NULL, append, 5, wents);
-
-    tests.push_back(t);
-  }
-  // replace the unstable entries
-  {
-    Entry entry;
-    EntryVec entries, append, wents;
-    
-    entry.set_index(5);
-    entry.set_term(1);
-    entries.push_back(entry); 
-    
-    entry.set_index(5);
-    entry.set_term(2);
-    append.push_back(entry);
-    entry.set_index(6);
-    entry.set_term(2);
-    append.push_back(entry);
-
-    entry.set_index(5);
-    entry.set_term(2);
-    wents.push_back(entry);
-    entry.set_index(6);
-    entry.set_term(2);
-    wents.push_back(entry);
-
-    tmp t(entries, 5, NULL, append, 5, wents);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    EntryVec entries, append, wents;
-    
-    entry.set_index(5);
-    entry.set_term(1);
-    entries.push_back(entry); 
-    
-    entry.set_index(4);
-    entry.set_term(2);
-    append.push_back(entry);
-    entry.set_index(5);
-    entry.set_term(2);
-    append.push_back(entry);
-    entry.set_index(6);
-    entry.set_term(2);
-    append.push_back(entry);
-
-    entry.set_index(4);
-    entry.set_term(2);
-    wents.push_back(entry);
-    entry.set_index(5);
-    entry.set_term(2);
-    wents.push_back(entry);
-    entry.set_index(6);
-    entry.set_term(2);
-    wents.push_back(entry);
-
-    tmp t(entries, 5, NULL, append, 4, wents);
-
-    tests.push_back(t);
-  }
-  // truncate the existing entries and append
-  {
-    Entry entry;
-    EntryVec entries, append, wents;
-    
-    entry.set_index(5);
-    entry.set_term(1);
-    entries.push_back(entry); 
-    entry.set_index(6);
-    entry.set_term(1);
-    entries.push_back(entry); 
-    entry.set_index(7);
-    entry.set_term(1);
-    entries.push_back(entry); 
-    
-    entry.set_index(6);
-    entry.set_term(2);
-    append.push_back(entry);
-
-    entry.set_index(5);
-    entry.set_term(1);
-    wents.push_back(entry);
-    entry.set_index(6);
-    entry.set_term(2);
-    wents.push_back(entry);
-
-    tmp t(entries, 5, NULL, append, 5, wents);
-
-    tests.push_back(t);
-  }
-  {
-    Entry entry;
-    EntryVec entries, append, wents;
-    
-    entry.set_index(5);
-    entry.set_term(1);
-    entries.push_back(entry); 
-    entry.set_index(6);
-    entry.set_term(1);
-    entries.push_back(entry); 
-    entry.set_index(7);
-    entry.set_term(1);
-    entries.push_back(entry); 
-    
-    entry.set_index(7);
-    entry.set_term(2);
-    append.push_back(entry);
-    entry.set_index(8);
-    entry.set_term(2);
-    append.push_back(entry);
-
-    entry.set_index(5);
-    entry.set_term(1);
-    wents.push_back(entry);
-    entry.set_index(6);
-    entry.set_term(1);
-    wents.push_back(entry);
-    entry.set_index(7);
-    entry.set_term(2);
-    wents.push_back(entry);
-    entry.set_index(8);
-    entry.set_term(2);
-    wents.push_back(entry);
-
-    tmp t(entries, 5, NULL, append, 5, wents);
-
-    tests.push_back(t);
-  }
-
   size_t i;
-  for (i = 0;i < tests.size(); ++i) {
+  for (i = 0;i < SIZEOF_ARRAY(tests); ++i) {
     unstableLog unstable;
     unstable.entries_ = tests[i].entries;
     unstable.offset_  = tests[i].offset;
@@ -686,5 +373,9 @@ TEST(unstableLogTests, TestUnstableTruncateAndAppend) {
     unstable.truncateAndAppend(tests[i].toappend);
     EXPECT_EQ(unstable.offset_, tests[i].woffset) << "i: " << i << ", woffset: " << tests[i].woffset;
     EXPECT_TRUE(isDeepEqualEntries(unstable.entries_, tests[i].wentries)) << "i: " << i;
+
+    if (tests[i].snapshot != NULL) {
+      delete tests[i].snapshot;
+    }     
   }
 }
