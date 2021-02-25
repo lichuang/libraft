@@ -21,7 +21,7 @@ void preVoteConfig(Config *c) {
   c->preVote = true; 
 }
 
-raftStateMachine* entsWithConfig(ConfigFun fun, const vector<uint64_t>& terms) {
+raftStateMachine* entsWithConfig(ConfigFun fun, vector<uint64_t> terms) {
   MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
 
   vector<Entry> entries;
@@ -166,35 +166,71 @@ TEST(raftTests, TestProgressMaybeDecr) {
     bool w;
     uint64_t wn;
   } tests[] = {
+    // state replicate and rejected is not greater than match
     {
-      
-    }
+      .state = ProgressStateReplicate,
+      .m = 5, .n = 10, .rejected = 5, .last = 5,
+      .w = false, .wn = 10,
+    },
+    // state replicate and rejected is not greater than match
+    {
+      .state = ProgressStateReplicate,
+      .m = 5, .n = 10, .rejected = 4, .last = 4,
+      .w = false, .wn = 10,
+    },
+    // state replicate and rejected is greater than match
+    // directly decrease to match+1    
+    {
+      .state = ProgressStateReplicate,
+      .m = 5, .n = 10, .rejected = 9, .last = 9,
+      .w = true, .wn = 6,
+    },     
+    // next-1 != rejected is always false 
+    {
+      .state = ProgressStateProbe,
+      .m = 0, .n = 0, .rejected = 0, .last = 0,
+      .w = false, .wn = 0,
+    },
+    // next-1 != rejected is always false 
+    {
+      .state = ProgressStateProbe,
+      .m = 0, .n = 10, .rejected = 5, .last = 5,
+      .w = false, .wn = 10,
+    },
+    // next>1 = decremented by 1
+    {
+      .state = ProgressStateProbe,
+      .m = 0, .n = 10, .rejected = 9, .last = 9,
+      .w = true, .wn = 9,
+    },
+    // next>1 = decremented by 1 
+    {
+      .state = ProgressStateProbe,
+      .m = 0, .n = 2, .rejected = 1, .last = 1,
+      .w = true, .wn = 1,
+    },
+    // next<=1 = reset to 1
+    {
+      .state = ProgressStateProbe,
+      .m = 0, .n = 1, .rejected = 0, .last = 0,
+      .w = true, .wn = 1,
+    },
+    // decrease to min(rejected, last+1)
+    {
+      .state = ProgressStateProbe,
+      .m = 0, .n = 10, .rejected = 9, .last = 2,
+      .w = true, .wn = 3,
+    }, 
+    // rejected < 1, reset to 1
+    {
+      .state = ProgressStateProbe,
+      .m = 0, .n = 10, .rejected = 9, .last = 0,
+      .w = true, .wn = 1,
+    },                               
   };
 
-  vector<tmp> tests;
-  // state replicate and rejected is not greater than match
-  tests.push_back(tmp(ProgressStateReplicate, 5, 10, 5, 5, false, 10));
-  // state replicate and rejected is not greater than match
-  tests.push_back(tmp(ProgressStateReplicate, 5, 10, 4, 4, false, 10));
-  // state replicate and rejected is greater than match
-  // directly decrease to match+1
-  tests.push_back(tmp(ProgressStateReplicate, 5, 10, 9, 9, true,  6));
-  // next-1 != rejected is always false
-  tests.push_back(tmp(ProgressStateProbe, 0, 0, 0, 0, false,  0));
-  // next-1 != rejected is always false
-  tests.push_back(tmp(ProgressStateProbe, 0, 10, 5, 5, false, 10));
-  // next>1 = decremented by 1
-  tests.push_back(tmp(ProgressStateProbe, 0, 10, 9, 9, true, 9));
-  // next>1 = decremented by 1
-  tests.push_back(tmp(ProgressStateProbe, 0, 2, 1, 1, true, 1));
-  // next<=1 = reset to 1
-  tests.push_back(tmp(ProgressStateProbe, 0, 1, 0, 0, true, 1));
-  // decrease to min(rejected, last+1)
-  tests.push_back(tmp(ProgressStateProbe, 0, 10, 9, 2, true, 3));
-  // rejected < 1, reset to 1
-  tests.push_back(tmp(ProgressStateProbe, 0, 10, 9, 0, true, 1));
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp &t = tests[i];
     Progress p(t.n, 256, &kDefaultLogger);
     p.match_ = t.m;
@@ -212,20 +248,17 @@ TEST(raftTests, TestProgressIsPaused) {
     ProgressState state;
     bool paused;
     bool w;
-
-    tmp(ProgressState s, bool paused, bool w)
-      : state(s), paused(paused), w(w) {}
+  } tests[] = {
+    {.state = ProgressStateProbe, .paused = false, .w = false},
+    {.state = ProgressStateProbe, .paused = true, .w = true},
+    {.state = ProgressStateReplicate, .paused = false, .w = false},
+    {.state = ProgressStateReplicate, .paused = true, .w = false},
+    {.state = ProgressStateSnapshot, .paused = false, .w = true},
+    {.state = ProgressStateSnapshot, .paused = true, .w = true},
   };
 
-  vector<tmp> tests;
-  tests.push_back(tmp(ProgressStateProbe, false, false));
-  tests.push_back(tmp(ProgressStateProbe, true, true));
-  tests.push_back(tmp(ProgressStateReplicate, false, false));
-  tests.push_back(tmp(ProgressStateReplicate, true, false));
-  tests.push_back(tmp(ProgressStateSnapshot, false, true));
-  tests.push_back(tmp(ProgressStateSnapshot, true, true));
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp &t = tests[i];
     Progress p(0, 256, &kDefaultLogger);
     p.paused_ = t.paused;
@@ -252,76 +285,39 @@ TEST(raftTests, TestProgressResume) {
 
 // TestProgressResumeByHeartbeatResp ensures raft.heartbeat reset progress.paused by heartbeat response.
 TEST(raftTests, TestProgressResumeByHeartbeatResp) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
+  vector<uint64_t> peers = {1,2};
+
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 5, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
   r->progressMap_[2]->paused_ = true;
 
-  {
-    Message msg;
-    msg.set_from(1);
-    msg.set_to(1);
-    msg.set_type(MsgBeat);
-
-    r->step(msg);
-    EXPECT_TRUE(r->progressMap_[2]->paused_);
-  }
+  r->step(initMessage(1,1,MsgBeat));
+  EXPECT_TRUE(r->progressMap_[2]->paused_);
 
   r->progressMap_[2]->becomeReplicate();
-  {
-    Message msg;
-    msg.set_from(2);
-    msg.set_to(1);
-    msg.set_type(MsgHeartbeatResp);
 
-    r->step(msg);
-    EXPECT_FALSE(r->progressMap_[2]->paused_);
-  }
+  r->step(initMessage(2,1,MsgHeartbeatResp));
+  EXPECT_FALSE(r->progressMap_[2]->paused_);  
 
   delete r;
 }
 
 TEST(raftTests, TestProgressPaused) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
+  vector<uint64_t> peers = {1,2};
+
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 5, 1, s);
 
   r->becomeCandidate();
   r->becomeLeader();
 
-  {
-    Message msg;
-    msg.set_from(1);
-    msg.set_to(1);
-    msg.set_type(MsgProp);
-    Entry *entry = msg.add_entries();
-    entry->set_data("somedata");
-    r->step(msg);
-  }
-  {
-    Message msg;
-    msg.set_from(1);
-    msg.set_to(1);
-    msg.set_type(MsgProp);
-    Entry *entry = msg.add_entries();
-    entry->set_data("somedata");
-    r->step(msg);
-  }
-  {
-    Message msg;
-    msg.set_from(1);
-    msg.set_to(1);
-    msg.set_type(MsgProp);
-    Entry *entry = msg.add_entries();
-    entry->set_data("somedata");
-    r->step(msg);
-  }
+  EntryVec entries = {initEntry(0,0,"somedata")};
+  Message msg = initMessage(1,1,MsgProp,&entries);
+  r->step(msg);
+  r->step(msg);
+  r->step(msg);
 
   vector<Message *> msgs;
   r->readMessages(&msgs);
@@ -339,73 +335,43 @@ void testLeaderElection(bool prevote) {
     network *net;
     StateType state;
     uint64_t expTerm;
+  } tests[] = {
+    {
+      .net = newNetworkWithConfig(fun, {NULL, NULL, NULL}),
+      .state = StateLeader, .expTerm = 1,
+    },
 
-    tmp(network *net, StateType state, uint64_t t)
-      : net(net), state(state), expTerm(t) {}
+    
+    {
+      .net = newNetworkWithConfig(fun, {NULL, NULL, new blackHole()}),
+      .state = StateLeader, .expTerm = 1,
+    }, 
+      
+    {
+      .net = newNetworkWithConfig(fun, {NULL, new blackHole(), new blackHole()}),
+      .state = StateCandidate, .expTerm = 1,
+    },
+    
+    {
+      .net = newNetworkWithConfig(fun, {NULL, new blackHole(), new blackHole(),NULL}),
+      .state = StateCandidate, .expTerm = 1,
+    }, 
+     
+    {
+      .net = newNetworkWithConfig(fun, {NULL, new blackHole(), new blackHole(),NULL,NULL}),
+      .state = StateLeader, .expTerm = 1,
+    },
+       
+    // three logs further along than 0, but in the same term so rejections
+    // are returned instead of the votes being ignored.    
+    {
+      .net = newNetworkWithConfig(fun, {NULL, entsWithConfig(fun, {1}), entsWithConfig(fun, {1}),entsWithConfig(fun, {1,1}),NULL}),
+      .state = StateFollower, .expTerm = 1,
+    },                    
   };
 
-  vector<tmp> tests;
-  {
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(NULL);
-    peers.push_back(NULL);
-    tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
-    tests.push_back(t);
-  }
-  {
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(NULL);
-    peers.push_back(nopStepper);
-    tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
-    tests.push_back(t);
-  }
-  {
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(nopStepper);
-    peers.push_back(nopStepper);
-    tmp t(newNetworkWithConfig(fun, peers), StateCandidate, 1);
-    tests.push_back(t);
-  }
-  {
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(nopStepper);
-    peers.push_back(nopStepper);
-    peers.push_back(NULL);
-    tmp t(newNetworkWithConfig(fun, peers), StateCandidate, 1);
-    tests.push_back(t);
-  }
-  {
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(nopStepper);
-    peers.push_back(nopStepper);
-    peers.push_back(NULL);
-    peers.push_back(NULL);
-    tmp t(newNetworkWithConfig(fun, peers), StateLeader, 1);
-    tests.push_back(t);
-  }
-  // three logs further along than 0, but in the same term so rejections
-  // are returned instead of the votes being ignored.
-  {
-    vector<uint64_t> terms;
-    terms.push_back(1);
-
-    vector<stateMachine*> peers;
-    peers.push_back(NULL);
-    peers.push_back(entsWithConfig(fun, terms));
-    peers.push_back(entsWithConfig(fun, terms));
-    terms.push_back(1);
-    peers.push_back(entsWithConfig(fun, terms));
-    peers.push_back(NULL);
-    tmp t(newNetworkWithConfig(fun, peers), StateFollower, 1);
-    tests.push_back(t);
-  }
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp& t = tests[i];
     Message msg;
     msg.set_from(1);
@@ -430,6 +396,8 @@ void testLeaderElection(bool prevote) {
 
     EXPECT_EQ(r->state_, expState) << "i: " << i;
     EXPECT_EQ(r->term_, expTerm);
+
+    delete t.net;
   }
 }
 
@@ -450,20 +418,12 @@ void testLeaderCycle(bool prevote) {
   if (prevote) {
     fun = &preVoteConfig;
   }
-  vector<stateMachine*> peers;
-  peers.push_back(NULL);
-  peers.push_back(NULL);
-  peers.push_back(NULL);
 
-  network *net = newNetworkWithConfig(fun, peers);
+  network *net = newNetworkWithConfig(fun, {NULL, NULL, NULL});
   size_t i;
   for (i = 1; i <= 3; i++) {
-    Message msg;
-    msg.set_from(i);
-    msg.set_to(i);
-    msg.set_type(MsgHup);
     vector<Message> msgs;
-    msgs.push_back(msg);
+    msgs.push_back(initMessage(i,i,MsgHup));
     net->send(&msgs);
 
     map<uint64_t, stateMachine*>::iterator iter;
@@ -474,6 +434,8 @@ void testLeaderCycle(bool prevote) {
       EXPECT_FALSE(r->id_ != i && r->state_ != StateFollower);
     }
   }
+
+  delete net;
 }
 
 TEST(raftTests, TestLeaderCycle) {
@@ -503,45 +465,21 @@ void testLeaderElectionOverwriteNewerLogs(bool preVote) {
   // entry overwrites the losers'. (TestLeaderSyncFollowerLog tests
   // the case where older log entries are overwritten, so this test
   // focuses on the case where the newer entries are lost).
-  vector<stateMachine*> peers;
-  {
-    // Node 1: Won first election
-    vector<uint64_t> terms;
-    terms.push_back(1);
-    peers.push_back(entsWithConfig(fun, terms));
-  }
-  {
-    // Node 2: Got logs from node 1
-    vector<uint64_t> terms;
-    terms.push_back(1);
-    peers.push_back(entsWithConfig(fun, terms));
-  }
-  {
-    // Node 3: Won second election
-    vector<uint64_t> terms;
-    terms.push_back(2);
-    peers.push_back(entsWithConfig(fun, terms));
-  }
-  {
-    // Node 4: Voted but didn't get logs
-    peers.push_back(votedWithConfig(fun, 3, 2));
-  }
-  {
-    // Node 5: Voted but didn't get logs
-    peers.push_back(votedWithConfig(fun, 3, 2));
-  }
+  vector<stateMachine*> peers = {
+    entsWithConfig(fun, {1}),   // Node 1: Won first election
+    entsWithConfig(fun, {1}),   // Node 2: Got logs from node 1
+    entsWithConfig(fun, {2}),   // Node 3: Won second election
+    votedWithConfig(fun, 3, 2), // Node 4: Voted but didn't get logs
+    votedWithConfig(fun, 3, 2), // Node 5: Voted but didn't get logs
+  };
+
   network *net = newNetworkWithConfig(fun, peers);
 
   // Node 1 campaigns. The election fails because a quorum of nodes
   // know about the election that already happened at term 2. Node 1's
   // term is pushed ahead to 2.
   {
-    Message msg;
-    msg.set_from(1);
-    msg.set_to(1);
-    msg.set_type(MsgHup);
-    vector<Message> msgs;
-    msgs.push_back(msg);
+    vector<Message> msgs = {initMessage(1,1,MsgHup)};
     net->send(&msgs);
   }
   
@@ -551,14 +489,10 @@ void testLeaderElectionOverwriteNewerLogs(bool preVote) {
 
   // Node 1 campaigns again with a higher term. This time it succeeds.
   {
-    Message msg;
-    msg.set_from(1);
-    msg.set_to(1);
-    msg.set_type(MsgHup);
-    vector<Message> msgs;
-    msgs.push_back(msg);
+    vector<Message> msgs = {initMessage(1,1,MsgHup)};
     net->send(&msgs);
   }
+
   EXPECT_EQ(r1->state_, StateLeader);
   EXPECT_EQ((int)r1->term_, 3);
 
@@ -573,6 +507,8 @@ void testLeaderElectionOverwriteNewerLogs(bool preVote) {
     EXPECT_EQ((int)entries[0].term(), 1);
     EXPECT_EQ((int)entries[1].term(), 3);
   }
+
+  delete net;
 }
 
 // TestLeaderElectionOverwriteNewerLogs tests a scenario in which a
@@ -588,10 +524,7 @@ TEST(raftTests, TestLeaderElectionOverwriteNewerLogsPreVote) {
 }
 
 void testVoteFromAnyState(MessageType vt) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
-  peers.push_back(3);
+  vector<uint64_t> peers = {1,2,3};
 
   size_t i;
   for (i = 0; i < (int)NumStateType; ++i) {
@@ -650,6 +583,8 @@ void testVoteFromAnyState(MessageType vt) {
       // In StateCandidate or StateLeader, it's voted for itself.
       EXPECT_FALSE(r->vote_ != kEmptyPeerId && r->vote_ != 1);
     }
+
+    delete r;
   }
 }
 

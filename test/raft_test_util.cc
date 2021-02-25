@@ -93,7 +93,7 @@ void idsBySize(int size, vector<uint64_t>* ids) {
 
 // newNetworkWithConfig is like newNetwork but calls the given func to
 // modify the configuration of any state machines it creates.
-network* newNetworkWithConfig(ConfigFun fun, const vector<stateMachine*>& peers) {
+network* newNetworkWithConfig(ConfigFun fun, vector<stateMachine*> peers) {
   srand(time(NULL));
   int size = peers.size();
   vector<uint64_t> peerAddrs;
@@ -151,15 +151,7 @@ network::~network() {
       delete iter->second;
       ++iter;
     }
-  }
-  
-  {
-    map<uint64_t, MemoryStorage*>::iterator iter = storage.begin();
-    while (iter != storage.end()) {
-      delete iter->second;
-      ++iter;
-    }
-  }  
+  } 
 }
 
 void network::send(vector<Message> *msgs) {
