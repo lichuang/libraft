@@ -30,6 +30,7 @@ public:
 private:
   Locker *locker_;
 };
+
 }; // namespace libraft
 
 #endif  // __LIBRAFT_MUTEX_H__
