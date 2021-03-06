@@ -21,11 +21,14 @@ TEST(iobufferTests, TestMemoryBuffer) {
 }
 
 TEST(iobufferTests, TestMemoryBufferWithString) {
-  IOBuffer* mb = newMemoryBufferWithString("test");
-  char tmp[10];
-  mb->ReadFull(tmp);
+  string test = string("\b\xef\xfd\x02");
+  IOBuffer* mb = newMemoryBufferWithString(test);
+  char tmp[20] = {'\0'};
+  int err;
+  int size = mb->ReadFull(tmp, 20, &err);
 
-  ASSERT_EQ(0, strncmp(tmp, "test", 4));
+  ASSERT_EQ((int)test.size(), size);
+  ASSERT_EQ(0, strncmp(tmp, test.c_str(), size));
 
   delete mb;
 }

@@ -3,7 +3,7 @@
  */
 
 #include "base/file.h"
-#include "base/crc32.h"
+#include "base/crc32c.h"
 #include "wal/encoder.h"
 
 namespace libraft {

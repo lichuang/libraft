@@ -18,7 +18,12 @@ struct Block {
 
   uint32_t WriteSize() { return kBlockSize - write_pos; }
 
-  uint32_t ReadSize() { return write_pos - read_pos; }
+  uint32_t ReadSize() { 
+    if (write_pos <= read_pos) {
+      return 0;
+    }
+    return write_pos - read_pos; 
+  }
 
   void AdvanceWrite(uint32_t wpos) { write_pos += wpos;}
 
@@ -67,17 +72,26 @@ IOBuffer::ensureMemory(uint32_t size) {
 }
 
 int 
-IOBuffer::ReadFull(char* data) {
-  int offset = 0, size, total = 0;
-  while (read_block_) {
-    size = read_block_->ReadSize();
+IOBuffer::ReadFull(char* data, uint32_t bufsize, int* err) {
+  *err = kOK;
+  uint32_t offset = 0, size, total = 0;
+  while (read_block_) {  
+    size = read_block_->ReadSize();  
+    if (size == 0) {
+      goto out;
+    }
     memcpy(data + offset, read_block_->ReadPos(), size);
     read_block_->AdvanceRead(size);
     offset += size;
     total += size;
-    read_block_ = read_block_->next;
+    read_block_ = read_block_->next;    
   }
 
+out:
+  if (total < bufsize) {
+    *err = (total == 0) ? kEOF : kErrUnexpectedEOF;
+  }
+  
   return total;
 }
 
@@ -126,6 +140,10 @@ MemoryBuffer::Append(const string& data) {
 
 int 
 MemoryBuffer::ReadInt64(int64_t* ret) {
+  memcpy(ret, read_block_->ReadPos(), sizeof(int64_t));
+  read_block_->AdvanceRead(sizeof(int64_t));
+  return 0;
+  /*
   if (read_block_ == NULL) return kEOF;
   *ret = read_block_->ReadPos()[0] << 24; read_block_->AdvanceRead(1);
   if (read_block_->ReadSize() == 0) read_block_ = read_block_->next;
@@ -143,6 +161,7 @@ MemoryBuffer::ReadInt64(int64_t* ret) {
   if (read_block_->ReadSize() == 0) read_block_ = read_block_->next;
 
   return 0;
+  */
 }
 
 int 

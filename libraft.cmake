@@ -3,7 +3,7 @@ set(libraft_files
   src/proto/record.pb.cc 
 
   src/base/default_logger.cc 
-  src/base/crc32.cc
+  src/base/crc32c.cc
   src/base/mutex.cc
   src/base/io_buffer.cc 
   src/base/util.cc 

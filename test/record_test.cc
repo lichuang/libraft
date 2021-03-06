@@ -5,16 +5,24 @@
 #include <string>
 #include <gtest/gtest.h>
 #include "raft_test_util.h"
-#include "base/crc32.h"
+#include "base/crc32c.h"
+#include "base/io_error.h"
 #include "base/io_buffer.h"
 #include "proto/record.pb.h"
 #include "wal/decoder.h"
+#include "wal/wal.h"
 
 using namespace std;
 using namespace walpb;
 
-const static string infoData = string("\b\xef\xfd\x02");
-const static string infoRecord = string("\x0e\x00\x00\x00\x00\x00\x00\x00\b\x01\x10\x99\xb5\xe4\xd0\x03\x1a\x04") + infoData;
+typedef unsigned char byte;
+typedef vector<byte> ByteVector;
+
+const static byte infoDataBytes[] = "\b\xef\xfd\x02";
+const static byte infoRecordBytes[] = "\x0e\x00\x00\x00\x00\x00\x00\x00\b\x01\x10\x99\xb5\xe4\xd0\x03\x1a\x04";
+
+const static string infoData = string((char*)infoDataBytes, sizeof(infoDataBytes));
+const static string infoRecord = string((char*)infoRecordBytes, sizeof(infoRecordBytes) - 1) + infoData;
 
 static inline Record
 initRecord(int64_t type, uint32_t crc, const string& data) {
@@ -27,9 +35,8 @@ initRecord(int64_t type, uint32_t crc, const string& data) {
 }
 
 TEST(recordTests, TestReadRecord) {
-  char * badInfoRecord = new char[infoRecord.size()];
-  strncpy(badInfoRecord, infoRecord.c_str(), infoRecord.size());
-  badInfoRecord[infoRecord.size() - 1] = 'a';
+  string badInfoRecord = string(infoRecord.c_str(), infoRecord.length() - 1);
+  badInfoRecord[badInfoRecord.length() - 1] = 'a';
 
   struct tmp {
     string data;
@@ -38,9 +45,27 @@ TEST(recordTests, TestReadRecord) {
   } tests[] = {
     {
       .data = infoRecord,
-      .wr = initRecord(1, Value(infoData.c_str(), infoData.size()), infoData),
+      .wr = initRecord(1, Value(infoData.c_str(), infoData.length() - 1), infoData),
       .we = 0,
     },
+    {
+      .data = "", .wr = Record(), .we = kEOF,
+    },
+    {
+      .data = infoRecord.substr(0,8), .wr = Record(), .we = kErrUnexpectedEOF,
+    },  
+    {
+      .data = infoRecord.substr(0,infoRecord.length() - infoData.length() - 8), .wr = Record(), .we = kErrUnexpectedEOF,
+    },
+    {
+      .data = infoRecord.substr(0,infoRecord.length() - infoData.length()), .wr = Record(), .we = kErrUnexpectedEOF,
+    }, 
+    {
+      .data = infoRecord.substr(0,infoRecord.length() - 8), .wr = Record(), .we = kErrUnexpectedEOF,
+    },   
+    {
+      .data = badInfoRecord, .wr = Record(), .we = kErrCRCMismatch,
+    },       
   };
 
   uint32_t i;
@@ -51,10 +76,8 @@ TEST(recordTests, TestReadRecord) {
     decoder* dec = newDecoder(buf);
     int err = dec->decode(&record);
     
-    ASSERT_EQ(err, tt.we);
+    ASSERT_EQ(err, tt.we) << "i:" << i << tt.data.length();
 
     delete dec;
   }
-
-  delete [] badInfoRecord;
 }

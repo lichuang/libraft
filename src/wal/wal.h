@@ -29,6 +29,10 @@ struct walOption {
   Logger *logger;
 };
 
+enum walErrorCode {
+  kErrCRCMismatch = -100,
+};
+
 // WAL is a logical representation of the stable storage.
 // WAL is either in read mode or append mode but not both.
 // A newly created WAL is in append mode, and ready for appending records.

@@ -2,7 +2,8 @@
  * Copyright (C) lichuang
  */
 
-#include "base/crc32.h"
+#include <string.h>
+#include "base/crc32c.h"
 #include "base/io_buffer.h"
 #include "base/file.h"
 #include "wal/decoder.h"
@@ -51,7 +52,9 @@ decoder::decodeRecord(Record* rec) {
   decodeFrameSize(lenField, &recBytes, &padBytes);
 
   char *data = new char[recBytes + padBytes];
-  err = io_buffers[0]->ReadFull(data);
+  memset(data, '\0', recBytes + padBytes);
+  int total = io_buffers[0]->ReadFull(data, recBytes + padBytes, &err);
+  (void)total;
   if (err != kOK) {
 		// ReadFull returns io.kEOF only if no bytes were read
 		// the decoder should treat this as an kErrUnexpectedEOF instead.
@@ -63,7 +66,7 @@ decoder::decodeRecord(Record* rec) {
     goto out;
   }
 
-  if (!rec->ParseFromString(string(data, recBytes))) {
+  if (!rec->ParseFromArray(data, recBytes)) {
     if (isTornEntry(data, recBytes + padBytes)) {
       err = kErrUnexpectedEOF;      
     } else {
@@ -74,13 +77,13 @@ decoder::decodeRecord(Record* rec) {
 
   // skip crc checking if the record type is crcType
   if (rec->type() != crcType) {
-    crc32 = Value(rec->data().c_str(),rec->data().size());
+    crc32 = Value(rec->data().c_str(),rec->data().length());
     if (crc32 != rec->crc()) {
-      if (isTornEntry(rec->data().c_str(),rec->data().size())) {
+      if (isTornEntry(data, recBytes + padBytes)) {
         return kErrUnexpectedEOF;
-      }      
+      }
+      return kErrCRCMismatch;
     }
-    return kEOF;
   }
 
   // record decoded as valid; point last valid offset to end of record
@@ -94,7 +97,8 @@ out:
 void 
 decoder::decodeFrameSize(int64_t lenField, int64_t* recBytes, int64_t* padBytes) {
   // the record size is stored in the lower 56 bits of the 64-bit length
-  *recBytes = int64_t(uint64_t(lenField) & ((((uint64_t)(0xff) << 56))));
+  *recBytes = (int64_t)(((uint64_t)lenField) & (uint64_t(0xffff) ^ ((uint64_t)(0xff) << 56)));
+  *padBytes = 0;
 
   // non-zero padding is indicated by set MSb / a negative length
   if (lenField < 0) {
@@ -106,9 +110,10 @@ decoder::decodeFrameSize(int64_t lenField, int64_t* recBytes, int64_t* padBytes)
 // isTornEntry determines whether the last entry of the WAL was partially written
 // and corrupted because of a torn write.
 struct chunk {
-  const char* buf;
+  const unsigned char* buf;
   int32_t len;
 };
+
 bool 
 decoder::isTornEntry(const char* data, uint32_t len) {
   if (io_buffers.size() != 1) {
@@ -127,7 +132,7 @@ decoder::isTornEntry(const char* data, uint32_t len) {
       chunkLen = len - curOff;
     }
 
-    chunks.push_back((chunk){.buf = data + curOff, .len = chunkLen});
+    chunks.push_back((chunk){.buf = (unsigned char*)data + curOff, .len = chunkLen});
     fileOff += chunkLen;
     curOff += chunkLen;
   }
@@ -136,15 +141,20 @@ decoder::isTornEntry(const char* data, uint32_t len) {
   uint32_t i;
   for (i = 0; i < chunks.size(); i++) {
     chunk& c = chunks[i];
+    bool isZero = true;
     int j;
     for (j = 0; j < c.len; j++) {
       if (c.buf[j] != '\0') {
-        return false;
+        isZero = false;
+        break;
       }
+    }
+    if (isZero) {
+      return true;
     }
   }
 
-  return true;
+  return false;
 }
 
 decoder::decoder(const vector<IOBuffer*>& buffer) {

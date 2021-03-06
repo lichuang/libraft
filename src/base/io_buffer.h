@@ -26,7 +26,7 @@ public:
 
   virtual ~IOBuffer();
 
-  int ReadFull(char* data);
+  int ReadFull(char* data, uint32_t size, int* err);
   /*
   
   int Write(const string& data);
