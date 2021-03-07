@@ -1,5 +1,6 @@
 
 add_executable ( libraft_test  
+  test/crc32c_test.cc
   test/log_test.cc
   test/main.cc
   test/memory_storage_test.cc

@@ -143,43 +143,13 @@ MemoryBuffer::ReadInt64(int64_t* ret) {
   memcpy(ret, read_block_->ReadPos(), sizeof(int64_t));
   read_block_->AdvanceRead(sizeof(int64_t));
   return 0;
-  /*
-  if (read_block_ == NULL) return kEOF;
-  *ret = read_block_->ReadPos()[0] << 24; read_block_->AdvanceRead(1);
-  if (read_block_->ReadSize() == 0) read_block_ = read_block_->next;
-
-  if (read_block_ == NULL) return kEOF;
-  *ret += read_block_->ReadPos()[0] << 16; read_block_->AdvanceRead(1);
-  if (read_block_->ReadSize() == 0) read_block_ = read_block_->next;
-
-  if (read_block_ == NULL) return kEOF;
-  *ret += read_block_->ReadPos()[0] << 8; read_block_->AdvanceRead(1);
-  if (read_block_->ReadSize() == 0) read_block_ = read_block_->next;
-
-  if (read_block_ == NULL) return kEOF;
-  *ret += read_block_->ReadPos()[0]; read_block_->AdvanceRead(1);
-  if (read_block_->ReadSize() == 0) read_block_ = read_block_->next;
-
-  return 0;
-  */
 }
 
 int 
 MemoryBuffer::WriteUint64(uint64_t n) {
   ensureMemory(sizeof(uint64_t));
-
-  write_block_->WritePos()[0] = (int)((n >> 24) & 0xFF); write_block_->AdvanceWrite(1);
-  if (write_block_->WriteSize() == 0) write_block_ = write_block_->next;
-  
-  write_block_->WritePos()[0] = (int)((n >> 16) & 0xFF); write_block_->AdvanceWrite(1);
-  if (write_block_->WriteSize() == 0) write_block_ = write_block_->next;
-
-  write_block_->WritePos()[0] = (int)((n >> 8) & 0xFF); write_block_->AdvanceWrite(1);
-  if (write_block_->WriteSize() == 0) write_block_ = write_block_->next;
-
-  write_block_->WritePos()[0] = (int)(n& 0xFF); write_block_->AdvanceWrite(1);
-  if (write_block_->WriteSize() == 0) write_block_ = write_block_->next;
-  
+  memcpy(&(write_block_->WritePos()[0]), &n, sizeof(uint64_t));
+  write_block_->AdvanceWrite(sizeof(uint64_t));
   return 0;
 }
 

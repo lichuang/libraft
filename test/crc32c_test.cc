@@ -2,33 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
-#include "util/crc32c.h"
-#include "util/testharness.h"
+#include <gtest/gtest.h>
+#include "base/crc32c.h"
 
-namespace leveldb {
-namespace crc32c {
+using namespace libraft;
 
-class CRC { };
-
-TEST(CRC, StandardResults) {
+TEST(crc32cTests, StandardResults) {
   // From rfc3720 section B.4.
   char buf[32];
 
   memset(buf, 0, sizeof(buf));
-  ASSERT_EQ(0x8a9136aa, Value(buf, sizeof(buf)));
+  ASSERT_EQ((uint32_t)0x8a9136aa, Value(buf, sizeof(buf)));
 
   memset(buf, 0xff, sizeof(buf));
-  ASSERT_EQ(0x62a8ab43, Value(buf, sizeof(buf)));
+  ASSERT_EQ((uint32_t)0x62a8ab43, Value(buf, sizeof(buf)));
 
   for (int i = 0; i < 32; i++) {
     buf[i] = i;
   }
-  ASSERT_EQ(0x46dd794e, Value(buf, sizeof(buf)));
+  ASSERT_EQ((uint32_t)0x46dd794e, Value(buf, sizeof(buf)));
 
   for (int i = 0; i < 32; i++) {
     buf[i] = 31 - i;
   }
-  ASSERT_EQ(0x113fdb5c, Value(buf, sizeof(buf)));
+  ASSERT_EQ((uint32_t)0x113fdb5c, Value(buf, sizeof(buf)));
 
   unsigned char data[48] = {
     0x01, 0xc0, 0x00, 0x00,
@@ -44,29 +41,22 @@ TEST(CRC, StandardResults) {
     0x02, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00,
   };
-  ASSERT_EQ(0xd9963a56, Value(reinterpret_cast<char*>(data), sizeof(data)));
+  ASSERT_EQ((uint32_t)0xd9963a56, Value(reinterpret_cast<char*>(data), sizeof(data)));
 }
 
-TEST(CRC, Values) {
+TEST(crc32cTests, Values) {
   ASSERT_NE(Value("a", 1), Value("foo", 3));
 }
 
-TEST(CRC, Extend) {
+TEST(crc32cTests, Extend) {
   ASSERT_EQ(Value("hello world", 11),
             Extend(Value("hello ", 6), "world", 5));
 }
 
-TEST(CRC, Mask) {
+TEST(crc32cTests, Mask) {
   uint32_t crc = Value("foo", 3);
   ASSERT_NE(crc, Mask(crc));
   ASSERT_NE(crc, Mask(Mask(crc)));
   ASSERT_EQ(crc, Unmask(Mask(crc)));
   ASSERT_EQ(crc, Unmask(Unmask(Mask(Mask(crc)))));
-}
-
-}  // namespace crc32c
-}  // namespace leveldb
-
-int main(int argc, char** argv) {
-  return leveldb::test::RunAllTests();
 }
