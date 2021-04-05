@@ -6,6 +6,9 @@
 #define __LIBRAFT_UTIL_H__
 
 #include "libraft.h"
+#include "proto/record.pb.h"
+
+using namespace walpb;
 
 namespace libraft {
 
@@ -16,6 +19,7 @@ bool isDeepEqualSnapshot(const Snapshot *s1, const Snapshot *s2);
 bool isDeepEqualEntries(const EntryVec& ents1, const EntryVec& ents2);
 bool isDeepEqualReadStates(const vector<ReadState*>& rs1, const vector<ReadState*>& rs2);
 bool isDeepEqualMessage(const Message& msg1, const Message& msg2);
+bool isDeepEqualRecord(const Record& r1, const Record& r2);
 bool isHardStateEqual(const HardState& h1, const HardState& h2);
 bool isSoftStateEqual(const SoftState& s1, const SoftState& s2);
 bool isEmptySnapshot(const Snapshot* snapshot);

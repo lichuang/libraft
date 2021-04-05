@@ -8,6 +8,7 @@
 #include "base/crc32c.h"
 #include "base/io_error.h"
 #include "base/io_buffer.h"
+#include "base/util.h"
 #include "proto/record.pb.h"
 #include "wal/decoder.h"
 #include "wal/wal.h"
@@ -45,7 +46,7 @@ TEST(recordTests, TestReadRecord) {
   } tests[] = {
     {
       .data = infoRecord,
-      .wr = initRecord(1, Value(infoData.c_str(), infoData.length() - 1), infoData),
+      .wr = initRecord(1, Value(infoData.c_str(), infoData.length() - 1), string(infoData.c_str(), infoData.length() - 1)),
       .we = 0,
     },
     {
@@ -64,7 +65,7 @@ TEST(recordTests, TestReadRecord) {
       .data = infoRecord.substr(0,infoRecord.length() - 8), .wr = Record(), .we = kErrUnexpectedEOF,
     },   
     {
-      .data = badInfoRecord, .wr = Record(), .we = kErrCRCMismatch,
+      .data = badInfoRecord, .wr = initRecord(1,0,""), .we = kErrCRCMismatch,
     },       
   };
 
@@ -78,6 +79,12 @@ TEST(recordTests, TestReadRecord) {
     
     ASSERT_EQ(err, tt.we) << "i:" << i << tt.data.length();
 
+    if (tt.we != kErrCRCMismatch)
+      ASSERT_TRUE(isDeepEqualRecord(record, tt.wr)) << "i:" << i;
+
     delete dec;
   }
+}
+
+TEST(recordTests, TestWriteRecord) {
 }

@@ -8,7 +8,7 @@ add_executable ( libraft_test
   test/io_buffer_test.cc     
   test/progress_test.cc
   test/raft_flow_controller_test.cc
-  #test/raft_paper_test.cc
+  test/raft_paper_test.cc
   test/raft_snap_test.cc
   test/raft_test_util.cc
   test/raft_test.cc 

@@ -178,6 +178,23 @@ isDeepEqualMessage(const Message& msg1, const Message& msg2) {
   return true;
 }
 
+bool isDeepEqualRecord(const Record& r1, const Record& r2) {
+  if (r1.type() != r2.type()) {    
+    printf("type:%lld,%lld\n", r1.type(), r2.type());
+    return false;
+  }
+  if (r1.crc() != r2.crc()) {
+    printf("crc\n");
+    return false;
+  }
+  if (r1.data() != r2.data()) {
+    printf("data\n");
+    return false;
+  }
+
+  return true;
+}
+
 int 
 numOfPendingConf(const EntryVec& entries) {
   size_t i;

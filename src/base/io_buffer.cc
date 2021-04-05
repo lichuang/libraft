@@ -153,7 +153,6 @@ MemoryBuffer::WriteUint64(uint64_t n) {
   return 0;
 }
 
-
 IOBuffer* 
 newMemoryBuffer() { 
   return new MemoryBuffer();

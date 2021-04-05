@@ -30,6 +30,14 @@ Test part uses Step function to generate the scenario. Check part checks
 outgoing messages and state.
 */
 
+static void
+releaseMsgVector(MessageVec* mvec) {
+  uint32_t i;
+  for (i = 0; i < mvec->size(); ++i) {
+    delete (*mvec)[i];
+  }
+}
+
 bool isDeepEqualMsgs(const MessageVec& msgs1, const MessageVec& msgs2) {
 	if (msgs1.size() != msgs2.size()) {
     kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
@@ -119,10 +127,7 @@ void commitNoopEntry(raft *r, MemoryStorage *s) {
 // it immediately reverts to follower state.
 // Reference: section 5.1
 void testUpdateTermFromMessage(StateType state) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
-  peers.push_back(3);
+  vector<uint64_t> peers = {1,2,3};
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
 
@@ -151,6 +156,8 @@ void testUpdateTermFromMessage(StateType state) {
 
 	EXPECT_EQ((int)r->term_, 2);
 	EXPECT_EQ(r->state_, StateFollower);
+
+  delete r;
 }
 
 TEST(raftPaperTests, TestFollowerUpdateTermFromMessage) {
@@ -170,19 +177,45 @@ TEST(raftPaperTests, TestLeaderUpdateTermFromMessage) {
 // Our implementation ignores the request instead.
 // Reference: section 5.1
 // TODO
+static bool called = false;
+
+static void 
+fakeStep(raft* r, const Message& msg) {
+  called = true;
+}
+
 TEST(raftPaperTests, TestRejectStaleTermMessage) {
+  called = false;
+  vector<uint64_t> peers = {1,2,3};
+  Storage *s = new MemoryStorage(&kDefaultLogger);
+  raft *r = newTestRaft(1, peers, 10, 1, s);
+  r->stateStepFunc_ = fakeStep;
+
+  HardState hs;
+  hs.set_term(2);
+  r->loadState(hs);
+
+  {
+    Message msg;
+    msg.set_type(MsgApp);
+    msg.set_term(r->term_ - 1);
+
+    r->step(msg);
+  }
+
+  EXPECT_FALSE(called);
+  delete r;
 }
 
 // TestStartAsFollower tests that when servers start up, they begin as followers.
 // Reference: section 5.2
 TEST(raftPaperTests, TestStartAsFollower) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
-  peers.push_back(3);
+  vector<uint64_t> peers = {1,2,3};
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
 	EXPECT_EQ(r->state_, StateFollower);
+
+  delete r;
 }
 
 // TestLeaderBcastBeat tests that if the leader receives a heartbeat tick,
@@ -192,10 +225,7 @@ TEST(raftPaperTests, TestStartAsFollower) {
 TEST(raftPaperTests, TestLeaderBcastBeat) {
 	// heartbeat interval
 	uint64_t hi = 1;
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
-  peers.push_back(3);
+  vector<uint64_t> peers = {1,2,3};
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
 	r->becomeCandidate();
@@ -234,6 +264,9 @@ TEST(raftPaperTests, TestLeaderBcastBeat) {
 		wmsgs.push_back(msg);
 	}
 	EXPECT_TRUE(isDeepEqualMsgs(msgs, wmsgs));
+
+  delete r;
+  releaseMsgVector(&wmsgs);
 }
 
 // testNonleaderStartElection tests that if a follower receives no communication
@@ -249,10 +282,8 @@ TEST(raftPaperTests, TestLeaderBcastBeat) {
 void testNonleaderStartElection(StateType state) {
 	// election timeout
 	uint64_t et = 10;
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
-  peers.push_back(3);
+  vector<uint64_t> peers = {1,2,3};
+
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
 
@@ -266,10 +297,13 @@ void testNonleaderStartElection(StateType state) {
   default:
     break;
 	}
+
+  // simulate election timeout
 	size_t i;
   for (i = 0; i < 2*et; ++i) {
 		r->tick();
 	}
+
 	EXPECT_EQ((int)r->term_, 2);
 	EXPECT_EQ(r->state_, StateCandidate);
 	EXPECT_TRUE(r->votes_[r->id_]);
@@ -294,11 +328,15 @@ void testNonleaderStartElection(StateType state) {
 		wmsgs.push_back(msg);
 	}
 	EXPECT_TRUE(isDeepEqualMsgs(msgs, wmsgs));
+
+  delete r;  
+  releaseMsgVector(&wmsgs);
 }
 
 TEST(raftPaperTests, TestFollowerStartElection) {
 	testNonleaderStartElection(StateFollower);
 }
+
 TEST(raftPaperTests, TestCandidateStartNewElection) {
 	testNonleaderStartElection(StateCandidate);
 }
