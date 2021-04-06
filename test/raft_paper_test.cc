@@ -854,91 +854,26 @@ TEST(raftPaperTests, TestFollowerCommitEntry) {
   struct tmp {
     EntryVec entries;
     uint64_t commit;
-    
-    tmp(EntryVec ents, uint64_t commit)
-      : entries(ents), commit(commit) {
-    }
+  } tests[] = {
+    {.entries = {initEntry(1,1,"some data")}, .commit = 1},
+    {.entries = {initEntry(1,1,"some data"),initEntry(2,1,"some data2")}, .commit = 2},
+    {.entries = {initEntry(1,1,"some data2"),initEntry(2,1,"some data")}, .commit = 2},
+    {.entries = {initEntry(1,1,"some data"),initEntry(2,1,"some data2")}, .commit = 1},
   };
 
-  vector<tmp> tests;
-  {
-    Entry entry;
-    EntryVec entries;
-
-    entry.set_term(1);
-    entry.set_index(1);
-    entry.set_data("some data");
-    entries.push_back(entry);
-
-    tests.push_back(tmp(entries, 1));
-  }
-  {
-    Entry entry;
-    EntryVec entries;
-
-    entry.set_term(1);
-    entry.set_index(1);
-    entry.set_data("some data");
-    entries.push_back(entry);
-
-    entry.set_term(1);
-    entry.set_index(2);
-    entry.set_data("some data2");
-    entries.push_back(entry);
-
-    tests.push_back(tmp(entries, 2));
-  }
-  {
-    Entry entry;
-    EntryVec entries;
-
-    entry.set_term(1);
-    entry.set_index(1);
-    entry.set_data("some data2");
-    entries.push_back(entry);
-
-    entry.set_term(1);
-    entry.set_index(2);
-    entry.set_data("some data");
-    entries.push_back(entry);
-
-    tests.push_back(tmp(entries, 2));
-  }
-  {
-    Entry entry;
-    EntryVec entries;
-
-    entry.set_term(1);
-    entry.set_index(1);
-    entry.set_data("some data");
-    entries.push_back(entry);
-
-    entry.set_term(1);
-    entry.set_index(2);
-    entry.set_data("some data2");
-    entries.push_back(entry);
-
-    tests.push_back(tmp(entries, 1));
-  }
-
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp &t = tests[i];
 
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
+    vector<uint64_t> peers = {1,2,3};
+
     Storage *s = new MemoryStorage(&kDefaultLogger);
     raft *r = newTestRaft(1, peers, 10, 1, s);
     r->becomeFollower(1,2);
 
     {
-      Message msg;
-      msg.set_from(2);
-      msg.set_to(1);
-      msg.set_term(1);
-      msg.set_type(MsgApp);
+      Message msg = initMessage(2,1,MsgApp);
+      msg.set_term(1);      
       msg.set_commit(t.commit);
       size_t j;
       for (j = 0; j < t.entries.size(); ++j) {
@@ -952,6 +887,8 @@ TEST(raftPaperTests, TestFollowerCommitEntry) {
     r->raftLog_->nextEntries(&ents);
     wents.insert(wents.end(), t.entries.begin(), t.entries.begin() + t.commit);
     EXPECT_TRUE(isDeepEqualEntries(ents, wents)) << "i:" << i;
+
+    delete r;
   }
 }
 
@@ -961,19 +898,10 @@ TEST(raftPaperTests, TestFollowerCommitEntry) {
 // append entries.
 // Reference: section 5.3
 TEST(raftPaperTests, TestFollowerCheckMsgApp) {
-  EntryVec entries;
-  {
-    Entry entry;
-    entry.set_term(1);
-    entry.set_index(1);
-    entries.push_back(entry);
-  }
-  {
-    Entry entry;
-    entry.set_term(2);
-    entry.set_index(2);
-    entries.push_back(entry);
-  }
+  EntryVec entries = {
+    initEntry(1,1),
+    initEntry(2,2),
+  };
 
   struct tmp {
     uint64_t term;
@@ -981,49 +909,41 @@ TEST(raftPaperTests, TestFollowerCheckMsgApp) {
     uint64_t windex;
     bool wreject;
     uint64_t wrejectHint;
-
-    tmp(uint64_t t, uint64_t i, uint64_t wi, bool wr, uint64_t wrh)
-      : term(t), index(i), windex(wi), wreject(wr), wrejectHint(wrh) {}
+  } tests[] = {
+    // match with committed entries
+    {.term = 0, .index = 0, .windex = 1, .wreject = false, .wrejectHint = 0},
+    {.term = entries[0].term(), .index = entries[0].index(), .windex = 1, .wreject = false, .wrejectHint = 0},
+    // match with uncommitted entries
+    {.term = entries[1].term(), .index = entries[1].index(), .windex = 2, .wreject = false, .wrejectHint = 0},
+    // unmatch with existing entry
+    {.term = entries[0].term(), .index = entries[1].index(), .windex = entries[1].index(), .wreject = true, .wrejectHint = 2},
+    // unexisting entry
+    {.term = entries[1].term(), .index = entries[1].index() + 1, .windex = entries[1].index() + 1, .wreject = true, .wrejectHint = 2},
   };
 
-  vector<tmp> tests;
-
-  // match with committed entries
-  tests.push_back(tmp(0, 0, 1, false, 0));
-  tests.push_back(tmp(entries[0].term(), entries[0].index(), 1, false, 0));
-  // match with uncommitted entries
-  tests.push_back(tmp(entries[1].term(), entries[1].index(), 2, false, 0));
-
-  // unmatch with existing entry
-  tests.push_back(tmp(entries[0].term(), entries[1].index(), entries[1].index(), true, 2));
-  // unexisting entry
-  tests.push_back(tmp(entries[1].term() + 1, entries[1].index() + 1, entries[1].index() + 1, true, 2));
-  
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp& t = tests[i];
 
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
+    vector<uint64_t> peers = {1,2,3};
+
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
     EntryVec ents = entries;
     s->Append(ents);
     raft *r = newTestRaft(1, peers, 10, 1, s);
+
     HardState hs;
     hs.set_commit(1);
     r->loadState(hs);
     r->becomeFollower(2, 2);
     {
       Message msg;
+      msg.set_index(t.index);
       msg.set_type(MsgApp);
       msg.set_from(2);
       msg.set_to(1);
       msg.set_term(2);
-      msg.set_term(2);
-      msg.set_logterm(t.term);
-      msg.set_index(t.index);
+      msg.set_logterm(t.term);      
 
       r->step(msg);
     }
@@ -1043,6 +963,9 @@ TEST(raftPaperTests, TestFollowerCheckMsgApp) {
     }
 
     EXPECT_TRUE(isDeepEqualMsgs(msgs, wmsgs)) << "i: " << i;
+
+    delete r;
+    releaseMsgVector(&wmsgs);
   }
 }
 
@@ -1055,108 +978,38 @@ TEST(raftPaperTests, TestFollowerAppendEntries) {
 	struct tmp {
 		uint64_t index, term;
 		EntryVec ents, wents, wunstable;
-
-		tmp(uint64_t i, uint64_t t, EntryVec e, EntryVec we, EntryVec wu)
-			: index(i), term(t), ents(e), wents(we), wunstable(wu) {}
-	};
-
-	vector<tmp> tests;
-	{
-		EntryVec ents, wents, wunstable;
-		Entry entry;
-
-		entry.set_term(3);
-		entry.set_index(3);
-		ents.push_back(entry);
-		
-		entry.set_term(1);
-		entry.set_index(1);
-		wents.push_back(entry);
-		entry.set_term(2);
-		entry.set_index(2);
-		wents.push_back(entry);
-		entry.set_term(3);
-		entry.set_index(3);
-		wents.push_back(entry);
-	
-		wunstable.push_back(entry);
-
-		tests.push_back(tmp(2, 2, ents, wents, wunstable));
-	}
-	{
-		EntryVec ents, wents, wunstable;
-		Entry entry;
-
-		entry.set_term(3);
-		entry.set_index(2);
-		ents.push_back(entry);
-		entry.set_term(4);
-		entry.set_index(3);
-		ents.push_back(entry);
-		
-		entry.set_term(1);
-		entry.set_index(1);
-		wents.push_back(entry);
-		entry.set_term(3);
-		entry.set_index(2);
-		wents.push_back(entry);
-		wunstable.push_back(entry);
-
-		entry.set_term(4);
-		entry.set_index(3);
-		wents.push_back(entry);
-		wunstable.push_back(entry);
-
-		tests.push_back(tmp(1, 1, ents, wents, wunstable));
-	}
-	{
-		EntryVec ents, wents, wunstable;
-		Entry entry;
-
-		entry.set_term(1);
-		entry.set_index(1);
-		ents.push_back(entry);
-		
-		entry.set_term(1);
-		entry.set_index(1);
-		wents.push_back(entry);
-
-		entry.set_term(2);
-		entry.set_index(2);
-		wents.push_back(entry);
-
-		tests.push_back(tmp(0, 0, ents, wents, wunstable));
-	}
-	{
-		EntryVec ents, wents, wunstable;
-		Entry entry;
-
-		entry.set_term(3);
-		entry.set_index(1);
-		ents.push_back(entry);
-		wents.push_back(entry);
-		wunstable.push_back(entry);
-
-		tests.push_back(tmp(0, 0, ents, wents, wunstable));
-	}
+	} tests[] = {
+    {
+      .index = 2, .term = 2,
+      .ents = {initEntry(3,3)},
+      .wents = {initEntry(1,1),initEntry(2,2),initEntry(3,3)},
+      .wunstable = {initEntry(3,3)},
+    },
+    {
+      .index = 1, .term = 1,
+      .ents = {initEntry(2,3),initEntry(3,4)},
+      .wents = {initEntry(1,1),initEntry(2,3),initEntry(3,4)},
+      .wunstable = {initEntry(2,3),initEntry(3,4)},
+    },
+    {
+      .index = 0, .term = 0,
+      .ents = {initEntry(1,3),},
+      .wents = {initEntry(1,3)},
+      .wunstable = {initEntry(1,3)},
+    },        
+  };
 
 	size_t i;
-	for (i = 0; i < tests.size(); ++i) {
+	for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
 		tmp& t = tests[i];
-		vector<uint64_t> peers;
-		peers.push_back(1);
-		peers.push_back(2);
-		peers.push_back(3);
+		vector<uint64_t> peers = {1,2,3};
+
 		MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
 
-		EntryVec appEntries;
-		Entry entry;
-		entry.set_term(1);
-		entry.set_index(1);
-		appEntries.push_back(entry);
-		entry.set_term(2);
-		entry.set_index(2);
-		appEntries.push_back(entry);
+		EntryVec appEntries = {
+      initEntry(1,1),
+      initEntry(2,2),
+    };
 
     s->Append(appEntries);
 		raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -1183,6 +1036,8 @@ TEST(raftPaperTests, TestFollowerAppendEntries) {
 
 		r->raftLog_->unstableEntries(&wunstable);
 		EXPECT_TRUE(isDeepEqualEntries(wunstable, t.wunstable));
+
+    delete r;
 	}
 }
 
