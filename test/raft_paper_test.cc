@@ -1045,160 +1045,61 @@ TEST(raftPaperTests, TestFollowerAppendEntries) {
 // into consistency with its own.
 // Reference: section 5.3, figure 7
 TEST(raftPaperTests, TestLeaderSyncFollowerLog) {
-	EntryVec ents;
-	{
-		Entry entry;
-		
-		ents.push_back(entry);
-
-		entry.set_term(1); entry.set_index(1); ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); ents.push_back(entry);
-		entry.set_term(1); entry.set_index(3); ents.push_back(entry);
-
-		entry.set_term(4); entry.set_index(4); ents.push_back(entry);
-		entry.set_term(4); entry.set_index(5); ents.push_back(entry);
-
-		entry.set_term(5); entry.set_index(6); ents.push_back(entry);
-		entry.set_term(5); entry.set_index(7); ents.push_back(entry);
-
-		entry.set_term(6); entry.set_index(8); ents.push_back(entry);
-		entry.set_term(6); entry.set_index(9); ents.push_back(entry);
-		entry.set_term(6); entry.set_index(10); ents.push_back(entry);
-	}
+	EntryVec ents = {
+    {},
+    initEntry(1,1),initEntry(2,1),initEntry(3,1),
+    initEntry(4,4),initEntry(5,4),
+    initEntry(6,5),initEntry(7,5),
+    initEntry(8,6),initEntry(9,6),initEntry(10,6),
+  };	
 
 	uint64_t term = 8;
-	vector<EntryVec> tests;
-	{
-		Entry entry;
-		EntryVec tmp_ents;
-		
-		tmp_ents.push_back(entry);
+	vector<EntryVec> tests = {
+    {
+      {},
+      initEntry(1,1),initEntry(2,1),initEntry(3,1),
+      initEntry(4,4),initEntry(5,4),
+      initEntry(6,5),initEntry(7,5),
+      initEntry(8,6),initEntry(9,6),   
+    },
+    {
+      {},
+      initEntry(1,1),initEntry(2,1),initEntry(3,1),
+      initEntry(4,4),   
+    }, 
+    {
+      {},
+      initEntry(1,1),initEntry(2,1),initEntry(3,1),
+      initEntry(4,4),initEntry(5,4),
+      initEntry(6,5),initEntry(7,5),
+      initEntry(8,6),initEntry(9,6),initEntry(10,6),initEntry(11,6),   
+    }, 
+    {
+      {},
+      initEntry(1,1),initEntry(2,1),initEntry(3,1),
+      initEntry(4,4),initEntry(5,4),
+      initEntry(6,5),initEntry(7,5),
+      initEntry(8,6),initEntry(9,6),initEntry(10,6), 
+      initEntry(11,7),initEntry(12,7),
+    },
+    {
+      {},
+      initEntry(1,1),initEntry(2,1),initEntry(3,1),
+      initEntry(4,4),initEntry(5,4),initEntry(6,4),initEntry(7,4),
+    },   
+    {
+      {},
+      initEntry(1,1),initEntry(2,1),initEntry(3,1),
+      initEntry(4,2),initEntry(5,2),initEntry(6,2),
+      initEntry(7,3),initEntry(8,3),initEntry(9,3),initEntry(10,3),initEntry(11,3),
+    },                 
+  };
 
-		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
-
-		entry.set_term(4); entry.set_index(4); tmp_ents.push_back(entry);
-		entry.set_term(4); entry.set_index(5); tmp_ents.push_back(entry);
-
-		entry.set_term(5); entry.set_index(6); tmp_ents.push_back(entry);
-		entry.set_term(5); entry.set_index(7); tmp_ents.push_back(entry);
-
-		entry.set_term(6); entry.set_index(8); tmp_ents.push_back(entry);
-		entry.set_term(6); entry.set_index(9); tmp_ents.push_back(entry);
-
-		tests.push_back(tmp_ents);
-	}
-	{
-		Entry entry;
-		EntryVec tmp_ents;
-		
-		tmp_ents.push_back(entry);
-
-		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
-
-		entry.set_term(4); entry.set_index(4); tmp_ents.push_back(entry);
-
-		tests.push_back(tmp_ents);
-	}
-	{
-		Entry entry;
-		EntryVec tmp_ents;
-		
-		tmp_ents.push_back(entry);
-
-		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
-
-		entry.set_term(4); entry.set_index(4); tmp_ents.push_back(entry);
-		entry.set_term(4); entry.set_index(5); tmp_ents.push_back(entry);
-
-		entry.set_term(5); entry.set_index(6); tmp_ents.push_back(entry);
-		entry.set_term(5); entry.set_index(7); tmp_ents.push_back(entry);
-
-		entry.set_term(6); entry.set_index(8); tmp_ents.push_back(entry);
-		entry.set_term(6); entry.set_index(9); tmp_ents.push_back(entry);
-		entry.set_term(6); entry.set_index(10); tmp_ents.push_back(entry);
-		entry.set_term(6); entry.set_index(11); tmp_ents.push_back(entry);
-
-		tests.push_back(tmp_ents);
-	}
-	{
-		Entry entry;
-		EntryVec tmp_ents;
-		
-		tmp_ents.push_back(entry);
-
-		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
-
-		entry.set_term(4); entry.set_index(4); tmp_ents.push_back(entry);
-		entry.set_term(4); entry.set_index(5); tmp_ents.push_back(entry);
-
-		entry.set_term(5); entry.set_index(6); tmp_ents.push_back(entry);
-		entry.set_term(5); entry.set_index(7); tmp_ents.push_back(entry);
-
-		entry.set_term(6); entry.set_index(8); tmp_ents.push_back(entry);
-		entry.set_term(6); entry.set_index(9); tmp_ents.push_back(entry);
-		entry.set_term(6); entry.set_index(10); tmp_ents.push_back(entry);
-
-		entry.set_term(7); entry.set_index(11); tmp_ents.push_back(entry);
-		entry.set_term(7); entry.set_index(12); tmp_ents.push_back(entry);
-
-		tests.push_back(tmp_ents);
-	}
-	{
-		Entry entry;
-		EntryVec tmp_ents;
-		
-		tmp_ents.push_back(entry);
-
-		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
-
-		entry.set_term(4); entry.set_index(4); tmp_ents.push_back(entry);
-		entry.set_term(4); entry.set_index(5); tmp_ents.push_back(entry);
-
-		entry.set_term(4); entry.set_index(6); tmp_ents.push_back(entry);
-		entry.set_term(4); entry.set_index(7); tmp_ents.push_back(entry);
-
-		tests.push_back(tmp_ents);
-	}
-	{
-		Entry entry;
-		EntryVec tmp_ents;
-		
-		tmp_ents.push_back(entry);
-
-		entry.set_term(1); entry.set_index(1); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(2); tmp_ents.push_back(entry); 
-		entry.set_term(1); entry.set_index(3); tmp_ents.push_back(entry); 
-
-		entry.set_term(2); entry.set_index(4); tmp_ents.push_back(entry);
-		entry.set_term(2); entry.set_index(5); tmp_ents.push_back(entry);
-		entry.set_term(2); entry.set_index(6); tmp_ents.push_back(entry);
-
-		entry.set_term(3); entry.set_index(7); tmp_ents.push_back(entry);
-		entry.set_term(3); entry.set_index(8); tmp_ents.push_back(entry);
-		entry.set_term(3); entry.set_index(9); tmp_ents.push_back(entry);
-		entry.set_term(3); entry.set_index(10); tmp_ents.push_back(entry);
-		entry.set_term(3); entry.set_index(11); tmp_ents.push_back(entry);
-
-		tests.push_back(tmp_ents);
-	}
 	size_t i;
 	for (i = 0; i < tests.size(); ++i) {
 		EntryVec& t = tests[i];
 
-		vector<uint64_t> peers;
-		peers.push_back(1);
-		peers.push_back(2);
-		peers.push_back(3);
+		vector<uint64_t> peers = {1,2,3};
 
 		MemoryStorage *leaderStorage = new MemoryStorage(&kDefaultLogger);
 		EntryVec appEntries = ents;
@@ -1231,38 +1132,31 @@ TEST(raftPaperTests, TestLeaderSyncFollowerLog) {
 		
   	network *net = newNetwork(sts);
     {
-      vector<Message> msgs;
-      Message msg;
-      msg.set_from(1);
-      msg.set_to(1);
-      msg.set_type(MsgHup);
-      msgs.push_back(msg);
+      vector<Message> msgs = {initMessage(1,1,MsgHup)};
       net->send(&msgs);
     }
 		// The election occurs in the term after the one we loaded with
 		// lead.loadState above.
     {
       vector<Message> msgs;
-      Message msg;
-      msg.set_from(3);
-      msg.set_to(1);
+      Message msg = initMessage(3,1,MsgVoteResp);
+
       msg.set_term(term + 1);
-      msg.set_type(MsgVoteResp);
       msgs.push_back(msg);
       net->send(&msgs);
     }
     {
       vector<Message> msgs;
-      Message msg;
-      msg.set_from(1);
-      msg.set_to(1);
-      msg.set_type(MsgProp);
+      Message msg = initMessage(1,1,MsgProp);
 			msg.add_entries();
       msgs.push_back(msg);
       net->send(&msgs);
     }
 
 		EXPECT_EQ(raftLogString(leader->raftLog_), raftLogString(follower->raftLog_)) << "i: " << i;
+
+    delete leader;
+    delete follower;
 	}
 }
 
@@ -1273,51 +1167,28 @@ TEST(raftPaperTests, TestVoteRequest) {
   struct tmp {
     EntryVec ents;
     uint64_t wterm;
-
-    tmp(EntryVec ents, uint64_t t)
-      : ents(ents), wterm(t) {
-    }
+  } tests[] = {
+    {
+      .ents = {initEntry(1,1)},
+      .wterm = 2,
+    },
+    {
+      .ents = {initEntry(1,1), initEntry(2,2),},
+      .wterm = 3,
+    },    
   };
 
-  vector<tmp> tests;
-  {
-    EntryVec entries;
-    Entry entry;
-    entry.set_term(1);
-    entry.set_index(1);
-    entries.push_back(entry);
-
-    tests.push_back(tmp(entries, 2));
-  }
-  {
-    EntryVec entries;
-    Entry entry;
-    entry.set_term(1);
-    entry.set_index(1);
-    entries.push_back(entry);
-
-    entry.set_term(2);
-    entry.set_index(2);
-    entries.push_back(entry);
-
-    tests.push_back(tmp(entries, 3));
-  }
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp & t = tests[i];
   
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
+    vector<uint64_t> peers = {1,2,3};
+
     Storage *s = new MemoryStorage(&kDefaultLogger);
     raft *r = newTestRaft(1, peers, 10, 1, s);
     {
-      Message msg;
-      msg.set_from(2);
-      msg.set_to(1);
+      Message msg = initMessage(2,1,MsgApp);
       msg.set_term(t.wterm - 1);
-      msg.set_type(MsgApp);
       msg.set_logterm(0);
       msg.set_index(0);
       size_t j;
@@ -1350,6 +1221,8 @@ TEST(raftPaperTests, TestVoteRequest) {
       EXPECT_EQ(msg->index(), windex);
       EXPECT_EQ(msg->logterm(), wlogterm);
     }
+
+    delete r;
   }
 }
 
