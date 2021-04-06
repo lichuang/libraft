@@ -347,125 +347,54 @@ TEST(raftPaperTests, TestCandidateStartNewElection) {
 // b) it loses the election
 // c) it is unclear about the result
 // Reference: section 5.2
-TEST(raftPaperTests, TestLeaderElectionInOneRoundRPC) {
+TEST(raftPaperTests, TestLeaderElectionInOneRoundRPC) {  
 	struct tmp {
 		int size;
 		map<uint64_t, bool> votes;
 		StateType state;
-		tmp(int size, map<uint64_t, bool> votes, StateType s)
-			: size(size), votes(votes), state(s) {}
-	};
+	} tests[] = {
+    // win the election when receiving votes from a majority of the servers
+    {.size = 1, .votes = {}, .state = StateLeader},
+    {.size = 3, .votes = {{2,true},{3,true}}, .state = StateLeader},
+    {.size = 3, .votes = {{2,true},}, .state = StateLeader},
+    {.size = 5, .votes = {{2,true},{3,true},{4,true},{5,true},}, .state = StateLeader},
+    {.size = 5, .votes = {{2,true},{3,true},{4,true},}, .state = StateLeader},
+    {.size = 5, .votes = {{2,true},{3,true},}, .state = StateLeader},
 
-	vector<tmp> tests;
-	// win the election when receiving votes from a majority of the servers
-	{
-		map<uint64_t, bool>	votes;
-		tests.push_back(tmp(1, votes, StateLeader));
-	}
-	{
-		map<uint64_t, bool>	votes;
-		votes[2] = true;
-		votes[3] = true;
-		tests.push_back(tmp(3, votes, StateLeader));
-	}
-	{
-		map<uint64_t, bool>	votes;
-		votes[2] = true;
-		tests.push_back(tmp(3, votes, StateLeader));
-	}
-	{
-		map<uint64_t, bool>	votes;
-		votes[2] = true;
-		votes[3] = true;
-		votes[4] = true;
-		votes[5] = true;
-		tests.push_back(tmp(5, votes, StateLeader));
-	}
-	{
-		map<uint64_t, bool>	votes;
-		votes[2] = true;
-		votes[3] = true;
-		votes[4] = true;
-		tests.push_back(tmp(5, votes, StateLeader));
-	}
-	{
-		map<uint64_t, bool>	votes;
-		votes[2] = true;
-		votes[3] = true;
-		tests.push_back(tmp(5, votes, StateLeader));
-	}
-	// return to follower state if it receives vote denial from a majority
-	{
-		map<uint64_t, bool>	votes;
-		votes[2] = false;
-		votes[3] = false;
-		tests.push_back(tmp(3, votes, StateFollower));
-	}
-	{
-		map<uint64_t, bool>	votes;
-		votes[2] = false;
-		votes[3] = false;
-		votes[4] = false;
-		votes[5] = false;
-		tests.push_back(tmp(5, votes, StateFollower));
-	}
-	{
-		map<uint64_t, bool>	votes;
-		votes[2] = true;
-		votes[3] = false;
-		votes[4] = false;
-		votes[5] = false;
-		tests.push_back(tmp(5, votes, StateFollower));
-	}
-	// stay in candidate if it does not obtain the majority
-	{
-		map<uint64_t, bool>	votes;
-		tests.push_back(tmp(3, votes, StateCandidate));
-	}
-	{
-		map<uint64_t, bool>	votes;
-		votes[2] = true;
-		tests.push_back(tmp(5, votes, StateCandidate));
-	}
-	{
-		map<uint64_t, bool>	votes;
-		votes[2] = false;
-		votes[3] = false;
-		tests.push_back(tmp(5, votes, StateCandidate));
-	}
-	{
-		map<uint64_t, bool>	votes;
-		tests.push_back(tmp(5, votes, StateCandidate));
-	}
+    // return to follower state if it receives vote denial from a majority
+    {.size = 3, .votes = {{2,false},{3,false},}, .state = StateFollower},
+    {.size = 5, .votes = {{2,false},{3,false},{4,false},{5,false},}, .state = StateFollower},
+    {.size = 5, .votes = {{2,true},{3,false},{4,false},{5,false},}, .state = StateFollower},
+
+    // stay in candidate if it does not obtain the majority
+    {.size = 3, .votes = {}, .state = StateCandidate},
+    {.size = 5, .votes = {{2,true},}, .state = StateCandidate},
+    {.size = 5, .votes = {{2,false},{3,false}}, .state = StateCandidate},
+    {.size = 5, .votes = {}, .state = StateCandidate},
+  };
 
 	size_t i;
-	for (i = 0; i < tests.size(); ++i) {
+	for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
 		tmp &t = tests[i];
 
 		vector<uint64_t> peers;
 		idsBySize(t.size, &peers);
 		Storage *s = new MemoryStorage(&kDefaultLogger);
 		raft *r = newTestRaft(1, peers, 10, 1, s);
-		
-		{
-			Message msg;
-			msg.set_from(1);
-			msg.set_to(1);
-			msg.set_type(MsgHup);
-			r->step(msg);
-		}
+
+		r->step(initMessage(1,1,MsgHup));
+
 		map<uint64_t, bool>::iterator iter;
 		for (iter = t.votes.begin(); iter != t.votes.end(); ++iter) {
-			Message msg;
-			msg.set_from(iter->first);
-			msg.set_to(1);
-			msg.set_type(MsgVoteResp);
+			Message msg = initMessage(iter->first,1,MsgVoteResp);
 			msg.set_reject(!iter->second);
 			r->step(msg);
 		}
 
 		EXPECT_EQ(r->state_, t.state) << "i: " << i;
 		EXPECT_EQ((int)r->term_, 1);
+
+    delete r;
 	}
 }
 
@@ -477,27 +406,20 @@ TEST(raftPaperTests, TestFollowerVote) {
     uint64_t vote;
     uint64_t nvote;
     bool wreject;
-    tmp(uint64_t vote, uint64_t nvote, bool reject)
-      : vote(vote), nvote(nvote), wreject(reject) {
-    }
-	};
-
-	vector<tmp> tests;
-  tests.push_back(tmp(kEmptyPeerId, 1, false));
-  tests.push_back(tmp(kEmptyPeerId, 2, false));
-  tests.push_back(tmp(1, 1, false));
-  tests.push_back(tmp(2, 2, false));
-  tests.push_back(tmp(1, 2, true));
-  tests.push_back(tmp(2, 1, true));
+	} tests[] = {
+    {.vote = kEmptyPeerId, .nvote = 1, .wreject = false},
+    {.vote = kEmptyPeerId, .nvote = 2, .wreject = false},
+    {.vote = 1, .nvote = 1, .wreject = false},
+    {.vote = 2, .nvote = 2, .wreject = false},
+    {.vote = 1, .nvote = 2, .wreject = true},
+    {.vote = 2, .nvote = 1, .wreject = true},
+  };
 
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp &t = tests[i];
     
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
+    vector<uint64_t> peers = {1,2,3};
     Storage *s = new MemoryStorage(&kDefaultLogger);
     raft *r = newTestRaft(1, peers, 10, 1, s);
 
@@ -506,13 +428,7 @@ TEST(raftPaperTests, TestFollowerVote) {
     hs.set_vote(t.vote);
     r->loadState(hs);
 
-		{
-			Message msg;
-			msg.set_from(t.nvote);
-			msg.set_to(1);
-			msg.set_type(MsgVote);
-			r->step(msg);
-		}
+		r->step(initMessage(t.nvote,1,MsgVote));
 
     MessageVec msgs;
     r->readMessages(&msgs);
@@ -528,6 +444,9 @@ TEST(raftPaperTests, TestFollowerVote) {
       wmsgs.push_back(msg);
     }
 	  EXPECT_TRUE(isDeepEqualMsgs(msgs, wmsgs));
+
+    delete r;
+    releaseMsgVector(&wmsgs);
   }
 }
 
@@ -559,24 +478,18 @@ TEST(raftPaperTests, TestCandidateFallback) {
   for (i = 0; i < tests.size(); ++i) {
     Message& msg = tests[i];
     
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
+    vector<uint64_t> peers = {1,2,3};
     Storage *s = new MemoryStorage(&kDefaultLogger);
     raft *r = newTestRaft(1, peers, 10, 1, s);
-		{
-			Message tmp_msg;
-			tmp_msg.set_from(1);
-			tmp_msg.set_to(1);
-			tmp_msg.set_type(MsgHup);
-			r->step(tmp_msg);
-		}
+
+		r->step(initMessage(1,1,MsgHup));
+		
     EXPECT_EQ(r->state_, StateCandidate);
     r->step(msg);
 
     EXPECT_EQ(r->state_, StateFollower);
     EXPECT_EQ(r->term_, msg.term());
+    delete r;
   }
 }
 
@@ -586,10 +499,8 @@ TEST(raftPaperTests, TestCandidateFallback) {
 void testNonleaderElectionTimeoutRandomized(StateType state) {
   uint64_t et = 10;
   
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
-  peers.push_back(3);
+  vector<uint64_t> peers = {1,2,3};
+
   Storage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, et, 1, s);
   size_t i;
@@ -620,6 +531,8 @@ void testNonleaderElectionTimeoutRandomized(StateType state) {
   for (i = et + 1; i < 2 * et; ++i) {
     EXPECT_TRUE(timeouts[i]);
   }
+
+  delete r;
 }
 
 TEST(raftPaperTests, TestFollowerElectionTimeoutRandomized) {
@@ -684,6 +597,10 @@ void testNonleadersElectionTimeoutNonconflict(StateType state) {
 
   float g = float(conflicts) / 1000;
   EXPECT_FALSE(g > 0.3);
+
+  for (i = 0; i < rs.size(); ++i) {
+    delete rs[i];
+  }  
 }
 
 TEST(raftPaperTests, TestFollowersElectioinTimeoutNonconflict) {
@@ -703,10 +620,7 @@ TEST(raftPaperTests, TestCandidatesElectionTimeoutNonconflict) {
 // Also, it writes the new entry into stable storage.
 // Reference: section 5.3
 TEST(raftPaperTests, TestLeaderStartReplication) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
-  peers.push_back(3);
+  vector<uint64_t> peers = {1,2,3};
   MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->becomeCandidate();
@@ -718,10 +632,7 @@ TEST(raftPaperTests, TestLeaderStartReplication) {
   {
     Entry entry;
     entry.set_data("some data");
-    Message msg;
-    msg.set_from(1);
-    msg.set_to(1);
-    msg.set_type(MsgProp);
+    Message msg = initMessage(1,1,MsgProp);
     *(msg.add_entries()) = entry;
     r->step(msg);
   }
@@ -765,6 +676,9 @@ TEST(raftPaperTests, TestLeaderStartReplication) {
     wmsgs.push_back(msg);
   }
   EXPECT_TRUE(isDeepEqualMsgs(msgs, wmsgs));
+
+  delete r;
+  releaseMsgVector(&wmsgs);
 }
 
 // TestLeaderCommitEntry tests that when the entry has been safely replicated,
@@ -775,10 +689,8 @@ TEST(raftPaperTests, TestLeaderStartReplication) {
 // servers eventually find out.
 // Reference: section 5.3
 TEST(raftPaperTests, TestLeaderCommitEntry) {
-  vector<uint64_t> peers;
-  peers.push_back(1);
-  peers.push_back(2);
-  peers.push_back(3);
+  vector<uint64_t> peers = {1,2,3};
+
   MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->becomeCandidate();
@@ -790,10 +702,7 @@ TEST(raftPaperTests, TestLeaderCommitEntry) {
   {
     Entry entry;
     entry.set_data("some data");
-    Message msg;
-    msg.set_from(1);
-    msg.set_to(1);
-    msg.set_type(MsgProp);
+    Message msg = initMessage(1,1,MsgProp);
     *(msg.add_entries()) = entry;
     r->step(msg);
   }
@@ -806,23 +715,23 @@ TEST(raftPaperTests, TestLeaderCommitEntry) {
     r->step(acceptAndReply(msg));
   }
 
-  EXPECT_EQ(r->raftLog_->committed_, li + 1);
+  EXPECT_EQ(r->raftLog_->committed_, li + 1);  
 
-  r->readMessages(&msgs);
-
-  Entry entry;
-  entry.set_index(li + 1);
-  entry.set_term(1);
-  entry.set_data("some data");
+  Entry entry = initEntry(li + 1, 1, "some data");
   EntryVec g, wents;
   wents.push_back(entry);
+  r->raftLog_->nextEntries(&g);
+  EXPECT_TRUE(isDeepEqualEntries(g,wents));
 
+  r->readMessages(&msgs);
   for (i = 0; i < msgs.size(); ++i) {
     Message *msg = msgs[i];
     EXPECT_EQ(msg->to(), i + 2);
     EXPECT_EQ(msg->type(), MsgApp);
     EXPECT_EQ(msg->commit(), li +1);
   }
+
+  delete r;
 }
 
 // TestLeaderAcknowledgeCommit tests that a log entry is committed once the
@@ -833,63 +742,20 @@ TEST(raftPaperTests, TestLeaderAcknowledgeCommit) {
     int size;
     map<uint64_t, bool> acceptors;
     bool wack;
-
-    tmp(int size, map<uint64_t, bool> acceptors, bool ack)
-      : size(size), acceptors(acceptors), wack(ack) {}
+  } tests[] = {
+    { .size = 1, .acceptors = {}, .wack = true},
+    { .size = 3, .acceptors = {}, .wack = false},
+    { .size = 3, .acceptors = {{2,true}}, .wack = true},
+    { .size = 3, .acceptors = {{2,true},{3,true}}, .wack = true},
+    { .size = 5, .acceptors = {}, .wack = false},
+    { .size = 5, .acceptors = {{2,true},}, .wack = false},
+    { .size = 5, .acceptors = {{2,true},{3,true}}, .wack = true},
+    { .size = 5, .acceptors = {{2,true},{3,true},{4,true}}, .wack = true},
+    { .size = 5, .acceptors = {{2,true},{3,true},{4,true},{5,true}}, .wack = true},
   };
 
-  vector<tmp> tests;
-  {
-    map<uint64_t, bool> acceptors;
-    tests.push_back(tmp(1, acceptors, true));
-  }
-  {
-    map<uint64_t, bool> acceptors;
-    tests.push_back(tmp(3, acceptors, false));
-  }
-  {
-    map<uint64_t, bool> acceptors;
-    acceptors[2] = true;
-    tests.push_back(tmp(3, acceptors, true));
-  }
-  {
-    map<uint64_t, bool> acceptors;
-    acceptors[2] = true;
-    acceptors[3] = true;
-    tests.push_back(tmp(3, acceptors, true));
-  }
-  {
-    map<uint64_t, bool> acceptors;
-    tests.push_back(tmp(5, acceptors, false));
-  }
-  {
-    map<uint64_t, bool> acceptors;
-    acceptors[2] = true;
-    tests.push_back(tmp(5, acceptors, false));
-  }
-  {
-    map<uint64_t, bool> acceptors;
-    acceptors[2] = true;
-    acceptors[3] = true;
-    tests.push_back(tmp(5, acceptors, true));
-  }
-  {
-    map<uint64_t, bool> acceptors;
-    acceptors[2] = true;
-    acceptors[3] = true;
-    acceptors[4] = true;
-    tests.push_back(tmp(5, acceptors, true));
-  }
-  {
-    map<uint64_t, bool> acceptors;
-    acceptors[2] = true;
-    acceptors[3] = true;
-    acceptors[4] = true;
-    acceptors[5] = true;
-    tests.push_back(tmp(5, acceptors, true));
-  }
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp &t = tests[i];
     vector<uint64_t> peers;
     idsBySize(t.size, &peers);
@@ -903,10 +769,7 @@ TEST(raftPaperTests, TestLeaderAcknowledgeCommit) {
     {
       Entry entry;
       entry.set_data("some data");
-      Message msg;
-      msg.set_from(1);
-      msg.set_to(1);
-      msg.set_type(MsgProp);
+      Message msg = initMessage(1,1,MsgProp);
       *(msg.add_entries()) = entry;
       r->step(msg);
     }
@@ -921,6 +784,8 @@ TEST(raftPaperTests, TestLeaderAcknowledgeCommit) {
     }
 
     EXPECT_EQ(r->raftLog_->committed_ > li, t.wack);
+
+    delete r;
   }
 }
 
@@ -930,51 +795,23 @@ TEST(raftPaperTests, TestLeaderAcknowledgeCommit) {
 // Also, it applies the entry to its local state machine (in log order).
 // Reference: section 5.3
 TEST(raftPaperTests, TestLeaderCommitPrecedingEntries) {
-  vector<EntryVec> tests;
-  {
-    EntryVec entries; 
-    tests.push_back(entries);
-  }
-  {
-    Entry entry;
-    EntryVec entries; 
-    entry.set_term(2);
-    entry.set_index(1);
-    entries.push_back(entry);
-    tests.push_back(entries);
-  }
-  {
-    Entry entry;
-    EntryVec entries; 
-    entry.set_term(1);
-    entry.set_index(1);
-    entries.push_back(entry);
+  EntryVec tests[] = {
+    {},
+    {initEntry(1,2)},
+    {initEntry(1,1),initEntry(2,2)},
+    {initEntry(1,1),},
+  };
 
-    entry.set_term(2);
-    entry.set_index(2);
-    entries.push_back(entry);
-    tests.push_back(entries);
-  }
-  {
-    Entry entry;
-    EntryVec entries; 
-    entry.set_term(1);
-    entry.set_index(1);
-    entries.push_back(entry);
-
-    tests.push_back(entries);
-  }
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     EntryVec &t = tests[i];
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
-    peers.push_back(3);
+    vector<uint64_t> peers = {1,2,3};
+
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
     EntryVec appEntries = t;
     s->Append(appEntries);
     raft *r = newTestRaft(1, peers, 10, 1, s);
+
     HardState hs;
     hs.set_term(2);
     r->loadState(hs);
@@ -984,10 +821,7 @@ TEST(raftPaperTests, TestLeaderCommitPrecedingEntries) {
     {
       Entry entry;
       entry.set_data("some data");
-      Message msg;
-      msg.set_from(1);
-      msg.set_to(1);
-      msg.set_type(MsgProp);
+      Message msg = initMessage(1,1,MsgProp);
       *(msg.add_entries()) = entry;
       r->step(msg);
     }
@@ -1002,21 +836,14 @@ TEST(raftPaperTests, TestLeaderCommitPrecedingEntries) {
 
     uint64_t li = t.size();
     EntryVec g, wents = t;
-    {
-      Entry entry;
-      entry.set_term(3);
-      entry.set_index(li + 1);
-      wents.push_back(entry);
-    }
-    {
-      Entry entry;
-      entry.set_term(3);
-      entry.set_index(li + 2);
-      entry.set_data("some data");
-      wents.push_back(entry);
-    }
+
+    wents.push_back(initEntry(li + 1, 3));
+    wents.push_back(initEntry(li + 2, 3, "some data"));
+
     r->raftLog_->nextEntries(&g);
     EXPECT_TRUE(isDeepEqualEntries(g, wents)) << "i:" << i;
+
+    delete r;
   }
 }
 
