@@ -1235,125 +1235,63 @@ TEST(raftPaperTests, TestVoter) {
     uint64_t logterm;
     uint64_t index;
     bool wreject;
-
-    tmp(EntryVec ents, uint64_t lt, uint64_t i, bool wr)
-      : ents(ents), logterm(lt), index(i), wreject(wr) {}
+  } tests[] = {
+    // same logterm
+    {
+      .ents = {initEntry(1,1)},
+      .logterm = 1, .index = 1, .wreject = false,
+    },
+    {
+      .ents = {initEntry(1,1)},
+      .logterm = 1, .index = 2, .wreject = false,
+    },
+    {
+      .ents = {initEntry(1,1),initEntry(2,1)},
+      .logterm = 1, .index = 1, .wreject = true,
+    },  
+    // candidate higher logterm
+    {
+      .ents = {initEntry(1,1),},
+      .logterm = 2, .index = 1, .wreject = false,
+    },
+    {
+      .ents = {initEntry(1,1),},
+      .logterm = 2, .index = 2, .wreject = false,
+    },     
+    {
+      .ents = {initEntry(1,1),initEntry(2,1)},
+      .logterm = 2, .index = 1, .wreject = false,
+    },
+    // voter higher logterm      
+    {
+      .ents = {initEntry(1,2),},
+      .logterm = 1, .index = 1, .wreject = true,
+    },
+    {
+      .ents = {initEntry(1,2),},
+      .logterm = 1, .index = 2, .wreject = true,
+    },     
+    {
+      .ents = {initEntry(1,2),initEntry(2,1)},
+      .logterm = 1, .index = 1, .wreject = true,
+    },
   };
 
-  vector<tmp> tests;
-  // same logterm
-  {
-    EntryVec ents;
-    Entry entry;
-    entry.set_term(1);
-    entry.set_index(1);
-    ents.push_back(entry);
-    
-    tests.push_back(tmp(ents, 1, 1, false));
-  }
-  {
-    EntryVec ents;
-    Entry entry;
-    entry.set_term(1);
-    entry.set_index(1);
-    ents.push_back(entry);
-    
-    tests.push_back(tmp(ents, 1, 2, false));
-  }
-  {
-    EntryVec ents;
-    Entry entry;
-    entry.set_term(1);
-    entry.set_index(1);
-    ents.push_back(entry);
-    
-    entry.set_term(1);
-    entry.set_index(2);
-    ents.push_back(entry);
-    tests.push_back(tmp(ents, 1, 1, true));
-  }
-  // candidate higher logterm
-  {
-    EntryVec ents;
-    Entry entry;
-    entry.set_term(1);
-    entry.set_index(1);
-    ents.push_back(entry);
-    
-    tests.push_back(tmp(ents, 2, 1, false));
-  }
-  {
-    EntryVec ents;
-    Entry entry;
-    entry.set_term(1);
-    entry.set_index(1);
-    ents.push_back(entry);
-    
-    tests.push_back(tmp(ents, 2, 2, false));
-  }
-  {
-    EntryVec ents;
-    Entry entry;
-    entry.set_term(1);
-    entry.set_index(1);
-    ents.push_back(entry);
-    
-    entry.set_term(1);
-    entry.set_index(2);
-    ents.push_back(entry);
-    tests.push_back(tmp(ents, 2, 1, false));
-  }
-  // voter higher logterm
-  {
-    EntryVec ents;
-    Entry entry;
-    entry.set_term(2);
-    entry.set_index(1);
-    ents.push_back(entry);
-    
-    tests.push_back(tmp(ents, 1, 1, true));
-  }
-  {
-    EntryVec ents;
-    Entry entry;
-    entry.set_term(2);
-    entry.set_index(1);
-    ents.push_back(entry);
-    
-    tests.push_back(tmp(ents, 1, 2, true));
-  }
-  {
-    EntryVec ents;
-    Entry entry;
-    entry.set_term(2);
-    entry.set_index(1);
-    ents.push_back(entry);
-    
-    entry.set_term(1);
-    entry.set_index(2);
-    ents.push_back(entry);
-    tests.push_back(tmp(ents, 1, 1, true));
-  }
-
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp& t = tests[i];
     
-    vector<uint64_t> peers;
-    peers.push_back(1);
-    peers.push_back(2);
+    vector<uint64_t> peers = {1,2};
+
     MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
     s->Append(t.ents);
     raft *r = newTestRaft(1, peers, 10, 1, s);
 
 		{
-			Message msg;
-			msg.set_from(2);
-			msg.set_to(1);
+			Message msg = initMessage(2,1,MsgVote);
 			msg.set_term(3);
 			msg.set_logterm(t.logterm);
 			msg.set_index(t.index);
-			msg.set_type(MsgVote);
 			r->step(msg);
 		}
 
@@ -1365,6 +1303,8 @@ TEST(raftPaperTests, TestVoter) {
     
     EXPECT_EQ(msg->type(), MsgVoteResp);
     EXPECT_EQ(msg->reject(), t.wreject);
+
+    delete r;
   }
 }
 
@@ -1372,42 +1312,29 @@ TEST(raftPaperTests, TestVoter) {
 // current term are committed by counting replicas.
 // Reference: section 5.4.2
 TEST(raftPaperTests, TestLeaderOnlyCommitsLogFromCurrentTerm) {
-  EntryVec entries; 
-  {
-    Entry entry;
-    entry.set_term(1);
-    entry.set_index(1);
-    entries.push_back(entry);
-  }
-  {
-    Entry entry;
-    entry.set_term(2);
-    entry.set_index(2);
-    entries.push_back(entry);
-  }
+  EntryVec entries = {
+    initEntry(1,1),
+    initEntry(2,2),
+  }; 
+
   struct tmp {
     uint64_t index, wcommit;
-    tmp(uint64_t i, uint64_t w) 
-      : index(i), wcommit(w){}
+  } tests[] = {
+    // do not commit log entries in previous terms
+    {.index = 1, .wcommit = 0},
+    {.index = 2, .wcommit = 0},
+    // commit log in current term
+    {.index = 3, .wcommit = 3},
   };
 
-  vector<tmp> tests;
-  // do not commit log entries in previous terms
-  tests.push_back(tmp(1, 0));
-  tests.push_back(tmp(2, 0));
-  // commit log in current term
-  tests.push_back(tmp(3, 3));
-
   size_t i;
-  for (i = 0; i < tests.size(); ++i) {
+  for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp& t = tests[i];
     EntryVec ents = entries;
 
 		MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
     s->Append(ents);
-		vector<uint64_t> peers;
-		peers.push_back(1);
-		peers.push_back(2);
+		vector<uint64_t> peers = {1,2};
 		raft *r = newTestRaft(1, peers, 10, 1, s);
 
     HardState hs;
@@ -1424,24 +1351,22 @@ TEST(raftPaperTests, TestLeaderOnlyCommitsLogFromCurrentTerm) {
     // propose a entry to current term
     {
       Entry entry;
-      Message msg;
-      msg.set_from(1);
-      msg.set_to(1);
-      msg.set_type(MsgProp);
+      Message msg = initMessage(1,1,MsgProp);
       msg.add_entries();
       r->step(msg);
     }
     {
       Entry entry;
-      Message msg;
-      msg.set_from(2);
-      msg.set_to(1);
+      Message msg = initMessage(2,1,MsgAppResp);
+
       msg.set_term(r->term_);
       msg.set_index(t.index);
-      msg.set_type(MsgAppResp);
+
       r->step(msg);
     }
 
     EXPECT_EQ(r->raftLog_->committed_, t.wcommit);
+
+    delete r;
   }
 }
