@@ -44,7 +44,7 @@ make
 
 
 ## Acknowledgement
-libraft was ported from Etcd's raft module[etcd/raft](https://github.com/etcd-io/etcd/tree/master/raft) with some optimizing and improvement. Thanks to the etcd team for opening up such a great RAFT implementation.
+libraft was ported from Etcd's raft module [etcd/raft](https://github.com/etcd-io/etcd/tree/master/raft) with some optimizing and improvement. Thanks to the etcd team for opening up such a great RAFT implementation.
 
 ## License
 libraft is licensed under the [Apache License 2.0](./LICENSE). 
