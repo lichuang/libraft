@@ -9,25 +9,10 @@ mkdir -p ${third_party}
 
 protobuf=protobuf-3.14.0
 gtest=googletest-release-1.8.0
-gflags=gflags-2.2.2
-libevent=libevent-2.1.12-stable
 
 mkdir -p ${third_party}/include
 mkdir -p ${third_party}/lib
 mkdir -p ${third_party}/bin
-
-cd $pwd/deps
-echo "compile ${gflags}..."
-rm -fr ${gflags}
-tar xvf ${gflags}.tar.gz
-cd ${gflags}
-cmake .
-make -j8
-cp -r include/gflags ${third_party}/include/
-cp -r lib/* ${third_party}/lib/
-cd ../
-rm -fr ${gflags}
-echo "compile ${gflags} done"
 
 cd $pwd/deps
 echo "compile ${gtest}..."
@@ -56,20 +41,5 @@ make install
 cd ..
 rm -fr ${protobuf}
 echo "compile ${protobuf} done"
-
-cd ${pwd}
-
-cd $pwd/deps
-echo "compile ${libevent}..."
-rm -fr ${libevent}
-tar xvf ${libevent}.tar.gz
-cd ${libevent}
-./autogen.sh
-./configure --prefix=${third_party} --disable-openssl
-make -j6
-make install
-cd ..
-rm -fr ${libevent}
-echo "compile ${libevent} done"
 
 cd ${pwd}
