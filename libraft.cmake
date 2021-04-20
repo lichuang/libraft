@@ -1,6 +1,5 @@
 set(libraft_files
   src/proto/raft.pb.cc 
-  src/proto/record.pb.cc 
 
   src/base/default_logger.cc 
   src/base/crc32c.cc
