@@ -16,8 +16,6 @@ set(libraft_files
   src/storage/log.cc    
   src/storage/memory_storage.cc      
   src/storage/unstable_log.cc  
-
-  src/wal/decoder.cc
 )
 
 add_library(raft 
