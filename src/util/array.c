@@ -51,11 +51,6 @@ array_push_batch(array_t *array, const void *data, int n) {
   array->size += n;
 }
 
-void 
-array_push(array_t *array, const void *data) {
-  array_push_batch(array, data, 1);
-}
-
 void* 
 array_pop(array_t *array) {
   if (array->size == 0) {
@@ -71,19 +66,40 @@ array_get(array_t *array, size_t index) {
   
   void* d = ARRAY_GET_ELEM(array, index);
   
-  return *(void**)d;
+  //return *(void**)d;
+  return d;
 }
 
 void 
 array_erase(array_t *array, size_t from, size_t to) {
   assert(to < array->size && from < to);
 
-
+  char *start = (char*)array->data + from * array->elem_size;
+  char *end   = (char*)array->data + to  * array->elem_size;
+  size_t remain = array->size - to;
+  memmove(start, end, remain * array->elem_size);
+  array->size -= to - from;
 }
 
 void 
 array_insert_array(array_t *array, size_t index, const array_t *a) {
+  assert(index < array->size);
+  assert(array->elem_size == a->elem_size);
 
+  size_t a_size = array_size(a);
+  ensure_array_size(array, a_size);
+  
+  char *start = (char*)array->data + (array->size+a_size) * array->elem_size;
+  char *end   = (char*)array->data + index * array->elem_size;
+  
+  // first:move hole space
+  size_t remain = array->size - index;
+  memmove(start, end, remain * array->elem_size);
+
+  // second:add new array
+  memmove(end, a->data, a_size * array->elem_size);
+
+  array->size += a_size;
 }
 
 void 
