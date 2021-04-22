@@ -6,37 +6,8 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
-set(CXX_FLAGS
- -g
- -O0
- # -DVALGRIND
- -DCHECK_PTHREAD_RETURN_VALUE
- -D_FILE_OFFSET_BITS=64
- -Wall
- -Wextra
- -Werror
- #-Wconversion
- -Wno-unused-parameter
- #-Wold-style-cast
- -Wno-implicit-fallthrough
- -Woverloaded-virtual
- -Wpointer-arith
- -Wshadow
- -Wwrite-strings
- -march=native
- # -MMD
- -std=c++11
- -rdynamic
- )
-
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  list(APPEND CXX_FLAGS "-Wno-null-dereference")
-  list(APPEND CXX_FLAGS "-Wno-sign-conversion")
-  list(APPEND CXX_FLAGS "-Wno-unused-local-typedef")
-  list(APPEND CXX_FLAGS "-Wthread-safety")
-  list(REMOVE_ITEM CXX_FLAGS "-rdynamic")
-endif()
-string(REPLACE ";" " " CMAKE_CXX_FLAGS "${CXX_FLAGS}")
+SET(CMAKE_C_STANDARD 11)
+SET(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(CMAKE_CXX_FLAGS_DEBUG "-O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
