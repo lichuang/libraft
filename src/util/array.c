@@ -2,9 +2,9 @@
  * Copyright (C) lichuang
  */
 
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include "util/assert.h"
 #include "util/array.h"
 
 const static size_t min_size = 8;
@@ -66,7 +66,7 @@ array_pop(array_t *array) {
 
 void* 
 array_get(array_t *array, size_t index) {
-  assert(index < array->size);
+  ASSERT(index < array->size);
   
   void* d = ARRAY_GET_ELEM(array, index);
   
@@ -76,7 +76,7 @@ array_get(array_t *array, size_t index) {
 
 void 
 array_erase(array_t *array, size_t from, size_t to) {
-  assert(to < array->size && from < to);
+  ASSERT(to < array->size && from < to);
 
   char *start = (char*)array->data + from * array->elem_size;
   char *end   = (char*)array->data + to  * array->elem_size;
@@ -87,8 +87,8 @@ array_erase(array_t *array, size_t from, size_t to) {
 
 void 
 array_insert_array(array_t *array, size_t index, const array_t *a) {
-  assert(index < array->size);
-  assert(array->elem_size == a->elem_size);
+  ASSERT(index < array->size);
+  ASSERT(array->elem_size == a->elem_size);
 
   size_t a_size = array_size(a);
   ensure_array_size(array, a_size);
@@ -108,7 +108,7 @@ array_insert_array(array_t *array, size_t index, const array_t *a) {
 
 void 
 array_copy(array_t *array, array_t *from) {
-  assert(array->elem_size == from->elem_size);
+  ASSERT(array->elem_size == from->elem_size);
   size_t a_size = array_size(from);
   
   ensure_array_size(array, a_size);
