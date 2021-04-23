@@ -11,19 +11,23 @@ const static size_t min_size = 8;
 
 #define ARRAY_GET_ELEM(array, index) ((void*)((char*)((array)->data) + (index) * (array)->elem_size))
 
-void 
-array_init(array_t* array, size_t elem_size) {
+array_t* 
+array_create(size_t elem_size) {
+  array_t *array = (array_t*)malloc(sizeof(array_t));
   *array = (array_t) {
     .size = 0,
     .capacity = min_size,
     .elem_size = elem_size,
     .data = malloc(elem_size * min_size),
   };
+
+  return array;
 }
 
 void 
 array_destroy(array_t* array) {
   free(array->data);
+  free(array);
 }
 
 static inline void
@@ -105,5 +109,13 @@ array_insert_array(array_t *array, size_t index, const array_t *a) {
 void 
 array_copy(array_t *array, array_t *from) {
   assert(array->elem_size == from->elem_size);
+  size_t a_size = array_size(from);
+  
+  ensure_array_size(array, a_size);
 
+  char *start = (char*)array->data;
+  char *start_from   = (char*)from->data;
+  memmove(start, start_from, a_size * array->elem_size);
+
+  array->size = a_size;
 }

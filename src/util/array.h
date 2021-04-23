@@ -18,11 +18,11 @@ typedef struct array_t {
   void* data;
 } array_t;
 
-void array_init(array_t*, size_t elem_size);
+array_t* array_create(size_t elem_size);
 
 void array_destroy(array_t* array);
 
-static inline size_t array_size(array_t* array) {
+static inline size_t array_size(const array_t* array) {
   return array->size;
 }
 

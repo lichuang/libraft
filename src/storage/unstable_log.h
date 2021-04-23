@@ -18,7 +18,7 @@ typedef struct unstable_log_t {
   snapshot_t* snapshot;
 
   // all entries that have not yet been written to storage.
-  array_t entries;
+  array_t* entries;
 
   uint64_t offset;
 

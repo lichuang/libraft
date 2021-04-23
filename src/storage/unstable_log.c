@@ -11,7 +11,7 @@ unstable_log_t*
 unstable_log_create() { 
   unstable_log_t* unstable = (unstable_log_t*)malloc(sizeof(unstable_log_t));
   
-  array_init(&unstable->entries, sizeof(entry_t));
+  unstable->entries = array_create(sizeof(entry_t));
   *unstable = (unstable_log_t) {
     .snapshot = NULL,
     .offset = 0,
@@ -22,7 +22,7 @@ unstable_log_create() {
 
 void 
 unstable_log_destroy(unstable_log_t* unstable) {
-  array_destroy(&unstable->entries);
+  array_destroy(unstable->entries);
 
   free(unstable);
 }
@@ -41,8 +41,8 @@ unstable_log_maybe_first_index(unstable_log_t* unstable, uint64_t* first) {
 bool 
 unstable_log_maybe_last_index(unstable_log_t* unstable, uint64_t* last) {  
   // first check entries
-  if (array_size(&unstable->entries) > 0) {
-    *last = unstable->offset + array_size(&unstable->entries) - 1;
+  if (array_size(unstable->entries) > 0) {
+    *last = unstable->offset + array_size(unstable->entries) - 1;
     return true;
   }
 
@@ -80,7 +80,7 @@ unstable_log_maybe_term(unstable_log_t* unstable, raft_index_t i, raft_term_t* t
     return false;
   }
 
-  entry_t* entry = array_get(&unstable->entries, i - unstable->offset);
+  entry_t* entry = array_get(unstable->entries, i - unstable->offset);
   *term = entry->term;
   return true;
 }
@@ -98,7 +98,7 @@ unstable_log_stable_to(unstable_log_t* unstable, raft_index_t i, raft_term_t t) 
   // only update the unstable entries if term is matched with
   // an unstable entry.
   if (gt == t && i >= offset) {
-    array_erase(&unstable->entries, 0, i + 1 - offset);
+    array_erase(unstable->entries, 0, i + 1 - offset);
     unstable->offset = i + 1;
   }
 }
@@ -119,7 +119,7 @@ unstable_log_stable_snap_to(unstable_log_t* unstable, raft_index_t i) {
 void 
 unstable_log_restore(unstable_log_t* unstable, const snapshot_t* snapshot) {
   unstable->offset = snapshot->meta.index + 1;
-  array_clear(&unstable->entries);
+  array_clear(unstable->entries);
   if (unstable->snapshot == NULL) {
     unstable->snapshot = (snapshot_t*)malloc(sizeof(snapshot_t));
   }
@@ -137,7 +137,7 @@ unstable_log_truncate_and_append(unstable_log_t* unstable, array_t* entries) {
   if (after == offset + array_size(entries)) {
     // after is the next index in the u.entries
     // directly append
-    array_insert_array(&unstable->entries, array_end(&unstable->entries), entries);
+    array_insert_array(unstable->entries, array_end(unstable->entries), entries);
     return;    
   }
 
@@ -145,17 +145,16 @@ unstable_log_truncate_and_append(unstable_log_t* unstable, array_t* entries) {
     // The log is being truncated to before our current offset
     // portion, so set the offset and replace the entries
     unstable->offset = after;
-    array_copy(&unstable->entries, entries);
+    array_copy(unstable->entries, entries);
     return;
   }
 
   // truncate to after and copy to u.entries then append
-  array_t slice;
-  array_init(&slice, sizeof(entry_t));
-  unstable_log_slice(unstable, offset, after, &slice);
-  array_copy(&unstable->entries, &slice);
-  array_destroy(&slice);
-  array_insert_array(&unstable->entries, array_end(&unstable->entries), entries);
+  array_t *slice = array_create(sizeof(entry_t));
+  unstable_log_slice(unstable, offset, after, slice);
+  array_copy(unstable->entries, slice);
+  array_destroy(slice);
+  array_insert_array(unstable->entries, array_end(unstable->entries), entries);
 }
 
 static void
@@ -165,7 +164,7 @@ must_check_out_of_bounds(unstable_log_t* unstable,raft_index_t lo, raft_index_t 
   }
 
   raft_index_t offset = unstable->offset;
-  raft_index_t upper = offset + offset + array_size(&unstable->entries);
+  raft_index_t upper = offset + offset + array_size(unstable->entries);
   if (lo < offset || upper < hi) {
 
   }
