@@ -107,15 +107,32 @@ array_insert_array(array_t *array, size_t index, const array_t *a) {
 }
 
 void 
-array_copy(array_t *array, array_t *from) {
-  ASSERT(array->elem_size == from->elem_size);
-  size_t a_size = array_size(from);
-  
-  ensure_array_size(array, a_size);
+__array_assign(array_t *array, void* from, size_t new_size) {  
+  size_t a_size = new_size / array->size;
+  ensure_array_size(array, new_size);
 
   char *start = (char*)array->data;
-  char *start_from   = (char*)from->data;
-  memmove(start, start_from, a_size * array->elem_size);
+  memmove(start, from, new_size);
 
   array->size = a_size;
+}
+
+void 
+array_copy(array_t *array, array_t *from) {
+  ASSERT(array->elem_size == from->elem_size);
+  size_t a_size = array_size(from);  
+  char *start_from   = (char*)from->data;
+
+  __array_assign(array, start_from, a_size * array->size);
+}
+
+void 
+array_assign(array_t *array, array_t* a, size_t from, size_t to) {
+  ASSERT(array->elem_size == a->elem_size);
+  ASSERT(to < a->size && from < to);
+
+  size_t a_size = to - from;
+  char *start_from   = (char*)a->data + from * array->elem_size;
+
+  __array_assign(array, start_from, a_size * array->size);
 }

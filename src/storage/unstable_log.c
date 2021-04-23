@@ -157,22 +157,28 @@ unstable_log_truncate_and_append(unstable_log_t* unstable, array_t* entries) {
   array_insert_array(unstable->entries, array_end(unstable->entries), entries);
 }
 
-static void
+static bool
 must_check_out_of_bounds(unstable_log_t* unstable,raft_index_t lo, raft_index_t hi) {
   if (lo > hi) {
-
+    return false;
   }
 
   raft_index_t offset = unstable->offset;
   raft_index_t upper = offset + offset + array_size(unstable->entries);
   if (lo < offset || upper < hi) {
-
+    return false;
   }
+
+  return true;
 }
 
 void 
 unstable_log_slice(unstable_log_t* unstable, raft_index_t lo, raft_index_t hi, array_t* entries) {
   assert(entries->elem_size == sizeof(entry_t));
 
-  must_check_out_of_bounds(unstable, lo, hi);
+  if (!must_check_out_of_bounds(unstable, lo, hi)) {
+    return;
+  }
+
+  array_assign(unstable->entries, entries, lo - unstable->offset, hi - unstable->offset);
 }

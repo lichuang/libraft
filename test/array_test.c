@@ -109,3 +109,33 @@ CTEST(array_test, test_copy) {
   array_destroy(test1);
   array_destroy(test2);
 }
+
+CTEST(array_test, test_assign) {
+  array_t *test1 = array_create(sizeof(int));
+  array_t *test2 = array_create(sizeof(int));
+
+  int i;
+  for (i = 0; i < 5; ++i) {
+    array_push(test1, &i);
+  }
+
+  for (i = 10; i < 25; ++i) {
+    array_push(test2, &i);
+  }
+
+  // before copy
+  size_t index = 2;
+  int* j = array_get(test1, index);
+  ASSERT_EQUAL(*j, index);
+  ASSERT_EQUAL(array_size(test1), 5);
+
+  array_assign(test1, test2, 2, 5);
+
+  // after copy
+  j = array_get(test1, index);
+  ASSERT_EQUAL(*j, 14);
+  ASSERT_EQUAL(array_size(test1), 3);
+
+  array_destroy(test1);
+  array_destroy(test2);
+}

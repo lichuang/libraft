@@ -49,6 +49,8 @@ static inline void array_push(array_t *array, const void *data) {
   array_push_batch(array, data, 1);
 }
 
+void array_assign(array_t *array, array_t* a, size_t from, size_t to);
+
 void* array_pop(array_t *array);
 
 #ifdef __cplusplus
