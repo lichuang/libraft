@@ -26,14 +26,16 @@ array_create(size_t elem_size) {
 }
 
 array_t* 
-array_createf(size_t elem_size, void* args, ...) {
+array_createf(size_t elem_size, ...) {
   array_t *array = array_create(elem_size);
+  void *arg = NULL;
 
   va_list ap;
-  va_start(ap, args);
-  while (args != NULL) {
-    array_push(array, args);
-    args = va_arg(ap,void*);
+  va_start(ap, elem_size);
+  arg = va_arg(ap,void*);
+  while (arg != NULL) {
+    array_push(array, arg);
+    arg = va_arg(ap,void*);
   }
   va_end(ap);
 

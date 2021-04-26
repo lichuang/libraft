@@ -5,6 +5,20 @@
 #include "ctest.h"
 #include "util/array.h"
 
+CTEST(array_test, test_createf) {
+  int i = 1, j = 2;
+  array_t *test = array_createf(sizeof(int*), &i, &j,NULL);
+
+  ASSERT_EQUAL(array_size(test), 2);
+  int* p = array_get(test, 0);
+  ASSERT_EQUAL(*p, 1);
+
+  p = array_get(test, 1);
+  ASSERT_EQUAL(*p, 2);
+
+  array_destroy(test);
+}
+
 CTEST(array_test, test_push_pop) {
   array_t *test = array_create(sizeof(int));
 

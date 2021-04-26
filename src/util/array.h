@@ -28,7 +28,7 @@ struct array_t {
 
 array_t* array_create(size_t elem_size);
 
-array_t* array_createf(size_t elem_size, void* args,...);
+array_t* array_createf(size_t elem_size,...);
 
 static inline void array_set_free(array_t *array, void (*free) (void*)) {
   array->free = free;
