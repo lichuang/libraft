@@ -4,8 +4,8 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "util/assert.h"
 #include "util/array.h"
+#include "util/assert.h"
 
 const static size_t min_size = 8;
 
@@ -19,14 +19,38 @@ array_create(size_t elem_size) {
     .capacity = min_size,
     .elem_size = elem_size,
     .data = malloc(elem_size * min_size),
+    .free = NULL,
   };
+
+  return array;
+}
+
+array_t* 
+array_createf(size_t elem_size, void* args, ...) {
+  array_t *array = array_create(elem_size);
+
+  va_list ap;
+  va_start(ap, args);
+  while (args != NULL) {
+    array_push(array, args);
+    args = va_arg(ap,void*);
+  }
+  va_end(ap);
 
   return array;
 }
 
 void 
 array_destroy(array_t* array) {
-  free(array->data);
+  if (array->free) {
+    size_t i;
+    for (i = 0; i < array->size; ++i) {
+      array->free(ARRAY_GET_ELEM(array, i));
+    }
+  } else {
+    free(array->data);
+  }
+  
   free(array);
 }
 
@@ -45,14 +69,16 @@ ensure_array_size(array_t *array, int n) {
   array->data = realloc(array->data, array->elem_size * array->capacity);
 }
 
-void 
-array_push_batch(array_t *array, const void *data, int n) {
+array_t* 
+array_push_batch(array_t *array, void *data, int n) {
   ensure_array_size(array, n);
 
   void* dst = ARRAY_GET_ELEM(array, array->size);
   memcpy(dst, data, array->elem_size * n);
 
   array->size += n;
+
+  return array;
 }
 
 void* 
@@ -108,8 +134,8 @@ array_insert_array(array_t *array, size_t index, const array_t *a) {
 
 void 
 __array_assign(array_t *array, void* from, size_t new_size) {  
-  size_t a_size = new_size / array->size;
-  ensure_array_size(array, new_size);
+  size_t a_size = new_size / array->elem_size;
+  ensure_array_size(array, a_size);
 
   char *start = (char*)array->data;
   memmove(start, from, new_size);
@@ -123,7 +149,7 @@ array_copy(array_t *array, array_t *from) {
   size_t a_size = array_size(from);  
   char *start_from   = (char*)from->data;
 
-  __array_assign(array, start_from, a_size * array->size);
+  __array_assign(array, start_from, a_size * array->elem_size);
 }
 
 void 

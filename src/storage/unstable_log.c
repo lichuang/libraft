@@ -7,15 +7,21 @@
 #include <string.h>
 #include "unstable_log.h"
 
+static inline destroy_entry(void* entry) { 
+  free(entry);
+}
+
 unstable_log_t* 
 unstable_log_create() { 
   unstable_log_t* unstable = (unstable_log_t*)malloc(sizeof(unstable_log_t));
   
-  unstable->entries = array_create(sizeof(entry_t));
   *unstable = (unstable_log_t) {
     .snapshot = NULL,
     .offset = 0,
+    .entries = array_create(sizeof(entry_t*)),
   };
+
+  array_set_free(unstable->entries, destroy_entry);
 
   return unstable;
 }
