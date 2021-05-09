@@ -45,6 +45,18 @@ destroy_test_snapshot(snapshot_t* sn) {
   }
 }
 
+bool is_deep_equal_snapshot(snapshot_t* s1, snapshot_t* s2) {
+  if (s1 == NULL || s2 == NULL) {
+    return false;
+  }
+
+  if (s1->meta.index != s2->meta.index || s1->meta.term != s2->meta.term) {
+    return false;
+  }
+
+  return true;
+}
+
 #define SIZEOF_ARRAY(array) sizeof(array) / sizeof(array[0])
 
 #endif

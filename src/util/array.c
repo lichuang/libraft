@@ -26,16 +26,19 @@ array_create(size_t elem_size) {
 }
 
 array_t* 
-array_createf(size_t elem_size, ...) {
+array_createf(size_t elem_size, bool delete_after_init, ...) {
   array_t *array = array_create(elem_size);
   void *arg = NULL;
 
   va_list ap;
-  va_start(ap, elem_size);
+  va_start(ap, delete_after_init);
   arg = va_arg(ap,void*);
   while (arg != NULL) {
     array_push(array, arg);
     arg = va_arg(ap,void*);
+    if (delete_after_init) {
+      free(arg);
+    }
   }
   va_end(ap);
 
@@ -46,7 +49,7 @@ void
 array_destroy(array_t* array) {
   if (array->free) {
     size_t i;
-    for (i = 0; i < array->size; ++i) {
+    for (i = 0; i < array->size; i++) {
       array->free(ARRAY_GET_ELEM(array, i));
     }
   } else {
@@ -71,7 +74,7 @@ ensure_array_size(array_t *array, int n) {
   array->data = realloc(array->data, array->elem_size * array->capacity);
 }
 
-array_t* 
+array_t*
 array_push_batch(array_t *array, void *data, int n) {
   ensure_array_size(array, n);
 
@@ -83,8 +86,8 @@ array_push_batch(array_t *array, void *data, int n) {
   return array;
 }
 
-void* 
-array_pop(array_t *array) {
+void*
+array_pop_back(array_t *array) {
   if (array->size == 0) {
     return NULL;
   }
@@ -92,7 +95,7 @@ array_pop(array_t *array) {
   return ARRAY_GET_ELEM(array, array->size);  
 }
 
-void* 
+void*
 array_get(array_t *array, size_t index) {
   ASSERT(index < array->size);
   
@@ -104,12 +107,21 @@ array_get(array_t *array, size_t index) {
 
 void 
 array_erase(array_t *array, size_t from, size_t to) {
-  ASSERT(to < array->size && from < to);
+  ASSERT(to <= array->size && from < to);
 
   char *start = (char*)array->data + from * array->elem_size;
-  char *end   = (char*)array->data + to  * array->elem_size;
+  char *end   = (char*)array->data + to   * array->elem_size;
+  if (array->free) {
+    char *p = start;
+    do {
+      array->free(p);
+      p += array->elem_size;
+    } while (p < end);
+  }
   size_t remain = array->size - to;
-  memmove(start, end, remain * array->elem_size);
+  if (remain > 0) {
+    memmove(start, end, remain * array->elem_size);
+  }
   array->size -= to - from;
 }
 

@@ -23,7 +23,9 @@ unstable_log_create() {
 void 
 unstable_log_destroy(unstable_log_t* unstable) {
   array_destroy(unstable->entries);
-
+  if (unstable->snapshot) {
+    free(unstable->snapshot);
+  }
   free(unstable);
 }
 
@@ -90,8 +92,7 @@ unstable_log_maybe_term(unstable_log_t* unstable, raft_index_t i, raft_term_t* t
 }
 
 void 
-unstable_log_stable_to(unstable_log_t* unstable, raft_index_t i, raft_term_t t) {
-  raft_index_t offset = unstable->offset;
+unstable_log_stable_to(unstable_log_t* unstable, raft_index_t i, raft_term_t t) {  
   raft_term_t gt;
   bool ok = unstable_log_maybe_term(unstable, i, &gt);
   if (!ok) {
@@ -101,6 +102,7 @@ unstable_log_stable_to(unstable_log_t* unstable, raft_index_t i, raft_term_t t) 
   // if i < offset, term is matched with the snapshot
   // only update the unstable entries if term is matched with
   // an unstable entry.
+  raft_index_t offset = unstable->offset;
   if (gt == t && i >= offset) {
     array_erase(unstable->entries, 0, i + 1 - offset);
     unstable->offset = i + 1;

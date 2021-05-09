@@ -5,6 +5,7 @@
 #ifndef __LIB_RAFT_ARRAY_H__
 #define __LIB_RAFT_ARRAY_H__
 
+#include <stdbool.h>
 #include <stddef.h>
 /* for varags */
 #include <stdarg.h>
@@ -28,7 +29,9 @@ struct array_t {
 
 array_t* array_create(size_t elem_size);
 
-array_t* array_createf(size_t elem_size,...);
+// create array with varags parameters, 
+// delete_after_init means if delete the parameters immediately after init
+array_t* array_createf(size_t elem_size, bool delete_after_init, ...);
 
 static inline void array_set_free(array_t *array, void (*free) (void*)) {
   array->free = free;
@@ -69,7 +72,7 @@ static inline array_t* array_push(array_t *array, void *data) {
 
 void array_assign(array_t *array, array_t* a, size_t from, size_t to);
 
-void* array_pop(array_t *array);
+void* array_pop_back(array_t *array);
 
 #ifdef __cplusplus
 }

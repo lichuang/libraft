@@ -2,12 +2,13 @@
  * Copyright (C) lichuang
  */
 
+#include <stdlib.h>
 #include "ctest.h"
 #include "util/array.h"
 
 CTEST(array_test, test_createf) {
   int i = 1, j = 2;
-  array_t *test = array_createf(sizeof(int*), &i, &j,NULL);
+  array_t *test = array_createf(sizeof(int*), false, &i, &j,NULL);
 
   ASSERT_EQUAL(array_size(test), 2);
   int* p = array_get(test, 0);
@@ -31,7 +32,7 @@ CTEST(array_test, test_push_pop) {
 
   --i;
   for (; i >= 0; --i) {
-    int* j = array_pop(test);
+    int* j = array_pop_back(test);
     ASSERT_EQUAL(*j, i);
   }
 
@@ -152,4 +153,23 @@ CTEST(array_test, test_assign) {
 
   array_destroy(test1);
   array_destroy(test2);
+}
+
+static void
+free_test_int(void* i) {
+  free(i);
+}
+
+CTEST(array_test, test_assign_and_free) {
+  array_t *test1 = array_create(sizeof(int));
+
+  int i;
+  for (i = 0; i < 5; ++i) {
+    int *j = (int*)malloc(sizeof(int));
+    *j = i;
+    array_push(test1, j);
+  }
+
+  //array_set_free(test1, free_test_int);
+  array_destroy(test1);
 }
