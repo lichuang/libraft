@@ -20,18 +20,19 @@ array_create(size_t elem_size) {
     .elem_size = elem_size,
     .data = malloc(elem_size * k_min_size),
     .free = NULL,
+    .cmp  = NULL,
   };
 
   return array;
 }
 
 array_t* 
-array_createf(size_t elem_size, bool delete_after_init, ...) {
+array_createf(bool delete_after_init, size_t elem_size, ...) {
   array_t *array = array_create(elem_size);
   void *arg = NULL;
 
   va_list ap;
-  va_start(ap, delete_after_init);
+  va_start(ap, elem_size);
   arg = va_arg(ap,void*);
   while (arg != NULL) {
     array_push(array, arg);
@@ -147,6 +148,21 @@ array_insert_array(array_t *array, size_t index, const array_t *a) {
 }
 
 void 
+array_append_array(array_t *array, const array_t *a) {
+  ASSERT(array->elem_size == a->elem_size);
+
+  size_t a_size = a->size;
+  ensure_array_size(array, a_size);
+  
+  size_t index = array->size;
+  char *end   = (char*)array->data + index * array->elem_size;
+
+  memmove(end, a->data, a_size * array->elem_size);
+
+  array->size += a_size;
+}
+
+void 
 __array_assign(array_t *array, void* from, size_t new_size) {  
   size_t a_size = new_size / array->elem_size;
   ensure_array_size(array, a_size);
@@ -167,12 +183,42 @@ array_copy(array_t *array, array_t *from) {
 }
 
 void 
-array_assign(array_t *array, array_t* a, size_t from, size_t to) {
+array_assign_array(array_t *array, array_t* a, size_t from, size_t to) {
   ASSERT(array->elem_size == a->elem_size);
-  ASSERT(to < a->size && from < to);
+  ASSERT(to <= a->size && from < to);
 
   size_t a_size = to - from;
   char *start_from   = (char*)a->data + from * array->elem_size;
 
-  __array_assign(array, start_from, a_size * array->size);
+  __array_assign(array, start_from, a_size * array->elem_size);
+}
+
+void
+array_assign(array_t *array, void *data) {
+  array_clear(array);
+  array_push(array, data);
+}
+
+bool 
+array_equal(array_t *a1, array_t *a2) {
+  ASSERT(a1->elem_size == a2->elem_size);
+
+  if (a1->size != a2->size) {
+    return false;
+  }
+
+  size_t i;
+  for (i = 0; i < a1->size; i++) {
+    void *p1 = array_get(a1, i);
+    void *p2 = array_get(a2, i);
+    if (a1->cmp != NULL) {
+      if (!a1->cmp(p1, p2)) {
+        return false;
+      }
+    } else if (memcmp(p1, p2, a1->elem_size) != 0) {
+      return false;
+    }
+  }
+
+  return true;
 }

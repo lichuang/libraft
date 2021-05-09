@@ -17,7 +17,7 @@ CTEST(unstable_log_test, TestUnstableMaybeFirstIndex) {
   } tests[] = {
     // no snapshot
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),  init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = NULL,
       .wok = false, .windex = 0,
     },
@@ -28,7 +28,7 @@ CTEST(unstable_log_test, TestUnstableMaybeFirstIndex) {
     },    
     // has snapshot
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),  init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = create_test_snapshot(4,1),
       .wok = true, .windex = 5,
     }, 
@@ -68,12 +68,12 @@ CTEST(unstable_log_test, TestMaybeLastIndex) {
   } tests[] = {
     // last in entries
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = NULL,
       .wok = true, .windex = 5,
     },    
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = create_test_snapshot(4,1),
       .wok = true, .windex = 5,
     }, 
@@ -121,38 +121,38 @@ CTEST(unstable_log_test, TestUnstableMaybeTerm) {
   } tests[] = {
     // term from entries
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = NULL,
       .index = 5, .wok = true, .wterm = 1,
     },    
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = NULL,
       .index = 6, .wok = false, .wterm = 0,
     }, 
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = NULL,
       .index = 4, .wok = false, .wterm = 0,
     },  
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = create_test_snapshot(4,1),
       .index = 5, .wok = true, .wterm = 1,
     },        
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = create_test_snapshot(4,1),
       .index = 6, .wok = false, .wterm = 0,
     }, 
     // term from snapshot
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = create_test_snapshot(4,1),
       .index = 4, .wok = true, .wterm = 1,
     },
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = create_test_snapshot(4,1),
       .index = 3, .wok = false, .wterm = 0,
     }, 
@@ -229,62 +229,62 @@ CTEST(unstable_log_test, TestUnstableStableTo) {
       .woffset = 0, .wlen = 0,
     },
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1),NULL),
       .offset = 5, .snapshot = NULL,
       .index = 5, .term = 1,  // stable to the first entry
       .woffset = 6, .wlen = 0,
     },    
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1), init_test_entry(6,1), NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1), init_test_entry(6,1), NULL),
       .offset = 5, .snapshot = NULL,
       .index = 5, .term = 1,  // stable to the first entry
       .woffset = 6, .wlen = 1,
     },
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(6,2), NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(6,2), NULL),
       .offset = 6, .snapshot = NULL,
       .index = 6, .term = 1,  // stable to the first entry and term mismatch
       .woffset = 6, .wlen = 1,
     },
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1), NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1), NULL),
       .offset = 5, .snapshot = NULL,
       .index = 4, .term = 1,  // stable to old entry
       .woffset = 5, .wlen = 1,
     },
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1), NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1), NULL),
       .offset = 5, .snapshot = NULL,
       .index = 4, .term = 2,  // stable to old entry
       .woffset = 5, .wlen = 1,
     },
     // with snapshot
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1), NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1), NULL),
       .offset = 5, .snapshot = create_test_snapshot(4,1),
       .index = 5, .term = 1,  // stable to the first entry
       .woffset = 6, .wlen = 0,
     },
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1), init_test_entry(6,1),NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1), init_test_entry(6,1),NULL),
       .offset = 5, .snapshot = create_test_snapshot(4,1),
       .index = 5, .term = 1,  // stable to the first entry
       .woffset = 6, .wlen = 1,
     },
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(6,2), NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(6,2), NULL),
       .offset = 6, .snapshot = create_test_snapshot(5,1),
       .index = 6, .term = 1,  // stable to the first entry and term mismatch
       .woffset = 6, .wlen = 1,
     },
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,1), NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,1), NULL),
       .offset = 5, .snapshot = create_test_snapshot(4,1),
       .index = 4, .term = 1,  // stable to snapshot
       .woffset = 5, .wlen = 1,
     },
     {
-      .entries = array_createf(sizeof(entry_t), true,  init_test_entry(5,2), NULL),
+      .entries = array_createf(true, sizeof(entry_t),   init_test_entry(5,2), NULL),
       .offset = 5, .snapshot = create_test_snapshot(4,2),
       .index = 4, .term = 1,  // stable to old entry
       .woffset = 5, .wlen = 1,
@@ -312,3 +312,83 @@ CTEST(unstable_log_test, TestUnstableStableTo) {
   }  
 }
 
+bool entry_cmp (void* p1, void* p2) {
+  entry_t* e1 = (entry_t*)p1;
+  entry_t* e2 = (entry_t*)p2;
+
+  return (e1->index == e2->index) &&
+         (e1->term  == e2->term)  &&
+         (e1->type  == e2->type);
+}
+
+CTEST(unstable_log_test, TestUnstableTruncateAndAppend) {
+  struct tmp {
+    array_t* entries;
+    raft_index_t offset;
+    snapshot_t* snapshot;
+    array_t* toappend;
+
+    raft_index_t woffset;
+    array_t* wentries;
+  } tests[] = {
+    // append to the end
+    {
+      .entries = array_createf(true, sizeof(entry_t),  init_test_entry(5,1), NULL),
+      .offset = 5, .snapshot = NULL,
+      .toappend = array_createf(true, sizeof(entry_t),  init_test_entry(6,1), init_test_entry(7,1), NULL),
+      .woffset = 5,
+      .wentries = array_createf(true, sizeof(entry_t),  init_test_entry(5,1), init_test_entry(6,1), init_test_entry(7,1), NULL),
+    },
+    // replace the unstable entries
+    {
+      .entries = array_createf(true, sizeof(entry_t),  init_test_entry(5,1), NULL),
+      .offset = 5, .snapshot = NULL,
+      .toappend = array_createf(true, sizeof(entry_t),  init_test_entry(5,2), init_test_entry(6,2), NULL),
+      .woffset = 5,
+      .wentries = array_createf(true, sizeof(entry_t),  init_test_entry(5,2), init_test_entry(6,2), NULL),
+    },
+    {
+      .entries = array_createf(true, sizeof(entry_t),  init_test_entry(5,1), NULL),
+      .offset = 5, .snapshot = NULL,
+      .toappend = array_createf(true, sizeof(entry_t),  init_test_entry(4,2), init_test_entry(5,2), init_test_entry(6,2), NULL),
+      .woffset = 4,
+      .wentries = array_createf(true, sizeof(entry_t),  init_test_entry(4,2), init_test_entry(5,2), init_test_entry(6,2), NULL),
+    },
+    // truncate the existing entries and append
+    {
+      .entries = array_createf(true, sizeof(entry_t),  init_test_entry(5,1), init_test_entry(6,1), init_test_entry(7,1),NULL),
+      .offset = 5, .snapshot = NULL,
+      .toappend = array_createf(true, sizeof(entry_t),  init_test_entry(6,2), NULL),
+      .woffset = 5,
+      .wentries = array_createf(true, sizeof(entry_t),  init_test_entry(5,1), init_test_entry(6,2), NULL),
+    },
+    {
+      .entries = array_createf(true, sizeof(entry_t),  init_test_entry(5,1), init_test_entry(6,1), init_test_entry(7,1),NULL),
+      .offset = 5, .snapshot = NULL,
+      .toappend = array_createf(true, sizeof(entry_t),  init_test_entry(7,2), init_test_entry(8,2), NULL),
+      .woffset = 5,
+      .wentries = array_createf(true, sizeof(entry_t),  init_test_entry(5,1), init_test_entry(6,1), init_test_entry(7,2),init_test_entry(8,2),NULL),
+    },              
+  };
+
+  size_t i;
+  for (i = 0;i < SIZEOF_ARRAY(tests); ++i) {
+    unstable_log_t* unstable = unstable_log_create();
+    struct tmp *test = &(tests[i]);
+
+    array_copy(unstable->entries, test->entries);
+    array_set_cmp(unstable->entries, entry_cmp);
+
+    unstable->offset = test->offset;
+    unstable->snapshot = test->snapshot;
+    
+    unstable_log_truncate_and_append(unstable, test->toappend);
+
+    ASSERT_EQUAL(unstable->offset, test->woffset);
+    ASSERT_EQUAL(array_equal(unstable->entries, test->wentries), true);
+
+    array_destroy(test->entries);
+
+    unstable_log_destroy(unstable);
+  }  
+}

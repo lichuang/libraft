@@ -8,7 +8,7 @@
 
 CTEST(array_test, test_createf) {
   int i = 1, j = 2;
-  array_t *test = array_createf(sizeof(int*), false, &i, &j,NULL);
+  array_t *test = array_createf(false, sizeof(int*), &i, &j,NULL);
 
   ASSERT_EQUAL(array_size(test), 2);
   int* p = array_get(test, 0);
@@ -144,7 +144,7 @@ CTEST(array_test, test_assign) {
   ASSERT_EQUAL(*j, index);
   ASSERT_EQUAL(array_size(test1), 5);
 
-  array_assign(test1, test2, 2, 5);
+  array_assign_array(test1, test2, 2, 5);
 
   // after copy
   j = array_get(test1, index);

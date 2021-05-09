@@ -7,6 +7,11 @@
 #include <string.h>
 #include "unstable_log.h"
 
+static entry_t k_empty_entry = (entry_t) { 
+  .index = 0,
+  .term  = 0, 
+};
+
 unstable_log_t* 
 unstable_log_create() { 
   unstable_log_t* unstable = (unstable_log_t*)malloc(sizeof(unstable_log_t));
@@ -132,7 +137,7 @@ unstable_log_restore(unstable_log_t* unstable, const snapshot_t* snapshot) {
   memcpy(unstable->snapshot, snapshot, sizeof(snapshot_t));
 }
 
-void 
+void
 unstable_log_truncate_and_append(unstable_log_t* unstable, array_t* entries) {
   if (array_size(entries) == 0) {
     return;
@@ -140,10 +145,10 @@ unstable_log_truncate_and_append(unstable_log_t* unstable, array_t* entries) {
   entry_t* entry = array_get(entries, 0);
   raft_index_t after = entry->index;
   raft_index_t offset = unstable->offset;
-  if (after == offset + array_size(entries)) {
+  if (after == offset + array_size(unstable->entries)) {
     // after is the next index in the u.entries
     // directly append
-    array_insert_array(unstable->entries, array_end(unstable->entries), entries);
+    array_append_array(unstable->entries, entries);
     return;    
   }
 
@@ -156,11 +161,18 @@ unstable_log_truncate_and_append(unstable_log_t* unstable, array_t* entries) {
   }
 
   // truncate to after and copy to u.entries then append
-  array_t *slice = array_create(sizeof(entry_t));
+  array_t *slice = array_create(sizeof(entry_t));  
   unstable_log_slice(unstable, offset, after, slice);
+  
+#if 0  
+  array_assign(unstable->entries, &k_empty_entry);
+  array_append_array(unstable->entries, slice);
+#else  
   array_copy(unstable->entries, slice);
+#endif
+
   array_destroy(slice);
-  array_insert_array(unstable->entries, array_end(unstable->entries), entries);
+  array_append_array(unstable->entries, entries);
 }
 
 static bool
@@ -186,5 +198,5 @@ unstable_log_slice(unstable_log_t* unstable, raft_index_t lo, raft_index_t hi, a
     return;
   }
 
-  array_assign(unstable->entries, entries, lo - unstable->offset, hi - unstable->offset);
+  array_assign_array(entries, unstable->entries, lo - unstable->offset, hi - unstable->offset);
 }
