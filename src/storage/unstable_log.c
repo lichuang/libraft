@@ -7,10 +7,6 @@
 #include <string.h>
 #include "unstable_log.h"
 
-static inline destroy_entry(void* entry) { 
-  free(entry);
-}
-
 unstable_log_t* 
 unstable_log_create() { 
   unstable_log_t* unstable = (unstable_log_t*)malloc(sizeof(unstable_log_t));
@@ -18,10 +14,8 @@ unstable_log_create() {
   *unstable = (unstable_log_t) {
     .snapshot = NULL,
     .offset = 0,
-    .entries = array_create(sizeof(entry_t*)),
+    .entries = array_create(sizeof(entry_t)),
   };
-
-  array_set_free(unstable->entries, destroy_entry);
 
   return unstable;
 }
@@ -64,25 +58,29 @@ unstable_log_maybe_last_index(unstable_log_t* unstable, uint64_t* last) {
 
 bool 
 unstable_log_maybe_term(unstable_log_t* unstable, raft_index_t i, raft_term_t* term) {
-  *term = 0;
+  //*term = 0;
 
   if (i < unstable->offset) {
     if (unstable->snapshot == NULL) {
+      *term = 0;
       return false;
     }
     if (unstable->snapshot->meta.index == i) {
       *term = unstable->snapshot->meta.term;
       return true;
     }
+    *term = 0;
     return false;
   }
 
   raft_index_t last;
   bool ok = unstable_log_maybe_last_index(unstable, &last);
   if (!ok) {
+    *term = 0;
     return false;
   }
   if (i > last) {
+    *term = 0;
     return false;
   }
 

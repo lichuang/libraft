@@ -7,7 +7,7 @@
 #include "util/array.h"
 #include "util/assert.h"
 
-const static size_t min_size = 8;
+const static size_t k_min_size = 8;
 
 #define ARRAY_GET_ELEM(array, index) ((void*)((char*)((array)->data) + (index) * (array)->elem_size))
 
@@ -16,9 +16,9 @@ array_create(size_t elem_size) {
   array_t *array = (array_t*)malloc(sizeof(array_t));
   *array = (array_t) {
     .size = 0,
-    .capacity = min_size,
+    .capacity = k_min_size,
     .elem_size = elem_size,
-    .data = malloc(elem_size * min_size),
+    .data = malloc(elem_size * k_min_size),
     .free = NULL,
   };
 

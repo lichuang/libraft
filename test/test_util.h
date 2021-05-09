@@ -20,6 +20,11 @@ init_test_entry(uint64_t index, uint64_t term) {
   return entry;
 }
 
+static void
+free_test_entry(void* entry) {
+  free(entry);
+}
+
 static inline snapshot_t*
 create_test_snapshot(raft_index_t index, raft_term_t term) {
   snapshot_t* sn = (snapshot_t*)malloc(sizeof(snapshot_t));
