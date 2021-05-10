@@ -21,8 +21,6 @@ typedef struct unstable_log_t {
   array_t* entries;
 
   uint64_t offset;
-
-
 } unstable_log_t;
 
 unstable_log_t* unstable_log_create();

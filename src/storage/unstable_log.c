@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include "util/log.h"
 #include "unstable_log.h"
 
 static entry_t k_empty_entry = (entry_t) { 
@@ -35,7 +36,7 @@ unstable_log_destroy(unstable_log_t* unstable) {
 }
 
 bool 
-unstable_log_maybe_first_index(unstable_log_t* unstable, uint64_t* first) {
+unstable_log_maybe_first_index(unstable_log_t* unstable, raft_index_t* first) {
   if (unstable->snapshot != NULL) {
     *first = unstable->snapshot->meta.index + 1;
     return true;
@@ -46,7 +47,7 @@ unstable_log_maybe_first_index(unstable_log_t* unstable, uint64_t* first) {
 }
 
 bool 
-unstable_log_maybe_last_index(unstable_log_t* unstable, uint64_t* last) {  
+unstable_log_maybe_last_index(unstable_log_t* unstable, raft_index_t* last) {  
   // first check entries
   if (array_size(unstable->entries) > 0) {
     *last = unstable->offset + array_size(unstable->entries) - 1;
@@ -65,8 +66,6 @@ unstable_log_maybe_last_index(unstable_log_t* unstable, uint64_t* last) {
 
 bool 
 unstable_log_maybe_term(unstable_log_t* unstable, raft_index_t i, raft_term_t* term) {
-  //*term = 0;
-
   if (i < unstable->offset) {
     if (unstable->snapshot == NULL) {
       *term = 0;
@@ -111,6 +110,7 @@ unstable_log_stable_to(unstable_log_t* unstable, raft_index_t i, raft_term_t t) 
   if (gt == t && i >= offset) {
     array_erase(unstable->entries, 0, i + 1 - offset);
     unstable->offset = i + 1;
+    Debugf("stable to %llu, entries size:%d, offset:%llu", i, array_size(unstable->entries), unstable->offset);
   }
 }
 
@@ -149,6 +149,7 @@ unstable_log_truncate_and_append(unstable_log_t* unstable, array_t* entries) {
     // after is the next index in the u.entries
     // directly append
     array_append_array(unstable->entries, entries);
+    Infof("ENTRY size: %lld", array_size(unstable->entries));
     return;    
   }
 
@@ -157,14 +158,16 @@ unstable_log_truncate_and_append(unstable_log_t* unstable, array_t* entries) {
     // portion, so set the offset and replace the entries
     unstable->offset = after;
     array_copy(unstable->entries, entries);
+    Infof("replace the unstable entries from index %llu", after);
     return;
   }
 
   // truncate to after and copy to u.entries then append
+  Infof("truncate the unstable entries before index %llu", after);
   array_t *slice = array_create(sizeof(entry_t));  
   unstable_log_slice(unstable, offset, after, slice);
   
-#if 0  
+#if 0
   array_assign(unstable->entries, &k_empty_entry);
   array_append_array(unstable->entries, slice);
 #else  
@@ -178,12 +181,14 @@ unstable_log_truncate_and_append(unstable_log_t* unstable, array_t* entries) {
 static bool
 must_check_out_of_bounds(unstable_log_t* unstable,raft_index_t lo, raft_index_t hi) {
   if (lo > hi) {
+    Fatalf("invalid unstable.slice %llu > %llu", lo, hi);
     return false;
   }
 
   raft_index_t offset = unstable->offset;
   raft_index_t upper = offset + offset + array_size(unstable->entries);
   if (lo < offset || upper < hi) {
+    Fatalf("unstable.slice[%llu,%llu) out of bound [%llu,%llu]", lo, hi, offset, upper);
     return false;
   }
 
