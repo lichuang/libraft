@@ -85,6 +85,10 @@ void* array_pop_back(array_t *array);
 
 bool array_equal(array_t *a1, array_t *a2);
 
+bool array_empty(const array_t *array) {
+  return array->size == 0;
+}
+
 #ifdef __cplusplus
 }
 #endif

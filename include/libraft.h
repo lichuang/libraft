@@ -12,6 +12,7 @@ extern "C" {
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include "util/array.h"
 
 typedef uint64_t raft_term_t;
 typedef uint64_t raft_index_t;
@@ -99,7 +100,7 @@ typedef struct message_t {
 const static peer_t kEmptyPeerId = 0;
 const static uint64_t kNoLimit = ULONG_MAX;
 
-typedef enum error_e{
+typedef enum raft_error_e {
   OK                                = 0,
 
   // ErrCompacted is returned by Storage.Entries/Compact when a requested
@@ -123,9 +124,19 @@ typedef enum error_e{
 
   // Number of error code
   NumErrorCode
-} error_e;
+} raft_error_e;
 
 inline bool SUCCESS(int err) { return err == OK; }
+
+static const char* 
+k_raft_err_string[NumErrorCode] = {
+  "OK",
+  "ErrCompacted",
+  "ErrSnapOutOfDate",
+  "ErrUnavailable",
+  "ErrSnapshotTemporarilyUnavailable",
+  "ErrSerializeFail",
+};
 
 typedef enum state_e {
   StateFollower = 0,
@@ -150,6 +161,47 @@ typedef struct read_state_t {
   bytes_t request_context;
 } read_state_t;
 
+// raft_storage_t is an interface that may be implemented by the application
+// to retrieve log entries from storage.
+//
+// If any raft_storage_t method returns an error, the raft instance will
+// become inoperable and refuse to participate in elections; the
+// application is responsible for cleanup and recovery in this case.
+struct raft_storage_t;
+typedef struct raft_storage_t raft_storage_t;
+
+struct raft_storage_t {
+  // init_state returns the saved hard_state_t and conf_state_t information.
+  raft_error_e (*init_state)(raft_storage_t*, hard_state_t *, conf_state_t *);
+
+	// first_index returns the index of the first log entry that is
+	// possibly available via Entries (older entries have been incorporated
+	// into the latest Snapshot; if storage only contains the dummy entry the
+	// first log entry is not available).
+  raft_error_e (*first_index)(raft_storage_t*, raft_index_t *index);
+
+  // last_index returns the index of the last entry in the log.  
+  raft_error_e (*last_index)(raft_storage_t* s, raft_index_t *index);
+
+	// term returns the term of entry i, which must be in the range
+	// [FirstIndex()-1, LastIndex()]. The term of the entry before
+	// FirstIndex is retained for matching purposes even though the
+	// rest of that entry may not be available.
+  raft_error_e (*term)(raft_storage_t*, raft_index_t i, raft_term_t *term);
+
+	// entries returns a slice of log entries in the range [lo,hi).
+	// MaxSize limits the total size of the log entries returned, but
+	// Entries returns at least one entry if any. 
+  raft_error_e (*entries)(raft_storage_t*, raft_index_t lo, raft_index_t hi, uint64_t maxSize, array_t *entries);
+
+	// get_snapshot returns the most recent snapshot.
+	// If snapshot is temporarily unavailable, it should return ErrSnapshotTemporarilyUnavailable,
+	// so raft state machine could know that Storage needs some time to prepare
+	// snapshot and call get_snapshot later.
+  raft_error_e (*get_snapshot)(raft_storage_t*, snapshot_t **snapshot);
+
+  void* data;
+};
 
 #ifdef __cplusplus
 }
