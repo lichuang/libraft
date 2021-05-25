@@ -23,9 +23,6 @@ raft_log_storage_create(struct raft_storage_t* storage) {
 
 void                
 raft_log_storage_destroy(struct raft_log_t* log) {
-  if (log->storage) {
-    free(log->storage);
-  }
   unstable_log_destroy(log->unstable);
   free(log);
 }
@@ -52,21 +49,16 @@ raft_log_storage_maybe_append(raft_log_t* log,
   
   if (ci != 0) {
     offet = index + 1;
+    array_t* append_entries = array_create(sizeof(entry_t));
+    array_assign_array(append_entries, entries, ci - offset, array_size(entries));
+    raft_log_append(append_entries);
+    array_clear(append_entries);
+    array_destroy(append_entries);
   }
+
+  raft_log_commit_to(min(committed, last_new_i));
+  *last = last_new_i;
   return true;
-}
-
-bool
-raft_log_match_term(raft_log_t* log, raft_index_t i, raft_term_t term) {
-  raft_error_e err;
-  raft_term_t t;
-
-  err = raft_log_term(log, i, &t);
-  if (!SUCCESS(err)) {
-    return false;
-  }
-
-  return t == term;
 }
 
 void 
@@ -85,6 +77,7 @@ raft_log_commit_to(raft_log_t* log, raft_index_t tocommit) {
   log->committed = tocommit;
   Debugf("commit to %llu", tocommit);
 }
+
 
 void 
 raft_log_applied_to(raft_log_t* log, raft_index_t i) {
@@ -109,6 +102,45 @@ raft_log_stable_to(raft_log_t* log, raft_index_t i, raft_term_t term) {
 void 
 raft_log_stable_snap_to(raft_log_t* log, raft_index_t i) {
   unstable_log_stable_snap_to(log->unstable, i);
+}
+
+raft_term_t 
+raft_log_last_term(raft_log_t* log) {
+  raft_error_e err;
+  raft_term_t t;
+
+  err = raft_log_term(log, raft_log_last_index(log), &t);
+  if (!SUCCESS(err)) {
+    Fatalf("unexpected error when getting the last term (%s)", k_raft_err_string(err));
+  }
+
+  return t;
+}
+
+
+int 
+raft_log_entries(raft_log_t* log, raft_index_t i, raft_index_t max_size, array_t* entries) {
+  array_clear(entries);
+  raft_index_t last = raft_last_index(log);
+  // valid index check
+  if (i > last) {
+    return OK;
+  }
+
+
+}
+
+bool
+raft_log_match_term(raft_log_t* log, raft_index_t i, raft_term_t term) {
+  raft_error_e err;
+  raft_term_t t;
+
+  err = raft_log_term(log, i, &t);
+  if (!SUCCESS(err)) {
+    return false;
+  }
+
+  return t == term;
 }
 
 raft_index_t 
@@ -195,6 +227,11 @@ raft_log_last_index(raft_log_t* log) {
   }
 
   return i;
+}
+
+int 
+raft_log_slice(raft_log_t* log,raft_index_t lo, raft_index_t hi, raft_index_t max_size, array_t* entries) {
+
 }
 
 raft_index_t 

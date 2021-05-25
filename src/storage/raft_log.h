@@ -31,14 +31,22 @@ typedef struct raft_log_t {
 raft_log_t* raft_log_storage_create(struct raft_storage_t*);
 void        raft_log_storage_destroy(raft_log_t*);
 
-// raft_log_storage_maybe_append returns false if the entries cannot be appended. Otherwise,
-// it returns last index of new entries.
+// raft_log_storage_maybe_append returns false if the entries cannot be appended. 
+// Otherwise, it returns last index of new entries.
 bool         raft_log_storage_maybe_append(raft_log_t*, 
                                           raft_index_t index, raft_term_t log_term,
                                           raft_index_t committed, array_t*, raft_index_t* last);
 
 raft_index_t raft_log_first_index(raft_log_t*);
 raft_index_t raft_log_last_index(raft_log_t*);
+
+raft_term_t raft_log_last_term(raft_log_t*);
+
+// get entries from index i, no more than max_size
+int raft_log_entries(raft_log_t* log,raft_index_t i, raft_index_t max_size, array_t* entries);
+
+// slice returns a slice of log entries from lo through hi-1, inclusive.
+int raft_log_slice(raft_log_t* log,raft_index_t lo, raft_index_t hi, raft_index_t max_size, array_t* entries);
 
 // returns the term of the entry at index i, if there is any.
 raft_error_e raft_log_term(raft_log_t*, raft_index_t i, raft_term_t* term);
