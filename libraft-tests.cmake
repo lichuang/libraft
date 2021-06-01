@@ -1,11 +1,9 @@
 
-add_executable ( libraft_test  
-  test/crc32c_test.cc
+add_executable ( libraft_test
   test/log_test.cc
   test/main.cc
   test/memory_storage_test.cc
-  test/node_test.cc
-  test/io_buffer_test.cc     
+  test/node_test.cc 
   test/progress_test.cc
   test/raft_flow_controller_test.cc
   test/raft_paper_test.cc

@@ -79,7 +79,7 @@ TEST(unstableLogTests, TestMaybeLastIndex) {
       .offset = 5, .snapshot = newSnapshot(4,1),
       .wok = true, .windex = 5,
     },  
-    // last in entries     
+    // last in snapshot     
     {
       .entries = {},
       .offset = 5, .snapshot = newSnapshot(4,1),

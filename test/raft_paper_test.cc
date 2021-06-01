@@ -1125,10 +1125,7 @@ TEST(raftPaperTests, TestLeaderSyncFollowerLog) {
 		// It is necessary to have a three-node cluster.
 		// The second may have more up-to-date log than the first one, so the
 		// first node needs the vote from the third node to become the leader.
-		vector<stateMachine*> sts;
-		sts.push_back(new raftStateMachine(leader));
-		sts.push_back(new raftStateMachine(follower));
-		sts.push_back(nopStepper);
+		vector<stateMachine*> sts = {new raftStateMachine(leader), new raftStateMachine(follower), nopStepper};
 		
   	network *net = newNetwork(sts);
     {

@@ -10,6 +10,7 @@
 #include "core/raft.h"
 
 using namespace libraft;
+extern stateMachine *nopStepper;
 
 // nextEnts returns the appliable entries and updates the applied index
 void nextEnts(raft *r, MemoryStorage *s, EntryVec *entries) {
@@ -148,7 +149,10 @@ network::~network() {
   {
     map<uint64_t, stateMachine*>::iterator iter = peers.begin();
     while (iter != peers.end()) {
-      delete iter->second;
+      if (iter->second != nopStepper) {
+        delete iter->second;
+      }
+      
       ++iter;
     }
   } 

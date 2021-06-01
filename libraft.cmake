@@ -1,10 +1,8 @@
 set(libraft_files
   src/proto/raft.pb.cc 
 
-  src/base/default_logger.cc 
-  src/base/crc32c.cc
+  src/base/default_logger.cc
   src/base/mutex.cc
-  src/base/io_buffer.cc 
   src/base/util.cc 
 
   src/core/node.cc 
