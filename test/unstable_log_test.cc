@@ -54,6 +54,7 @@ TEST(unstableLogTests, TestUnstableMaybeFirstIndex) {
     uint64_t index;
     bool ok = unstable.maybeFirstIndex(&index);
     EXPECT_EQ(tests[i].wok, ok);
+    EXPECT_EQ(tests[i].windex, index);
     if (tests[i].snapshot != NULL) {
       delete tests[i].snapshot;
     }
@@ -104,6 +105,7 @@ TEST(unstableLogTests, TestMaybeLastIndex) {
     uint64_t index;
     bool ok = unstable.maybeLastIndex(&index);
     EXPECT_EQ(tests[i].wok, ok);
+    EXPECT_EQ(tests[i].windex, index);
 
     if (tests[i].snapshot != NULL) {
       delete tests[i].snapshot;
