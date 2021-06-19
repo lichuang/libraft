@@ -142,10 +142,10 @@ isDeepEqualReadStates(const vector<ReadState*>& rs1, const vector<ReadState*>& r
   for (i = 0; i < rs1.size(); ++i) {
     ReadState* r1 = rs1[i];
     ReadState* r2 = rs2[i];
-    if (r1->index_ != r2->index_) {
+    if (r1->index != r2->index) {
       return false;
     }
-    if (r1->requestCtx_ != r2->requestCtx_) {
+    if (r1->requestCtx != r2->requestCtx) {
       return false;
     }
   }

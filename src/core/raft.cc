@@ -928,12 +928,12 @@ stepLeader(raft *r, const Message& msg) {
     for (i = 0; i < rss.size(); ++i) {
       req = rss[i]->req_;
       if (req->from() == kEmptyPeerId || req->from() == r->id_) {
-        r->readStates_.push_back(new ReadState(rss[i]->index_, req->entries(0).data()));
+        r->readStates_.push_back(new ReadState(rss[i]->index, req->entries(0).data()));
       } else {
         respMsg = new Message();
         respMsg->set_type(MsgReadIndexResp); 
         respMsg->set_to(req->from()); 
-        respMsg->set_index(rss[i]->index_);
+        respMsg->set_index(rss[i]->index);
         respMsg->mutable_entries()->CopyFrom(req->entries());
         r->send(respMsg);
       }

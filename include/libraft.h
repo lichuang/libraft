@@ -91,11 +91,11 @@ struct SoftState {
 // state is what it requests through RequestCtx, eg. given a unique id as
 // RequestCtx
 struct ReadState {
-  uint64_t index_;
-  string   requestCtx_;
-  ReadState(uint64_t index, const string &ctx)
-    : index_(index),
-      requestCtx_(ctx) {}
+  uint64_t index;
+  string   requestCtx;
+  ReadState(uint64_t i, const string &ctx)
+    : index(i),
+      requestCtx(ctx) {}
 };
 
 typedef vector<Entry> EntryVec;

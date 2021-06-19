@@ -3141,8 +3141,8 @@ TEST(raftTests, TestReadOnlyOptionSafe) {
     raft *r = t.r;
     EXPECT_FALSE(r->readStates_.size() == 0);
     ReadState* state = r->readStates_[0];
-    EXPECT_EQ(state->index_, t.wri);
-    EXPECT_EQ(state->requestCtx_, t.ctx);
+    EXPECT_EQ(state->index, t.wri);
+    EXPECT_EQ(state->requestCtx, t.ctx);
     r->readStates_.clear();
   }
 }
@@ -3243,8 +3243,8 @@ TEST(raftTests, TestReadOnlyOptionLease) {
 
     raft *r = t.r;
     ReadState *s = r->readStates_[0];
-    EXPECT_EQ(s->index_, t.wri);
-    EXPECT_EQ(s->requestCtx_, t.wctx);
+    EXPECT_EQ(s->index, t.wri);
+    EXPECT_EQ(s->requestCtx, t.wctx);
 
     r->readStates_.clear();
   }
@@ -3304,8 +3304,8 @@ TEST(raftTests, TestReadOnlyOptionLeaseWithoutCheckQuorum) {
     net->send(&msgs);
   }
   ReadState *s = b->readStates_[0];
-  EXPECT_EQ(s->index_, kEmptyPeerId);
-  EXPECT_EQ(s->requestCtx_, ctx);
+  EXPECT_EQ(s->index, kEmptyPeerId);
+  EXPECT_EQ(s->requestCtx, ctx);
 }
 
 // TestReadOnlyForNewLeader ensures that a leader only accepts MsgReadIndex message
@@ -3462,8 +3462,8 @@ TEST(raftTests, TestReadOnlyForNewLeader) {
   }
   EXPECT_EQ((int)a->readStates_.size(), 1);
   ReadState *rs = a->readStates_[0];
-  EXPECT_EQ(rs->index_, index);
-  EXPECT_EQ(rs->requestCtx_, ctx);
+  EXPECT_EQ(rs->index, index);
+  EXPECT_EQ(rs->requestCtx, ctx);
 }
 
 TEST(raftTests, TestLeaderAppResp) {

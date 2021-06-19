@@ -13,12 +13,12 @@ using namespace std;
 namespace libraft {
 
 struct readIndexStatus {
-  uint64_t index_;
+  uint64_t index;
   Message *req_;
   map<uint64_t, bool> acks_;
 
   readIndexStatus(uint64_t index, Message *msg)
-    : index_(index),
+    : index(index),
       req_(msg) {
   }
 };
