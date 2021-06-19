@@ -14,7 +14,7 @@ namespace libraft {
 // in-memory array.
 class MemoryStorage : public Storage {
 public:
-  MemoryStorage(Logger *logger, EntryVec* entries = NULL);
+  MemoryStorage(EntryVec* entries);
   virtual ~MemoryStorage();
 
   int InitialState(HardState *, ConfState *);
@@ -45,8 +45,6 @@ public:
 	// run on the raft goroutine, but Append() is run on an application
 	// goroutine.
   Locker locker_;
-
-  Logger *logger_;
 };
 
 }; // namespace libraft

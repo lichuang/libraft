@@ -2,19 +2,19 @@
  * Copyright (C) lichuang
  */
 
+#include "base/logger.h"
 #include "core/progress.h"
 
 namespace libraft {
 
-Progress::Progress(uint64_t next, int maxInfilght, Logger *logger)
+Progress::Progress(uint64_t next, int maxInfilght)
   : match_(0),
     next_(next),
     state_(ProgressStateProbe),
     paused_(false),  
     pendingSnapshot_(0),
     recentActive_(false),
-    inflights_(inflights(maxInfilght, logger)),
-    logger_(logger) {
+    inflights_(inflights(maxInfilght)) {
 }
 
 Progress::~Progress() {
@@ -167,7 +167,7 @@ Progress::String() {
 void 
 inflights::add(uint64_t infight) {
   if (full()) {
-    logger_->Fatalf(__FILE__, __LINE__, "cannot add into a full inflights");
+    Fatalf("cannot add into a full inflights");
   }
 
   uint64_t next = start_ + count_;

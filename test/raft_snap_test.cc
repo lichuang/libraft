@@ -6,7 +6,6 @@
 #include <math.h>
 #include "libraft.h"
 #include "raft_test_util.h"
-#include "base/default_logger.h"
 #include "base/util.h"
 #include "core/progress.h"
 #include "core/raft.h"
@@ -27,7 +26,7 @@ Snapshot testingSnap() {
 
 TEST(raftPaperTests, TestSendingSnapshotSetPendingSnapshot) {
   vector<uint64_t> peers = {1};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->restore(testingSnap());
   r->becomeCandidate();
@@ -51,7 +50,7 @@ TEST(raftPaperTests, TestSendingSnapshotSetPendingSnapshot) {
 
 TEST(raftPaperTests, TestPendingSnapshotPauseReplication) {
   vector<uint64_t> peers = {1,2};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->restore(testingSnap());
   r->becomeCandidate();
@@ -75,7 +74,7 @@ TEST(raftPaperTests, TestPendingSnapshotPauseReplication) {
 
 TEST(raftPaperTests, TestSnapshotFailure) {
   vector<uint64_t> peers = {1,2};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->restore(testingSnap());
   r->becomeCandidate();
@@ -99,7 +98,7 @@ TEST(raftPaperTests, TestSnapshotFailure) {
 
 TEST(raftPaperTests, TestSnapshotSucceed) {
   vector<uint64_t> peers = {1,2};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->restore(testingSnap());
   r->becomeCandidate();
@@ -123,7 +122,7 @@ TEST(raftPaperTests, TestSnapshotSucceed) {
 
 TEST(raftPaperTests, TestSnapshotAbort) {
   vector<uint64_t> peers = {1,2};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->restore(testingSnap());
   r->becomeCandidate();

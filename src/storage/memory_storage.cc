@@ -2,14 +2,14 @@
  * Copyright (C) lichuang
  */
 
+#include "base/logger.h"
 #include "base/util.h"
 #include "storage/memory_storage.h"
 
 namespace libraft {
 
-MemoryStorage::MemoryStorage(Logger *logger, EntryVec* entries) 
-  : snapShot_(new Snapshot())
-  , logger_(logger) {
+MemoryStorage::MemoryStorage(EntryVec* entries) 
+  : snapShot_(new Snapshot()) {
   if (entries == NULL) {
     // When starting from scratch populate the list with a dummy entry at term zero.
     entries_.push_back(Entry());
@@ -121,7 +121,7 @@ MemoryStorage::Compact(uint64_t compactIndex) {
     return ErrCompacted;
   }
   if (compactIndex > lastIndex()) {
-    logger_->Fatalf(__FILE__, __LINE__, "compact %llu is out of bound lastindex(%llu)", compactIndex, lastIndex());
+    Fatalf("compact %llu is out of bound lastindex(%llu)", compactIndex, lastIndex());
   }
 
   uint64_t i = compactIndex - offset;
@@ -210,7 +210,7 @@ MemoryStorage::Append(const EntryVec& entries) {
     return OK;
   }
 
-  logger_->Fatalf(__FILE__, __LINE__, "missing log entry [last: %llu, append at: %llu]",
+  Fatalf("missing log entry [last: %llu, append at: %llu]",
     lastIndex(), appendEntries[0].index());
   return OK;
 }
@@ -229,7 +229,7 @@ MemoryStorage::CreateSnapshot(uint64_t i, ConfState *cs, const string& data, Sna
 
   uint64_t offset = entries_[0].index();
   if (i > lastIndex()) {
-    logger_->Fatalf(__FILE__, __LINE__, "snapshot %d is out of bound lastindex(%llu)", i, lastIndex());
+    Fatalf("snapshot %d is out of bound lastindex(%llu)", i, lastIndex());
   }
 
   snapShot_->mutable_metadata()->set_index(i);  

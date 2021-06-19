@@ -88,8 +88,6 @@ struct raft {
   // when raft changes its state to follower or candidate.
   int randomizedElectionTimeout_;
 
-  Logger* logger_;
-
   // current role state machine function
   stepFun stateStepFunc_;
 

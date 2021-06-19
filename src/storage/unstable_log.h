@@ -23,7 +23,6 @@ struct unstableLog {
   // all entries that have not yet been written to storage.
   EntryVec entries_;
   uint64_t offset_;
-  Logger *logger_;
 
   void truncateAndAppend(const EntryVec& entries);
 

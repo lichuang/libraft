@@ -5,7 +5,6 @@
 #include <gtest/gtest.h>
 #include "libraft.h"
 #include "raft_test_util.h"
-#include "base/default_logger.h"
 #include "base/util.h"
 #include "storage/unstable_log.h"
 
@@ -49,7 +48,6 @@ TEST(unstableLogTests, TestUnstableMaybeFirstIndex) {
     unstable.entries_ = tests[i].entries;
     unstable.offset_  = tests[i].offset;
     unstable.snapshot_  = tests[i].snapshot;
-    unstable.logger_  = NULL;
 
     uint64_t index;
     bool ok = unstable.maybeFirstIndex(&index);
@@ -100,7 +98,6 @@ TEST(unstableLogTests, TestMaybeLastIndex) {
     unstable.entries_ = tests[i].entries;
     unstable.offset_  = tests[i].offset;
     unstable.snapshot_  = tests[i].snapshot;
-    unstable.logger_  = NULL;
 
     uint64_t index;
     bool ok = unstable.maybeLastIndex(&index);
@@ -182,7 +179,6 @@ TEST(unstableLogTests, TestUnstableMaybeTerm) {
     unstable.entries_ = tests[i].entries;
     unstable.offset_  = tests[i].offset;
     unstable.snapshot_  = tests[i].snapshot;
-    unstable.logger_  = NULL;
 
     uint64_t term;
     bool ok = unstable.maybeTerm(tests[i].index, &term);
@@ -200,7 +196,6 @@ TEST(unstableLogTests, TestUnstableRestore) {
   unstable.entries_ = {initEntry(5,1)};;
   unstable.offset_  = 5;
   unstable.snapshot_  = newSnapshot(4,1);
-  unstable.logger_  = NULL;
 
   Snapshot s;
   {
@@ -303,7 +298,6 @@ TEST(unstableLogTests, TestUnstableStableTo) {
     unstable.entries_ = tests[i].entries;
     unstable.offset_  = tests[i].offset;
     unstable.snapshot_  = tests[i].snapshot;
-    unstable.logger_  = NULL;
 
     unstable.stableTo(tests[i].index, tests[i].term);
     EXPECT_EQ(unstable.offset_, tests[i].woffset) << "i: " << i << ", woffset: " << tests[i].woffset;
@@ -370,7 +364,6 @@ TEST(unstableLogTests, TestUnstableTruncateAndAppend) {
     unstable.entries_ = tests[i].entries;
     unstable.offset_  = tests[i].offset;
     unstable.snapshot_  = tests[i].snapshot;
-    unstable.logger_  = &kDefaultLogger;
 
     unstable.truncateAndAppend(tests[i].toappend);
     EXPECT_EQ(unstable.offset_, tests[i].woffset) << "i: " << i << ", woffset: " << tests[i].woffset;

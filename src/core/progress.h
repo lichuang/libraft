@@ -24,8 +24,6 @@ struct inflights {
   // inside one message.
   vector<uint64_t> buffer_;
 
-  Logger* logger_;
-
   void add(uint64_t infight);
   void growBuf();
   void freeTo(uint64_t to);
@@ -33,11 +31,10 @@ struct inflights {
   bool full();
   void reset();
 
-  inflights(int size, Logger *logger)
+  inflights(int size)
     : start_(0),
       count_(0),
-      size_(size),
-      logger_(logger) {
+      size_(size) {
     buffer_.resize(size);
   }
   ~inflights() {
@@ -104,8 +101,6 @@ struct Progress {
   // received entry.
   inflights inflights_;
 
-  Logger* logger_;
-
   const char* stateString();
 
   // reset progress state and sliding window
@@ -124,7 +119,7 @@ struct Progress {
   bool needSnapshotAbort();
   string String();
 
-  Progress(uint64_t next, int maxInfilght, Logger *logger);
+  Progress(uint64_t next, int maxInfilght);
   ~Progress();
 };
 

@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 #include "libraft.h"
 #include "raft_test_util.h"
-#include "base/default_logger.h"
+#include "base/logger.h"
 #include "base/util.h"
 #include "storage/memory_storage.h"
 
@@ -32,7 +32,7 @@ TEST(memoryStorageTests, TestStorageTerm) {
   size_t i = 0;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
-    MemoryStorage s(&kDefaultLogger, &entries);
+    MemoryStorage s(&entries);
     uint64_t term;
     int err = s.Term(test.i, &term);
     EXPECT_EQ(err, test.werr) << "i: " << i;
@@ -102,7 +102,7 @@ TEST(memoryStorageTests, TestStorageEntries) {
   size_t i = 0;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
-    MemoryStorage s(&kDefaultLogger, &entries);
+    MemoryStorage s(&entries);
     EntryVec ret;
 
     int err = s.Entries(test.lo, test.hi, test.maxsize, &ret);
@@ -118,7 +118,7 @@ TEST(memoryStorageTests, TestStorageLastIndex) {
     initEntry(5,5),
   };
 
-  MemoryStorage s(&kDefaultLogger, &entries);
+  MemoryStorage s(&entries);
 
   uint64_t last;
   int err = s.LastIndex(&last);
@@ -139,7 +139,7 @@ TEST(memoryStorageTests, TestStorageFirstIndex) {
     initEntry(5,5),
   };
 
-  MemoryStorage s(&kDefaultLogger, &entries);
+  MemoryStorage s(&entries);
 
   {
     uint64_t first;
@@ -167,7 +167,7 @@ TEST(memoryStorageTests, TestStorageCompact) {
     initEntry(5,5),
   };
 
-  MemoryStorage s(&kDefaultLogger, &entries);
+  MemoryStorage s(&entries);
 
   struct tmp {
     uint64_t i;
@@ -185,7 +185,7 @@ TEST(memoryStorageTests, TestStorageCompact) {
   size_t i = 0;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
-    MemoryStorage tmp_s(&kDefaultLogger, &entries);
+    MemoryStorage tmp_s(&entries);
     
     int err = tmp_s.Compact(test.i);
     EXPECT_EQ(err, test.werr);
@@ -233,7 +233,7 @@ TEST(memoryStorageTests, TestStorageCreateSnapshot) {
   size_t i = 0;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
-    MemoryStorage tmp_s(&kDefaultLogger, &entries);
+    MemoryStorage tmp_s(&entries);
     Snapshot ss;
 
     int err = tmp_s.CreateSnapshot(test.i, &cs, data, &ss);
@@ -297,7 +297,7 @@ TEST(memoryStorageTests, TestStorageAppend) {
   size_t i = 0;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     const tmp &test = tests[i];
-    MemoryStorage tmp_s(&kDefaultLogger, &entries);    
+    MemoryStorage tmp_s(&entries);    
 
     int err = tmp_s.Append(test.entries);
     EXPECT_EQ(err, test.werr);
@@ -318,7 +318,7 @@ TEST(memoryStorageTests, TestStorageApplySnapshot) {
     initSnapshot(data, 3, 3, cs),
   };
 
-  MemoryStorage s(&kDefaultLogger);
+  MemoryStorage s(NULL);
 
   {
     //Apply Snapshot successful

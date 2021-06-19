@@ -2,6 +2,7 @@
  * Copyright (C) lichuang
  */
 
+#include "base/logger.h"
 #include "storage/unstable_log.h"
 
 namespace libraft {
@@ -82,7 +83,7 @@ unstableLog::stableTo(uint64_t i, uint64_t t) {
   if (gt == t && i >= offset_) {
     entries_.erase(entries_.begin(), entries_.begin() + i + 1 - offset_);
     offset_ = i + 1;
-    //logger_->Debugf(__FILE__, __LINE__, "stable to %llu, entries size:%d, offset:%llu", i, entries_.size(), offset_);
+    //Debugf("stable to %llu, entries size:%d, offset:%llu", i, entries_.size(), offset_);
   }
 }
 
@@ -112,21 +113,21 @@ unstableLog::truncateAndAppend(const EntryVec& entries) {
     // after is the next index in the u.entries
     // directly append
     entries_.insert(entries_.end(), entries.begin(), entries.end());
-    logger_->Infof(__FILE__, __LINE__, "ENTRY size: %d", entries_.size());
+    Infof("ENTRY size: %d", entries_.size());
     return;
   }
 
   if (after <= offset_) {
     // The log is being truncated to before our current offset
     // portion, so set the offset and replace the entries
-    logger_->Infof(__FILE__, __LINE__, "replace the unstable entries from index %llu", after);
+    Infof("replace the unstable entries from index %llu", after);
     offset_ = after;
     entries_ = entries;
     return;
   }
 
   // truncate to after and copy to u.entries then append
-  logger_->Infof(__FILE__, __LINE__, "truncate the unstable entries before index %llu", after);
+  Infof("truncate the unstable entries before index %llu", after);
   vector<Entry> slice;
   this->slice(offset_, after, &slice);
   entries_ = slice;
@@ -143,12 +144,12 @@ unstableLog::slice(uint64_t lo, uint64_t hi, EntryVec *entries) {
 void 
 unstableLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
   if (lo > hi) {
-    logger_->Fatalf(__FILE__, __LINE__, "invalid unstable.slice %llu > %llu", lo, hi);
+    Fatalf("invalid unstable.slice %llu > %llu", lo, hi);
   }
 
   uint64_t upper = offset_ + (uint64_t)entries_.size();
   if (lo < offset_ || upper < hi) {
-    logger_->Fatalf(__FILE__, __LINE__, "unstable.slice[%llu,%llu) out of bound [%llu,%llu]", lo, hi, offset_, upper);
+    Fatalf("unstable.slice[%llu,%llu) out of bound [%llu,%llu]", lo, hi, offset_, upper);
   }
 }
 

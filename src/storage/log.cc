@@ -2,16 +2,16 @@
  * Copyright (C) lichuang
  */
 
+#include "base/logger.h"
 #include "base/util.h"
 #include "storage/log.h"
 
 namespace libraft {
 
-raftLog::raftLog(Storage *storage, Logger *logger) 
+raftLog::raftLog(Storage *storage) 
   : storage_(storage),
     committed_(0),
-    applied_(0),
-    logger_(logger) {
+    applied_(0) {
 }
 
 raftLog::~raftLog() {
@@ -39,7 +39,7 @@ raftLog::maybeAppend(uint64_t index, uint64_t logTerm,
   
   // if conflict entries is already committed
   if (ci != 0 && ci <= committed_) {
-    logger_->Fatalf(__FILE__, __LINE__, "entry %llu conflict with committed entry [committed(%llu)]", ci, committed_);
+    Fatalf("entry %llu conflict with committed entry [committed(%llu)]", ci, committed_);
   }
 
   if (ci != 0) {
@@ -63,13 +63,13 @@ raftLog::commitTo(uint64_t tocommit) {
 
   // to commit index cannot bigger than last index
   if (lastIndex() < tocommit) {
-    logger_->Fatalf(__FILE__, __LINE__, 
+    Fatalf( 
       "tocommit(%llu) is out of range [lastIndex(%llu)]. Was the raft log corrupted, truncated, or lost?",
       tocommit, lastIndex());
   }
 
   committed_ = tocommit;
-  logger_->Debugf(__FILE__, __LINE__, "commit to %llu", committed_);
+  Debugf("commit to %llu", committed_);
 }
 
 void
@@ -81,7 +81,7 @@ raftLog::appliedTo(uint64_t i) {
   // applied index cannot bigger than committed index,
   // also cannot smaller than already applied index.
   if (committed_ < i || i < applied_) {
-    logger_->Fatalf(__FILE__, __LINE__, "applied(%llu) is out of range [prevApplied(%llu), committed(%llu)]", i, applied_, committed_);
+    Fatalf("applied(%llu) is out of range [prevApplied(%llu), committed(%llu)]", i, applied_, committed_);
   }
   applied_ = i;
 }
@@ -103,7 +103,7 @@ raftLog::lastTerm() {
 
   err = term(lastIndex(), &t);
   if (!SUCCESS(err)) {
-    logger_->Fatalf(__FILE__, __LINE__, "unexpected error when getting the last term (%s)", kErrString[err]);
+    Fatalf("unexpected error when getting the last term (%s)", kErrString[err]);
   }
 
   return t;
@@ -133,7 +133,7 @@ raftLog::allEntries(EntryVec *entries) {
   if (err == ErrCompacted) { // try again if there was a racing compaction
     return allEntries(entries);
   }
-  logger_->Fatalf(__FILE__, __LINE__, "allEntries fatal: %s", kErrString[err]);
+  Fatalf("allEntries fatal: %s", kErrString[err]);
 }
 
 // isUpToDate determines if the given (lastIndex,term) log is more up-to-date
@@ -161,7 +161,7 @@ raftLog::maybeCommit(uint64_t maxIndex, uint64_t term) {
 
 void
 raftLog::restore(const Snapshot& snapshot) {
-  logger_->Infof(__FILE__, __LINE__, "log [%s] starts to restore snapshot [index: %llu, term: %llu]", 
+  Infof("log [%s] starts to restore snapshot [index: %llu, term: %llu]", 
     String().c_str(), snapshot.metadata().index(), snapshot.metadata().term());
   committed_ = snapshot.metadata().index();
   unstable_.restore(snapshot);
@@ -177,7 +177,7 @@ raftLog::append(const EntryVec& entries) {
 
   uint64_t after = entries[0].index() - 1;
   if (after < committed_) {
-    logger_->Fatalf(__FILE__, __LINE__, "after(%llu) is out of range [committed(%llu)]", after, committed_);
+    Fatalf("after(%llu) is out of range [committed(%llu)]", after, committed_);
   }
 
   unstable_.truncateAndAppend(entries);
@@ -206,7 +206,7 @@ uint64_t raftLog::findConflict(const EntryVec& entries) {
       if (index <= lastIndex()) {
         uint64_t dummy;
         int err = this->term(index, &dummy);
-        logger_->Infof(__FILE__, __LINE__, "found conflict at index %llu [existing term: %llu, conflicting term: %llu]",
+        Infof("found conflict at index %llu [existing term: %llu, conflicting term: %llu]",
           index, zeroTermOnErrCompacted(dummy, err), term);
       }
 
@@ -236,7 +236,7 @@ raftLog::nextEntries(EntryVec* entries) {
   if (committed_ + 1 > offset) {
     int err = slice(offset, committed_ + 1, kNoLimit, entries);  
     if (!SUCCESS(err)) {
-      logger_->Fatalf(__FILE__, __LINE__, "unexpected error when getting unapplied entries (%s)", kErrString[err]);
+      Fatalf("unexpected error when getting unapplied entries (%s)", kErrString[err]);
     }
   }
 }
@@ -282,7 +282,7 @@ raftLog::zeroTermOnErrCompacted(uint64_t t, int err) {
     return 0;
   }
 
-  logger_->Fatalf(__FILE__, __LINE__, "unexpected error: %s", kErrString[err]);
+  Fatalf("unexpected error: %s", kErrString[err]);
   return 0;
 }
 
@@ -327,7 +327,7 @@ raftLog::term(uint64_t i, uint64_t *t) {
   if (err == ErrCompacted || err == ErrUnavailable) {
     return err;
   }
-  logger_->Fatalf(__FILE__, __LINE__, "term err:%s", kErrString[err]);
+  Fatalf("term err:%s", kErrString[err]);
 
   return err;
 }
@@ -344,7 +344,7 @@ raftLog::firstIndex() {
 
   err = storage_->FirstIndex(&i);
   if (!SUCCESS(err)) {
-    logger_->Fatalf(__FILE__, __LINE__, "firstIndex error:%s", kErrString[err]);
+    Fatalf("firstIndex error:%s", kErrString[err]);
   }
 
   return i;
@@ -362,7 +362,7 @@ raftLog::lastIndex() {
 
   err = storage_->LastIndex(&i);
   if (!SUCCESS(err)) {
-    logger_->Fatalf(__FILE__, __LINE__, "lastIndex error:%s", kErrString[err]);
+    Fatalf("lastIndex error:%s", kErrString[err]);
   }
 
   return i;
@@ -388,9 +388,9 @@ int raftLog::slice(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec* entries
     if (err == ErrCompacted) {
       return err;
     } else if (err == ErrUnavailable) {
-      logger_->Fatalf(__FILE__, __LINE__, "entries[%llu:%llu) is unavailable from storage", lo, min(hi, unstable_.offset_));
+      Fatalf("entries[%llu:%llu) is unavailable from storage", lo, min(hi, unstable_.offset_));
     } else if (!SUCCESS(err)) {
-      logger_->Fatalf(__FILE__, __LINE__, "storage entries err:%s", kErrString[err]);
+      Fatalf("storage entries err:%s", kErrString[err]);
     }
 
     if ((uint64_t)entries->size() < min(hi, unstable_.offset_) - lo) {
@@ -416,7 +416,7 @@ int raftLog::slice(uint64_t lo, uint64_t hi, uint64_t maxSize, EntryVec* entries
 int 
 raftLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
   if (lo > hi) {
-    logger_->Fatalf(__FILE__, __LINE__, "invalid slice %llu > %llu", lo, hi);
+    Fatalf("invalid slice %llu > %llu", lo, hi);
   }
 
   uint64_t fi = firstIndex();
@@ -426,7 +426,7 @@ raftLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
 
   uint64_t li = lastIndex();
   if (hi > li + 1) {
-    logger_->Fatalf(__FILE__, __LINE__, "slice[%llu,%llu) out of bound [%llu,%llu]", lo, hi, fi, li);
+    Fatalf("slice[%llu,%llu) out of bound [%llu,%llu]", lo, hi, fi, li);
   }
 
   return OK;
@@ -435,8 +435,8 @@ raftLog::mustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
 // newLog returns log using the given storage. It recovers the log to the state
 // that it just commits and applies the latest snapshot.
 raftLog* 
-newLog(Storage *storage, Logger *logger) {
-  raftLog *log = new raftLog(storage, logger);
+newLog(Storage *storage) {
+  raftLog *log = new raftLog(storage);
 
   uint64_t firstIndex, lastIndex;
   int err;
@@ -444,16 +444,15 @@ newLog(Storage *storage, Logger *logger) {
   // init the first and last log index
   err = storage->FirstIndex(&firstIndex);
   if (!SUCCESS(err)) {
-    logger->Fatalf(__FILE__, __LINE__, "get first index err:%s", kErrString[err]);
+    Fatalf("get first index err:%s", kErrString[err]);
   }
 
   err = storage->LastIndex(&lastIndex);
   if (!SUCCESS(err)) {
-    logger->Fatalf(__FILE__, __LINE__, "get last index err:%s", kErrString[err]);
+    Fatalf("get last index err:%s", kErrString[err]);
   }
 
   log->unstable_.offset_ = lastIndex + 1;
-  log->unstable_.logger_ = logger;
 
   // Initialize our committed and applied pointers to the time of the last compaction.
   log->committed_ = firstIndex - 1;

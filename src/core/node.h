@@ -19,11 +19,10 @@ enum NodeMessageType {
 };
 
 struct raft;
-class Logger;
 
 class NodeImpl : public Node {
 public:
-  NodeImpl(Logger*, raft*);
+  NodeImpl(raft*);
   virtual ~NodeImpl();
 
   virtual void Tick(Ready **ready);
@@ -52,8 +51,6 @@ public:
 
   // the Raft state machine
   raft *raft_;
-
-  Logger *logger_;
 
   // save previous the state
   uint64_t leader_;

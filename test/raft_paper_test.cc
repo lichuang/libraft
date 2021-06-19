@@ -6,7 +6,7 @@
 #include <math.h>
 #include "libraft.h"
 #include "raft_test_util.h"
-#include "base/default_logger.h"
+#include "base/logger.h"
 #include "base/util.h"
 #include "core/raft.h"
 #include "core/progress.h"
@@ -40,7 +40,7 @@ releaseMsgVector(MessageVec* mvec) {
 
 bool isDeepEqualMsgs(const MessageVec& msgs1, const MessageVec& msgs2) {
 	if (msgs1.size() != msgs2.size()) {
-    kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
+    Debugf("error");
 		return false;
 	}
 	size_t i;
@@ -48,39 +48,39 @@ bool isDeepEqualMsgs(const MessageVec& msgs1, const MessageVec& msgs2) {
 		Message *m1 = msgs1[i];
 		Message *m2 = msgs2[i];
 		if (m1->from() != m2->from()) {
-      kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
+      Debugf("error");
 			return false;
 		}
 		if (m1->to() != m2->to()) {
-      kDefaultLogger.Debugf(__FILE__, __LINE__, "m1 to %llu, m2 to %llu", m1->to(), m2->to());
+      Debugf("m1 to %llu, m2 to %llu", m1->to(), m2->to());
 			return false;
 		}
 		if (m1->term() != m2->term()) {
-      kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
+      Debugf("error");
 			return false;
 		}
 		if (m1->logterm() != m2->logterm()) {
-      kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
+      Debugf("error");
 			return false;
 		}
 		if (m1->index() != m2->index()) {
-      kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
+      Debugf("error");
 			return false;
 		}
 		if (m1->commit() != m2->commit()) {
-      kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
+      Debugf("error");
 			return false;
 		}
 		if (m1->type() != m2->type()) {
-      kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
+      Debugf("error");
 			return false;
 		}
 		if (m1->reject() != m2->reject()) {
-      kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
+      Debugf("error");
 			return false;
 		}
 		if (m1->entries_size() != m2->entries_size()) {
-      kDefaultLogger.Debugf(__FILE__, __LINE__, "error");
+      Debugf("error");
 			return false;
 		}
 	}
@@ -128,7 +128,7 @@ void commitNoopEntry(raft *r, MemoryStorage *s) {
 // Reference: section 5.1
 void testUpdateTermFromMessage(StateType state) {
   vector<uint64_t> peers = {1,2,3};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
 
 	switch (state) {
@@ -187,7 +187,7 @@ fakeStep(raft* r, const Message& msg) {
 TEST(raftPaperTests, TestRejectStaleTermMessage) {
   called = false;
   vector<uint64_t> peers = {1,2,3};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->stateStepFunc_ = fakeStep;
 
@@ -211,7 +211,7 @@ TEST(raftPaperTests, TestRejectStaleTermMessage) {
 // Reference: section 5.2
 TEST(raftPaperTests, TestStartAsFollower) {
   vector<uint64_t> peers = {1,2,3};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
 	EXPECT_EQ(r->state_, StateFollower);
 
@@ -226,7 +226,7 @@ TEST(raftPaperTests, TestLeaderBcastBeat) {
 	// heartbeat interval
 	uint64_t hi = 1;
   vector<uint64_t> peers = {1,2,3};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
 	r->becomeCandidate();
 	r->becomeLeader();
@@ -284,7 +284,7 @@ void testNonleaderStartElection(StateType state) {
 	uint64_t et = 10;
   vector<uint64_t> peers = {1,2,3};
 
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
 
 	switch (state) {
@@ -379,7 +379,7 @@ TEST(raftPaperTests, TestLeaderElectionInOneRoundRPC) {
 
 		vector<uint64_t> peers;
 		idsBySize(t.size, &peers);
-		Storage *s = new MemoryStorage(&kDefaultLogger);
+		Storage *s = new MemoryStorage(NULL);
 		raft *r = newTestRaft(1, peers, 10, 1, s);
 
 		r->step(initMessage(1,1,MsgHup));
@@ -420,7 +420,7 @@ TEST(raftPaperTests, TestFollowerVote) {
     tmp &t = tests[i];
     
     vector<uint64_t> peers = {1,2,3};
-    Storage *s = new MemoryStorage(&kDefaultLogger);
+    Storage *s = new MemoryStorage(NULL);
     raft *r = newTestRaft(1, peers, 10, 1, s);
 
     HardState hs;
@@ -479,7 +479,7 @@ TEST(raftPaperTests, TestCandidateFallback) {
     Message& msg = tests[i];
     
     vector<uint64_t> peers = {1,2,3};
-    Storage *s = new MemoryStorage(&kDefaultLogger);
+    Storage *s = new MemoryStorage(NULL);
     raft *r = newTestRaft(1, peers, 10, 1, s);
 
 		r->step(initMessage(1,1,MsgHup));
@@ -501,7 +501,7 @@ void testNonleaderElectionTimeoutRandomized(StateType state) {
   
   vector<uint64_t> peers = {1,2,3};
 
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, et, 1, s);
   size_t i;
   map<int, bool> timeouts;
@@ -555,7 +555,7 @@ void testNonleadersElectionTimeoutNonconflict(StateType state) {
   idsBySize(size, &peers);
   size_t i;
   for (i = 0; i < peers.size(); ++i) {
-    Storage *s = new MemoryStorage(&kDefaultLogger);
+    Storage *s = new MemoryStorage(NULL);
     raft *r = newTestRaft(peers[i], peers, et, 1, s);
     rs.push_back(r);
   }
@@ -621,7 +621,7 @@ TEST(raftPaperTests, TestCandidatesElectionTimeoutNonconflict) {
 // Reference: section 5.3
 TEST(raftPaperTests, TestLeaderStartReplication) {
   vector<uint64_t> peers = {1,2,3};
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
@@ -691,7 +691,7 @@ TEST(raftPaperTests, TestLeaderStartReplication) {
 TEST(raftPaperTests, TestLeaderCommitEntry) {
   vector<uint64_t> peers = {1,2,3};
 
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 10, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
@@ -759,7 +759,7 @@ TEST(raftPaperTests, TestLeaderAcknowledgeCommit) {
     tmp &t = tests[i];
     vector<uint64_t> peers;
     idsBySize(t.size, &peers);
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     raft *r = newTestRaft(1, peers, 10, 1, s);
 		r->becomeCandidate();
 		r->becomeLeader();
@@ -807,7 +807,7 @@ TEST(raftPaperTests, TestLeaderCommitPrecedingEntries) {
     EntryVec &t = tests[i];
     vector<uint64_t> peers = {1,2,3};
 
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     EntryVec appEntries = t;
     s->Append(appEntries);
     raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -867,7 +867,7 @@ TEST(raftPaperTests, TestFollowerCommitEntry) {
 
     vector<uint64_t> peers = {1,2,3};
 
-    Storage *s = new MemoryStorage(&kDefaultLogger);
+    Storage *s = new MemoryStorage(NULL);
     raft *r = newTestRaft(1, peers, 10, 1, s);
     r->becomeFollower(1,2);
 
@@ -927,7 +927,7 @@ TEST(raftPaperTests, TestFollowerCheckMsgApp) {
 
     vector<uint64_t> peers = {1,2,3};
 
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     EntryVec ents = entries;
     s->Append(ents);
     raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -1004,7 +1004,7 @@ TEST(raftPaperTests, TestFollowerAppendEntries) {
 		tmp& t = tests[i];
 		vector<uint64_t> peers = {1,2,3};
 
-		MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+		MemoryStorage *s = new MemoryStorage(NULL);
 
 		EntryVec appEntries = {
       initEntry(1,1),
@@ -1101,7 +1101,7 @@ TEST(raftPaperTests, TestLeaderSyncFollowerLog) {
 
 		vector<uint64_t> peers = {1,2,3};
 
-		MemoryStorage *leaderStorage = new MemoryStorage(&kDefaultLogger);
+		MemoryStorage *leaderStorage = new MemoryStorage(NULL);
 		EntryVec appEntries = ents;
     leaderStorage->Append(appEntries);
 		raft *leader = newTestRaft(1, peers, 10, 1, leaderStorage);
@@ -1113,7 +1113,7 @@ TEST(raftPaperTests, TestLeaderSyncFollowerLog) {
       leader->loadState(hs);
     }
 
-		MemoryStorage *followerStorage = new MemoryStorage(&kDefaultLogger);
+		MemoryStorage *followerStorage = new MemoryStorage(NULL);
     followerStorage->Append(t);
 		raft *follower = newTestRaft(2, peers, 10, 1, followerStorage);
 
@@ -1181,7 +1181,7 @@ TEST(raftPaperTests, TestVoteRequest) {
   
     vector<uint64_t> peers = {1,2,3};
 
-    Storage *s = new MemoryStorage(&kDefaultLogger);
+    Storage *s = new MemoryStorage(NULL);
     raft *r = newTestRaft(1, peers, 10, 1, s);
     {
       Message msg = initMessage(2,1,MsgApp);
@@ -1280,7 +1280,7 @@ TEST(raftPaperTests, TestVoter) {
     
     vector<uint64_t> peers = {1,2};
 
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     s->Append(t.ents);
     raft *r = newTestRaft(1, peers, 10, 1, s);
 
@@ -1329,7 +1329,7 @@ TEST(raftPaperTests, TestLeaderOnlyCommitsLogFromCurrentTerm) {
     tmp& t = tests[i];
     EntryVec ents = entries;
 
-		MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+		MemoryStorage *s = new MemoryStorage(NULL);
     s->Append(ents);
 		vector<uint64_t> peers = {1,2};
 		raft *r = newTestRaft(1, peers, 10, 1, s);

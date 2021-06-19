@@ -6,7 +6,6 @@
 #include <math.h>
 #include "libraft.h"
 #include "raft_test_util.h"
-#include "base/default_logger.h"
 #include "base/util.h"
 #include "core/raft.h"
 #include "core/progress.h"
@@ -22,7 +21,7 @@ void preVoteConfig(Config *c) {
 }
 
 raftStateMachine* entsWithConfig(ConfigFun fun, vector<uint64_t> terms) {
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
 
   vector<Entry> entries;
   size_t i;
@@ -49,7 +48,7 @@ raftStateMachine* entsWithConfig(ConfigFun fun, vector<uint64_t> terms) {
 // to the given value but no log entries (indicating that it voted in
 // the given term but has not received any logs).
 raftStateMachine* votedWithConfig(ConfigFun fun, uint64_t vote, uint64_t term) {
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   HardState hs;
   hs.set_vote(vote);
   hs.set_term(term);
@@ -72,17 +71,17 @@ TEST(raftTests, TestProgressBecomeProbe) {
     uint64_t wnext;
   } tests[] = {
     {
-      .progress = initProgress(5, 256, &kDefaultLogger, ProgressStateReplicate, match),
+      .progress = initProgress(5, 256, ProgressStateReplicate, match),
       .wnext = 2,
     },
     // snapshot finish
     {
-      .progress = initProgress(5, 256, &kDefaultLogger, ProgressStateSnapshot, match, 10),
+      .progress = initProgress(5, 256, ProgressStateSnapshot, match, 10),
       .wnext = 11,
     },    
     // snapshot failure
     {
-      .progress = initProgress(5, 256, &kDefaultLogger, ProgressStateSnapshot, match, 0),
+      .progress = initProgress(5, 256, ProgressStateSnapshot, match, 0),
       .wnext = 2,
     },    
   };
@@ -98,7 +97,7 @@ TEST(raftTests, TestProgressBecomeProbe) {
 }
 
 TEST(raftTests, TestProgressBecomeReplicate) {
-  Progress p = initProgress(5, 256, &kDefaultLogger, ProgressStateProbe, 1, 0);
+  Progress p = initProgress(5, 256, ProgressStateProbe, 1, 0);
 
   p.becomeReplicate();
   EXPECT_EQ(p.state_, ProgressStateReplicate);
@@ -107,7 +106,7 @@ TEST(raftTests, TestProgressBecomeReplicate) {
 }
 
 TEST(raftTests, TestProgressBecomeSnapshot) {
-  Progress p = initProgress(5, 256, &kDefaultLogger, ProgressStateProbe, 1, 0);
+  Progress p = initProgress(5, 256, ProgressStateProbe, 1, 0);
 
   p.becomeSnapshot(10);
   EXPECT_EQ(p.state_, ProgressStateSnapshot);
@@ -147,7 +146,7 @@ TEST(raftTests, TestProgressUpdate) {
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp &t = tests[i];
 
-    Progress p = initProgress(prevN, 256, &kDefaultLogger, ProgressStateProbe, prevM, 0);
+    Progress p = initProgress(prevN, 256, ProgressStateProbe, prevM, 0);
 
     bool ok = p.maybeUpdate(t.update);
     EXPECT_EQ(ok, t.wok);
@@ -232,7 +231,7 @@ TEST(raftTests, TestProgressMaybeDecr) {
   size_t i;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp &t = tests[i];
-    Progress p(t.n, 256, &kDefaultLogger);
+    Progress p(t.n, 256);
     p.match_ = t.m;
     p.state_ = t.state;
 
@@ -260,7 +259,7 @@ TEST(raftTests, TestProgressIsPaused) {
   size_t i;
   for (i = 0; i < SIZEOF_ARRAY(tests); ++i) {
     tmp &t = tests[i];
-    Progress p(0, 256, &kDefaultLogger);
+    Progress p(0, 256);
     p.paused_ = t.paused;
     p.state_ = t.state;
 
@@ -272,7 +271,7 @@ TEST(raftTests, TestProgressIsPaused) {
 // TestProgressResume ensures that progress.maybeUpdate and progress.maybeDecrTo
 // will reset progress.paused.
 TEST(raftTests, TestProgressResume) {
-  Progress p(2, 256, &kDefaultLogger);
+  Progress p(2, 256);
   p.paused_ = true;
 
   p.maybeDecrTo(1, 1);
@@ -287,7 +286,7 @@ TEST(raftTests, TestProgressResume) {
 TEST(raftTests, TestProgressResumeByHeartbeatResp) {
   vector<uint64_t> peers = {1,2};
 
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 5, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
@@ -307,7 +306,7 @@ TEST(raftTests, TestProgressResumeByHeartbeatResp) {
 TEST(raftTests, TestProgressPaused) {
   vector<uint64_t> peers = {1,2};
 
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 5, 1, s);
 
   r->becomeCandidate();
@@ -528,7 +527,7 @@ void testVoteFromAnyState(MessageType vt) {
 
   size_t i;
   for (i = 0; i < (int)NumStateType; ++i) {
-    raft *r = newTestRaft(1, peers, 10, 1, new MemoryStorage(&kDefaultLogger));
+    raft *r = newTestRaft(1, peers, 10, 1, new MemoryStorage(NULL));
     r->term_ = 1;
 
     StateType st = (StateType)i;
@@ -930,7 +929,7 @@ TEST(raftTests, TestDuelingCandidates) {
     ids.push_back(1);
     ids.push_back(2);
     ids.push_back(3);
-    raft *r = newTestRaft(1, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    raft *r = newTestRaft(1, ids, 10, 1, new MemoryStorage(NULL));
     peers.push_back(new raftStateMachine(r)); 
   }
   {
@@ -938,7 +937,7 @@ TEST(raftTests, TestDuelingCandidates) {
     ids.push_back(1);
     ids.push_back(2);
     ids.push_back(3);
-    raft *r = newTestRaft(2, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    raft *r = newTestRaft(2, ids, 10, 1, new MemoryStorage(NULL));
     peers.push_back(new raftStateMachine(r)); 
   }
   {
@@ -946,7 +945,7 @@ TEST(raftTests, TestDuelingCandidates) {
     ids.push_back(1);
     ids.push_back(2);
     ids.push_back(3);
-    raft *r = newTestRaft(3, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    raft *r = newTestRaft(3, ids, 10, 1, new MemoryStorage(NULL));
     peers.push_back(new raftStateMachine(r)); 
   }
   network *net = newNetwork(peers);
@@ -995,7 +994,7 @@ TEST(raftTests, TestDuelingCandidates) {
     net->send(&msgs);
   }
 
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+  MemoryStorage *s = new MemoryStorage(NULL); 
   {
     EntryVec entries;
     entries.push_back(Entry());
@@ -1007,7 +1006,7 @@ TEST(raftTests, TestDuelingCandidates) {
     s->Append(entries);
   }
 
-  raftLog *log = new raftLog(s, &kDefaultLogger);
+  raftLog *log = new raftLog(s);
   log->committed_ = 1;
   log->unstable_.offset_ = 2;
 
@@ -1024,7 +1023,7 @@ TEST(raftTests, TestDuelingCandidates) {
   vector<tmp> tests;
   tests.push_back(tmp((raft*)peers[0]->data(), StateFollower, 2, log)); 
   tests.push_back(tmp((raft*)peers[1]->data(), StateFollower, 2, log)); 
-  tests.push_back(tmp((raft*)peers[2]->data(), StateFollower, 2, new raftLog(new MemoryStorage(&kDefaultLogger), &kDefaultLogger))); 
+  tests.push_back(tmp((raft*)peers[2]->data(), StateFollower, 2, new raftLog(new MemoryStorage(NULL)))); 
 
   size_t i;
   for (i = 0; i < tests.size(); ++i) {
@@ -1049,7 +1048,7 @@ TEST(raftTests, TestDuelingPreCandidates) {
     ids.push_back(1);
     ids.push_back(2);
     ids.push_back(3);
-    raft *r = newTestRaft(1, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    raft *r = newTestRaft(1, ids, 10, 1, new MemoryStorage(NULL));
     r->preVote_ = true;
     peers.push_back(new raftStateMachine(r)); 
   }
@@ -1058,7 +1057,7 @@ TEST(raftTests, TestDuelingPreCandidates) {
     ids.push_back(1);
     ids.push_back(2);
     ids.push_back(3);
-    raft *r = newTestRaft(2, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    raft *r = newTestRaft(2, ids, 10, 1, new MemoryStorage(NULL));
     r->preVote_ = true;
     peers.push_back(new raftStateMachine(r)); 
   }
@@ -1067,7 +1066,7 @@ TEST(raftTests, TestDuelingPreCandidates) {
     ids.push_back(1);
     ids.push_back(2);
     ids.push_back(3);
-    raft *r = newTestRaft(3, ids, 10, 1, new MemoryStorage(&kDefaultLogger));
+    raft *r = newTestRaft(3, ids, 10, 1, new MemoryStorage(NULL));
     r->preVote_ = true;
     peers.push_back(new raftStateMachine(r)); 
   }
@@ -1117,7 +1116,7 @@ TEST(raftTests, TestDuelingPreCandidates) {
     net->send(&msgs);
   }
 
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+  MemoryStorage *s = new MemoryStorage(NULL); 
   {
     EntryVec entries;
     entries.push_back(Entry());
@@ -1129,7 +1128,7 @@ TEST(raftTests, TestDuelingPreCandidates) {
     s->Append(entries);
   }
 
-  raftLog *log = new raftLog(s, &kDefaultLogger);
+  raftLog *log = new raftLog(s);
   log->committed_ = 1;
   log->unstable_.offset_ = 2;
 
@@ -1146,7 +1145,7 @@ TEST(raftTests, TestDuelingPreCandidates) {
   vector<tmp> tests;
   tests.push_back(tmp((raft*)peers[0]->data(), StateLeader, 1, log)); 
   tests.push_back(tmp((raft*)peers[1]->data(), StateFollower, 1, log)); 
-  tests.push_back(tmp((raft*)peers[2]->data(), StateFollower, 1, new raftLog(new MemoryStorage(&kDefaultLogger), &kDefaultLogger))); 
+  tests.push_back(tmp((raft*)peers[2]->data(), StateFollower, 1, new raftLog(new MemoryStorage(NULL)))); 
 
   size_t i;
   for (i = 0; i < tests.size(); ++i) {
@@ -1234,7 +1233,7 @@ TEST(raftTests, TestCandidateConcede) {
   EXPECT_EQ(r->state_, StateFollower);
   EXPECT_EQ((int)r->term_, 1);
 
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+  MemoryStorage *s = new MemoryStorage(NULL); 
   EntryVec entries;
 
   entries.push_back(Entry());
@@ -1254,7 +1253,7 @@ TEST(raftTests, TestCandidateConcede) {
   s->entries_.clear();
   s->entries_.insert(s->entries_.end(), entries.begin(), entries.end());
 
-  raftLog *log = new raftLog(s, &kDefaultLogger);
+  raftLog *log = new raftLog(s);
   log->committed_ = 2;
   log->unstable_.offset_ = 3;
   string logStr = raftLogString(log);
@@ -1376,7 +1375,7 @@ TEST(raftTests, TestOldMessages) {
     net->send(&msgs);
   }
 
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+  MemoryStorage *s = new MemoryStorage(NULL); 
   EntryVec entries;
 
   entries.push_back(Entry());
@@ -1407,7 +1406,7 @@ TEST(raftTests, TestOldMessages) {
   }
   s->entries_.clear();
   s->entries_.insert(s->entries_.end(), entries.begin(), entries.end());
-  raftLog *log = new raftLog(s, &kDefaultLogger);
+  raftLog *log = new raftLog(s);
   log->committed_ = 4;
   log->unstable_.offset_ = 5;
   string logStr = raftLogString(log);
@@ -1513,7 +1512,7 @@ TEST(raftTests, TestProposal) {
 
     string logStr = "";
     if (t.success) {
-      MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+      MemoryStorage *s = new MemoryStorage(NULL); 
       EntryVec entries;
 
       entries.push_back(Entry());
@@ -1532,7 +1531,7 @@ TEST(raftTests, TestProposal) {
       }
       s->entries_.clear();
       s->entries_.insert(s->entries_.end(), entries.begin(), entries.end());
-      raftLog *log = new raftLog(s, &kDefaultLogger);
+      raftLog *log = new raftLog(s);
       log->committed_ = 2;
       log->unstable_.offset_ = 3;
       logStr = raftLogString(log);
@@ -1601,7 +1600,7 @@ TEST(raftTests, TestProposalByProxy) {
     }
 
     string logStr = "";
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger); 
+    MemoryStorage *s = new MemoryStorage(NULL); 
     EntryVec entries;
 
     entries.push_back(Entry());
@@ -1620,7 +1619,7 @@ TEST(raftTests, TestProposalByProxy) {
     }
     s->entries_.clear();
     s->entries_.insert(s->entries_.end(), entries.begin(), entries.end());
-    raftLog *log = new raftLog(s, &kDefaultLogger);
+    raftLog *log = new raftLog(s);
     log->committed_ = 2;
     log->unstable_.offset_ = 3;
     logStr = raftLogString(log);
@@ -1967,7 +1966,7 @@ TEST(raftTests, TestCommit) {
   size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     s->Append(t.logs);
     s->hardState_.set_term(t.term);
 
@@ -2008,7 +2007,7 @@ TEST(raftTests, TestPastElectionTimeout) {
 
     vector<uint64_t> peers;
     peers.push_back(1);
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     raft *r = newTestRaft(1, peers, 10, 1, s);
     r->electionElapsed_ = t.elapse;
     int c = 0, j;
@@ -2194,7 +2193,7 @@ TEST(raftTests, TestHandleMsgApp) {
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
 
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<Entry> entries;
     {
       Entry entry;
@@ -2262,7 +2261,7 @@ TEST(raftTests, TestHandleHeartbeat) {
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
 
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<Entry> entries;
     {
       Entry entry;
@@ -2302,7 +2301,7 @@ TEST(raftTests, TestHandleHeartbeat) {
 
 // TestHandleHeartbeatResp ensures that we re-send log entries when we get a heartbeat response.
 TEST(raftTests, TestHandleHeartbeatResp) {
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<Entry> entries;
   {
     Entry entry;
@@ -2384,7 +2383,7 @@ TEST(raftTests, TestHandleHeartbeatResp) {
 // readOnly readIndexQueue and pendingReadIndex map.
 // related issue: https://github.com/coreos/etcd/issues/7571
 TEST(raftTests, TestRaftFreesReadOnlyMem) {
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   peers.push_back(2);
@@ -2435,7 +2434,7 @@ TEST(raftTests, TestRaftFreesReadOnlyMem) {
 // TestMsgAppRespWaitReset verifies the resume behavior of a leader
 // MsgAppResp.
 TEST(raftTests, TestMsgAppRespWaitReset) {
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   peers.push_back(2);
@@ -2543,7 +2542,7 @@ void testRecvMsgVote(MessageType type) {
   size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> peers;
     peers.push_back(1);
     raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -2564,7 +2563,7 @@ void testRecvMsgVote(MessageType type) {
     }
     r->vote_ = t.voteFor;  
 
-    s = new MemoryStorage(&kDefaultLogger); 
+    s = new MemoryStorage(NULL); 
     EntryVec entries;
 
     entries.push_back(Entry());
@@ -2582,7 +2581,7 @@ void testRecvMsgVote(MessageType type) {
     }
     s->entries_.clear();
     s->entries_.insert(s->entries_.end(), entries.begin(), entries.end());
-    r->raftLog_ = new raftLog(s, &kDefaultLogger);
+    r->raftLog_ = new raftLog(s);
     r->raftLog_->unstable_.offset_ = 3;
 
     {
@@ -2637,7 +2636,7 @@ TEST(raftTests, TestAllServerStepdown) {
   size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> peers;
     peers.push_back(1);
     peers.push_back(2);
@@ -2689,7 +2688,7 @@ TEST(raftTests, TestAllServerStepdown) {
 }
 
 TEST(raftTests, TestLeaderStepdownWhenQuorumActive) {
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   peers.push_back(2);
@@ -2715,7 +2714,7 @@ TEST(raftTests, TestLeaderStepdownWhenQuorumActive) {
 }
 
 TEST(raftTests, TestLeaderStepdownWhenQuorumLost) {
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   peers.push_back(2);
@@ -2740,7 +2739,7 @@ TEST(raftTests, TestLeaderSupersedingWithCheckQuorum) {
   vector<stateMachine*> peers;
 
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -2749,7 +2748,7 @@ TEST(raftTests, TestLeaderSupersedingWithCheckQuorum) {
     a->checkQuorum_ = true;
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -2758,7 +2757,7 @@ TEST(raftTests, TestLeaderSupersedingWithCheckQuorum) {
     b->checkQuorum_ = true;
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -2825,7 +2824,7 @@ TEST(raftTests, TestLeaderElectionWithCheckQuorum) {
   vector<stateMachine*> peers;
 
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -2834,7 +2833,7 @@ TEST(raftTests, TestLeaderElectionWithCheckQuorum) {
     a->checkQuorum_ = true;
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -2843,7 +2842,7 @@ TEST(raftTests, TestLeaderElectionWithCheckQuorum) {
     b->checkQuorum_ = true;
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -2907,7 +2906,7 @@ TEST(raftTests, TestFreeStuckCandidateWithCheckQuorum) {
   vector<stateMachine*> peers;
 
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -2916,7 +2915,7 @@ TEST(raftTests, TestFreeStuckCandidateWithCheckQuorum) {
     a->checkQuorum_ = true;
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -2925,7 +2924,7 @@ TEST(raftTests, TestFreeStuckCandidateWithCheckQuorum) {
     b->checkQuorum_ = true;
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -3002,7 +3001,7 @@ TEST(raftTests, TestNonPromotableVoterWithCheckQuorum) {
   vector<stateMachine*> peers;
 
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -3010,7 +3009,7 @@ TEST(raftTests, TestNonPromotableVoterWithCheckQuorum) {
     a->checkQuorum_ = true;
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     b = newTestRaft(2, tmp_peers, 10, 1, s);
@@ -3048,7 +3047,7 @@ TEST(raftTests, TestReadOnlyOptionSafe) {
   vector<stateMachine*> peers;
 
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -3057,7 +3056,7 @@ TEST(raftTests, TestReadOnlyOptionSafe) {
     a->checkQuorum_ = true;
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -3066,7 +3065,7 @@ TEST(raftTests, TestReadOnlyOptionSafe) {
     b->checkQuorum_ = true;
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> tmp_peers;
     tmp_peers.push_back(1);
     tmp_peers.push_back(2);
@@ -3156,7 +3155,7 @@ TEST(raftTests, TestReadOnlyOptionLease) {
 
   raft *a, *b, *c;
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     a = newTestRaft(1, peers, 10, 1, s);
     a->readOnly_->option_ = ReadOnlyLeaseBased;
@@ -3164,7 +3163,7 @@ TEST(raftTests, TestReadOnlyOptionLease) {
     sts.push_back(new raftStateMachine(a));
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     b = newTestRaft(2, peers, 10, 1, s);
     b->readOnly_->option_ = ReadOnlyLeaseBased;
@@ -3172,7 +3171,7 @@ TEST(raftTests, TestReadOnlyOptionLease) {
     sts.push_back(new raftStateMachine(b));
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     c = newTestRaft(3, peers, 10, 1, s);
     c->readOnly_->option_ = ReadOnlyLeaseBased;
@@ -3259,21 +3258,21 @@ TEST(raftTests, TestReadOnlyOptionLeaseWithoutCheckQuorum) {
 
   raft *a, *b, *c;
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     a = newTestRaft(1, peers, 10, 1, s);
     a->readOnly_->option_ = ReadOnlyLeaseBased;
     sts.push_back(new raftStateMachine(a));
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     b = newTestRaft(2, peers, 10, 1, s);
     b->readOnly_->option_ = ReadOnlyLeaseBased;
     sts.push_back(new raftStateMachine(b));
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     c = newTestRaft(3, peers, 10, 1, s);
     c->readOnly_->option_ = ReadOnlyLeaseBased;
@@ -3320,7 +3319,7 @@ TEST(raftTests, TestReadOnlyForNewLeader) {
 
   raft *a, *b, *c;
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     vector<Entry> entries;
     
@@ -3345,7 +3344,7 @@ TEST(raftTests, TestReadOnlyForNewLeader) {
     sts.push_back(new raftStateMachine(a));
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     vector<Entry> entries;
     
@@ -3368,7 +3367,7 @@ TEST(raftTests, TestReadOnlyForNewLeader) {
     sts.push_back(new raftStateMachine(b));
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     vector<Entry> entries;
     
@@ -3495,7 +3494,7 @@ TEST(raftTests, TestLeaderAppResp) {
  		// sm term is 1 after it becomes the leader.
 		// thus the last log term must be 1 to be committed.
     tmp &t = tests[i];
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> peers;
     peers.push_back(1);
     peers.push_back(2);
@@ -3503,7 +3502,7 @@ TEST(raftTests, TestLeaderAppResp) {
     raft* r = newTestRaft(1, peers, 10, 1, s);
 
     {
-      MemoryStorage *tmp_s = new MemoryStorage(&kDefaultLogger);
+      MemoryStorage *tmp_s = new MemoryStorage(NULL);
       EntryVec entries;
       entries.push_back(Entry());
 
@@ -3517,7 +3516,7 @@ TEST(raftTests, TestLeaderAppResp) {
       entries.push_back(entry);
 
       tmp_s->entries_ = entries;
-      r->raftLog_ = newLog(tmp_s, &kDefaultLogger);
+      r->raftLog_ = newLog(tmp_s);
       r->raftLog_->unstable_.offset_ = 3;
     }
 
@@ -3565,7 +3564,7 @@ TEST(raftTests, TestBcastBeat) {
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(1);
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(2);
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(3);
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   s->ApplySnapshot(ss);
   raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -3634,7 +3633,7 @@ TEST(raftTests, TestRecvMsgBeat) {
   size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp& t = tests[i];
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> peers;
     peers.push_back(1);
     peers.push_back(2);
@@ -3653,7 +3652,7 @@ TEST(raftTests, TestRecvMsgBeat) {
     entry.set_term(1);
     entries.push_back(entry);
     s->entries_ = entries;
-    r->raftLog_ = newLog(s, &kDefaultLogger);
+    r->raftLog_ = newLog(s);
     r->term_ = 1;
     r->state_ = t.state;
     switch (t.state) {
@@ -3726,7 +3725,7 @@ TEST(raftTests, TestLeaderIncreaseNext) {
 		vector<uint64_t> peers;
 		peers.push_back(1);
 		peers.push_back(2);
-		Storage *s = new MemoryStorage(&kDefaultLogger);
+		Storage *s = new MemoryStorage(NULL);
 		raft *r = newTestRaft(1, peers, 10, 1, s);
 		r->raftLog_->append(prevEntries);
 		r->becomeCandidate();
@@ -3749,7 +3748,7 @@ TEST(raftTests, TestSendAppendForProgressProbe) {
 	vector<uint64_t> peers;
 	peers.push_back(1);
 	peers.push_back(2);
-	Storage *s = new MemoryStorage(&kDefaultLogger);
+	Storage *s = new MemoryStorage(NULL);
 	raft *r = newTestRaft(1, peers, 10, 1, s);
 	r->becomeCandidate();
 	r->becomeLeader();
@@ -3814,7 +3813,7 @@ TEST(raftTests, TestSendAppendForProgressReplicate) {
 	vector<uint64_t> peers;
 	peers.push_back(1);
 	peers.push_back(2);
-	Storage *s = new MemoryStorage(&kDefaultLogger);
+	Storage *s = new MemoryStorage(NULL);
 	raft *r = newTestRaft(1, peers, 10, 1, s);
 	r->becomeCandidate();
 	r->becomeLeader();
@@ -3840,7 +3839,7 @@ TEST(raftTests, TestSendAppendForProgressSnapshot) {
 	vector<uint64_t> peers;
 	peers.push_back(1);
 	peers.push_back(2);
-	Storage *s = new MemoryStorage(&kDefaultLogger);
+	Storage *s = new MemoryStorage(NULL);
 	raft *r = newTestRaft(1, peers, 10, 1, s);
 	r->becomeCandidate();
 	r->becomeLeader();
@@ -3882,7 +3881,7 @@ TEST(raftTests, TestRecvMsgUnreachable) {
 	vector<uint64_t> peers;
 	peers.push_back(1);
 	peers.push_back(2);
-	MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+	MemoryStorage *s = new MemoryStorage(NULL);
 	s->Append(prevEntries);
 	raft *r = newTestRaft(1, peers, 10, 1, s);
 	r->becomeCandidate();
@@ -3913,7 +3912,7 @@ TEST(raftTests, TestRestore) {
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(2);
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(3);
 
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   peers.push_back(2);
@@ -3949,7 +3948,7 @@ TEST(raftTests, TestRestoreIgnoreSnapshot) {
 	vector<uint64_t> peers;
 	peers.push_back(1);
 	peers.push_back(2);
-	Storage *s = new MemoryStorage(&kDefaultLogger);
+	Storage *s = new MemoryStorage(NULL);
 	raft *r = newTestRaft(1, peers, 10, 1, s);
 	r->raftLog_->append(prevEntries);
   uint64_t commit = 1;
@@ -3980,7 +3979,7 @@ TEST(raftTests, TestProvideSnap) {
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(1);
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(2);
 
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -4016,7 +4015,7 @@ TEST(raftTests, TestIgnoreProvidingSnap) {
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(1);
   ss.mutable_metadata()->mutable_conf_state()->add_nodes(2);
 
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -4133,7 +4132,7 @@ TEST(raftTests, TestSlowNodeRestore) {
 // it appends the entry to log and sets pendingConf to be true.
 TEST(raftTests, TestStepConfig) {
   // a raft that cannot make progress
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   peers.push_back(2);
@@ -4159,7 +4158,7 @@ TEST(raftTests, TestStepConfig) {
 // the proposal to noop and keep its original state.
 TEST(raftTests, TestStepIgnoreConfig) {
   // a raft that cannot make progress
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   peers.push_back(2);
@@ -4219,7 +4218,7 @@ TEST(raftTests, TestRecoverPendingConfig) {
   size_t i;
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     vector<uint64_t> peers;
     peers.push_back(1);
     peers.push_back(2);
@@ -4241,7 +4240,7 @@ TEST(raftTests, TestRecoverDoublePendingConfig) {
 
 // TestAddNode tests that addNode could update pendingConf and nodes correctly.
 TEST(raftTests, TestAddNode) {
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
@@ -4259,7 +4258,7 @@ TEST(raftTests, TestAddNode) {
 // TestRemoveNode tests that removeNode could update pendingConf, nodes and
 // and removed list correctly.
 TEST(raftTests, TestRemoveNode) {
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   peers.push_back(2);
@@ -4314,7 +4313,7 @@ TEST(raftTests, TestPromotable) {
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
 
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     raft *r = newTestRaft(1, t.peers, 5, 1, s);
     EXPECT_EQ(r->promotable(), t.wp);
   }
@@ -4349,7 +4348,7 @@ TEST(raftTests, TestRaftNodes) {
   for (i = 0; i < tests.size(); ++i) {
     tmp &t = tests[i];
 
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
     raft *r = newTestRaft(1, t.ids, 10, 1, s);
     vector<uint64_t> nodes;
     r->nodes(&nodes);
@@ -4359,7 +4358,7 @@ TEST(raftTests, TestRaftNodes) {
 
 void testCampaignWhileLeader(bool prevote) {
   vector<uint64_t> peers;
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   peers.push_back(1);
   Config *c = newTestConfig(1, peers, 5, 1, s);
   c->preVote = prevote;
@@ -4402,7 +4401,7 @@ TEST(raftTests, TestPreCampaignWhileLeader) {
 // committed when a config change reduces the quorum requirements.
 TEST(raftTests, TestCommitAfterRemoveNode) {
   // Create a cluster with two nodes.
-  MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   peers.push_back(2);
@@ -5173,7 +5172,7 @@ TEST(raftTests, TestTransferNonMember) {
   peers.push_back(2);
   peers.push_back(3);
   peers.push_back(4);
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 5, 1, s);
 
   {

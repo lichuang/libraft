@@ -6,7 +6,6 @@
 #include <math.h>
 #include "libraft.h"
 #include "base/util.h"
-#include "base/default_logger.h"
 #include "core/raft.h"
 #include "core/progress.h"
 #include "core/read_only.h"
@@ -36,12 +35,11 @@ TEST(nodeTests, TestNodePropose) {
   msgs.clear();
   vector<ReadState*> readStates;
   
-  Logger * defaultLogger = new DefaultLogger();
-  MemoryStorage *s = new MemoryStorage(defaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  NodeImpl *n = new NodeImpl(defaultLogger, r);  
+  NodeImpl *n = new NodeImpl(r);  
 
   readStates.push_back(new ReadState(1, "somedata"));
   r->readStates_ = readStates;
@@ -81,21 +79,21 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
   raft *a, *b, *c;
 
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     a = newTestRaft(1, peers, 10, 1, s);
     storages.push_back(s);
     sts.push_back(new raftStateMachine(a));
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     b = newTestRaft(2, peers, 10, 1, s);
     storages.push_back(s);
     sts.push_back(new raftStateMachine(b));
   }
   {
-    MemoryStorage *s = new MemoryStorage(&kDefaultLogger);
+    MemoryStorage *s = new MemoryStorage(NULL);
 
     c = newTestRaft(3, peers, 10, 1, s);
     storages.push_back(s);
@@ -155,11 +153,10 @@ TEST(nodeTests, TestNodeReadIndexToOldLeader) {
 TEST(nodeTests, TestNodeProposeConfig) {
   msgs.clear();
 
-  Logger *defaultLogger = new DefaultLogger();
-  MemoryStorage *s = new MemoryStorage(defaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers = {1};
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  NodeImpl *n = new NodeImpl(defaultLogger, r); 
+  NodeImpl *n = new NodeImpl(r); 
 
   Ready *ready;
   n->Campaign(&ready);
@@ -218,12 +215,11 @@ void applyReadyEntries(Ready* ready, EntryVec* readyEntries, MemoryStorage *s, N
 }
 
 TEST(nodeTests, TestNodeProposeAddDuplicateNode) {
-  Logger *defaultLogger = new DefaultLogger();
-  MemoryStorage *s = new MemoryStorage(defaultLogger);
+  MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  NodeImpl *n = new NodeImpl(defaultLogger, r); 
+  NodeImpl *n = new NodeImpl(r); 
 
   Ready *ready;
   EntryVec readyEntries;

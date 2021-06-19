@@ -28,9 +28,7 @@ struct raftLog {
   // Invariant: applied <= committed
   uint64_t applied_;
 
-  Logger *logger_;
-
-  raftLog(Storage *, Logger *);
+  raftLog(Storage *);
   ~raftLog();
   
   string String();
@@ -110,7 +108,7 @@ struct raftLog {
 
 // newLog returns log using the given storage. It recovers the log to the state
 // that it just commits and applies the latest snapshot.
-extern raftLog* newLog(Storage *storage, Logger *logger);
+extern raftLog* newLog(Storage *storage);
 
 }; // namespace libraft
 

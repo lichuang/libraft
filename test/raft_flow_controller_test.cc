@@ -6,7 +6,6 @@
 #include <math.h>
 #include "libraft.h"
 #include "raft_test_util.h"
-#include "base/default_logger.h"
 #include "core/raft.h"
 #include "base/util.h"
 #include "core/progress.h"
@@ -20,7 +19,7 @@ using namespace libraft;
 // 2. when the window is full, no more msgApp can be sent.
 TEST(raftFlowController, TestMsgAppFlowControlFull) {
   vector<uint64_t> peers = {1,2};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 5, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
@@ -68,7 +67,7 @@ TEST(raftFlowController, TestMsgAppFlowControlFull) {
 // 2. out-of-dated msgAppResp has no effect on the sliding window.
 TEST(raftFlowController, TestMsgAppFlowControlMoveForward) {
   vector<uint64_t> peers = {1,2};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 5, 1, s);
   r->becomeCandidate();
   r->becomeLeader();
@@ -132,7 +131,7 @@ TEST(raftFlowController, TestMsgAppFlowControlMoveForward) {
 // frees one slot if the window is full.
 TEST(raftFlowController, TestMsgAppFlowControlRecvHeartbeat) {
   vector<uint64_t> peers = {1,2};
-  Storage *s = new MemoryStorage(&kDefaultLogger);
+  Storage *s = new MemoryStorage(NULL);
   raft *r = newTestRaft(1, peers, 5, 1, s);
   r->becomeCandidate();
   r->becomeLeader();

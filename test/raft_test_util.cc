@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include "raft_test_util.h"
-#include "base/default_logger.h"
 #include "base/util.h"
 #include "core/raft.h"
 
@@ -111,7 +110,7 @@ network* newNetworkWithConfig(ConfigFun fun, vector<stateMachine*> peers) {
     uint64_t id = peerAddrs[i];
 
     if (!p) {
-      s = new MemoryStorage(&kDefaultLogger);
+      s = new MemoryStorage(NULL);
       net->storage[id] = s;
       c = newTestConfig(id, peerAddrs, 10, 1, s);
       if (fun) {
@@ -127,7 +126,7 @@ network* newNetworkWithConfig(ConfigFun fun, vector<stateMachine*> peers) {
       rf = (raft *)p->data();
       rf->id_ = id;
       for (j = 0; j < size; ++j) {
-        rf->progressMap_[peerAddrs[j]] = new Progress(0, 256, &kDefaultLogger);
+        rf->progressMap_[peerAddrs[j]] = new Progress(0, 256);
       }
       rf->reset(rf->term_);
       net->peers[id] = p;
@@ -237,7 +236,6 @@ Config* newTestConfig(uint64_t id, const vector<uint64_t>& peers, int election, 
   c->storage = s;
   c->maxSizePerMsg = kNoLimit;
   c->maxInflightMsgs = 256;
-  c->logger = &kDefaultLogger;
   c->readOnlyOption = ReadOnlySafe;
   c->checkQuorum = false;
   return c;

@@ -3,6 +3,7 @@
  */
 
 #include <unistd.h>
+#include "base/logger.h"
 #include "base/util.h"
 #include "core/node.h"
 #include "core/raft.h"
@@ -20,11 +21,10 @@ isEmptySoftState(const SoftState& ss) {
   return isSoftStateEqual(ss, kEmptySoftState);
 }
 
-NodeImpl::NodeImpl(Logger* logger, raft* r)
+NodeImpl::NodeImpl(raft* r)
   : Node()
   , stopped_(false)
   , raft_(r)
-  , logger_(logger)
   , leader_(kEmptyPeerId)
   , prevSoftState_(kEmptySoftState)
   , prevHardState_(kEmptyHardState)
@@ -42,7 +42,6 @@ NodeImpl::NodeImpl(Logger* logger, raft* r)
 
 NodeImpl::~NodeImpl() {
   delete raft_;
-  delete logger_;
 }
 
 void 
@@ -71,7 +70,7 @@ int
 NodeImpl::ProposeConfChange(const ConfChange& cc, Ready **ready) {
   string data;
   if (!cc.SerializeToString(&data)) {
-    logger_->Errorf(__FILE__, __LINE__, "ConfChange SerializeToString error");
+    Errorf(__FILE__, __LINE__, "ConfChange SerializeToString error");
     return ErrSerializeFail;
   }
 
@@ -166,16 +165,16 @@ NodeImpl::stateMachine(const Message& msg, Ready **ready) {
   if (leader_ != raft_->leader_) {
     if (raft_->hasLeader()) {
       if (leader_ == kEmptyPeerId) {
-        logger_->Infof(__FILE__, __LINE__, "raft.node: %x elected leader %x at term %llu",
+        Infof("raft.node: %x elected leader %x at term %llu",
           raft_->id_, raft_->leader_, raft_->term_);
       } else {
-        logger_->Infof(__FILE__, __LINE__, "raft.node: %x changed leader from %x to %x at term %llu",
+        Infof(__FILE__, __LINE__, "raft.node: %x changed leader from %x to %x at term %llu",
           raft_->id_, leader_, raft_->leader_, raft_->term_);
       }
       canPropose_ = true;
     } else {
       canPropose_ = false;
-      logger_->Infof(__FILE__, __LINE__, "raft.node: %x lost leader %x at term %llu",
+      Infof(__FILE__, __LINE__, "raft.node: %x lost leader %x at term %llu",
         raft_->id_, leader_, raft_->term_);
     }
     leader_ = raft_->leader_;
@@ -241,7 +240,7 @@ NodeImpl::handleConfChange() {
     raft_->resetPendingConf();
     break;
   default:
-    logger_->Fatalf(__FILE__, __LINE__, "unexpected conf type");
+    Fatalf(__FILE__, __LINE__, "unexpected conf type");
     break;
   }
 
@@ -392,7 +391,7 @@ StartNode(Config* config, const vector<Peer>& peers) {
     r->addNode(peer.Id);
   }
 
-  return new NodeImpl(config->logger, r);
+  return new NodeImpl(r);
 }
 
 // RestartNode is similar to StartNode but does not take a list of peers.
@@ -406,7 +405,7 @@ RestartNode(Config *config) {
     return NULL;
   }
 
-  return new NodeImpl(config->logger, r);
+  return new NodeImpl(r);
 }
 
 }; // namespace libraft

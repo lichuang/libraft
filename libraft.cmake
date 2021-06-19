@@ -1,7 +1,7 @@
 set(libraft_files
   src/proto/raft.pb.cc 
 
-  src/base/default_logger.cc
+  src/base/logger.cc
   src/base/mutex.cc
   src/base/util.cc 
 

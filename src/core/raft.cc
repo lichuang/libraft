@@ -5,10 +5,10 @@
 #include <stdlib.h>
 #include <time.h>
 #include <algorithm>
+#include "base/logger.h"
 #include "base/util.h"
 #include "core/raft.h"
 #include "core/read_only.h"
-#include "base/default_logger.h"
 #include "storage/memory_storage.h"
 
 namespace libraft {
@@ -73,12 +73,11 @@ raft::raft(const Config *config, raftLog *log)
     maxMsgSize_(config->maxSizePerMsg),
     leader_(kEmptyPeerId),
     leadTransferee_(kEmptyPeerId),
-    readOnly_(new readOnly(config->readOnlyOption, config->logger)),
+    readOnly_(new readOnly(config->readOnlyOption)),
     heartbeatTimeout_(config->heartbeatTick),
     electionTimeout_(config->electionTick),
     checkQuorum_(config->checkQuorum),
     preVote_(config->preVote),
-    logger_(config->logger),
     stateStepFunc_(NULL) {
   srand((unsigned)time(NULL));
 }
@@ -108,7 +107,7 @@ raft::tick() {
     tickHeartbeat();
     break;
   default:
-    logger_->Fatalf(__FILE__, __LINE__, "unsport state %d", state_);
+    Fatalf("unsport state %d", state_);
     break;
   }
 }
@@ -169,8 +168,8 @@ void
 raft::loadState(const HardState &hs) {
   // validity check
   if (hs.commit() < raftLog_->committed_ || hs.commit() > raftLog_->lastIndex()) {
-    logger_->Fatalf(__FILE__, __LINE__, 
-      "%x state.commit %llu is out of range [%llu, %llu]", id_, hs.commit(), raftLog_->committed_, raftLog_->lastIndex());
+    Fatalf("%x state.commit %llu is out of range [%llu, %llu]", 
+      id_, hs.commit(), raftLog_->committed_, raftLog_->lastIndex());
   }
 
   raftLog_->committed_ = hs.commit();
@@ -193,11 +192,11 @@ raft::send(Message *msg) {
     if (msg->term() == 0) {
       // PreVote RPCs are sent at a term other than our actual term, so the code
       // that sends these messages is responsible for setting the term.
-      logger_->Fatalf(__FILE__, __LINE__, "term should be set when sending %s", kMsgString[type]);
+      Fatalf("term should be set when sending %s", kMsgString[type]);
     }
   } else {
     if (msg->term() != 0) { 
-      logger_->Fatalf(__FILE__, __LINE__, "term should not be set when sending %s (was %llu)", kMsgString[type], msg->term());
+      Fatalf("term should not be set when sending %s (was %llu)", kMsgString[type], msg->term());
     }
     // do not attach term to MsgProp, MsgReadIndex
     // proposals are a way to forward to the leader and
@@ -217,7 +216,7 @@ void
 raft::sendAppend(uint64_t to) {
   Progress *pr = progressMap_[to];
   if (pr == NULL || pr->isPaused()) {
-    logger_->Infof(__FILE__, __LINE__, "node %x paused", to);
+    Infof("node %x paused", to);
     return;
   }
 
@@ -235,7 +234,7 @@ raft::sendAppend(uint64_t to) {
   if (!SUCCESS(errt) || !SUCCESS(erre)) {
     // send snapshot if we failed to get term or entries
     if (!pr->recentActive_) {
-      logger_->Debugf(__FILE__, __LINE__, "ignore sending snapshot to %llu since it is not recently active", to);
+      Debugf("ignore sending snapshot to %llu since it is not recently active", to);
       return;
     }
 
@@ -243,26 +242,26 @@ raft::sendAppend(uint64_t to) {
     err = raftLog_->snapshot(&snapshot);
     if (!SUCCESS(err)) {
       if (err == ErrSnapshotTemporarilyUnavailable) {
-        logger_->Debugf(__FILE__, __LINE__, "%llu failed to send snapshot to %llu because snapshot is temporarily unavailable", id_, to);
+        Debugf("%llu failed to send snapshot to %llu because snapshot is temporarily unavailable", id_, to);
         return;
       }
 
-      logger_->Fatalf(__FILE__, __LINE__, "get snapshot err: %s", kErrString[err]);
+      Fatalf("get snapshot err: %s", kErrString[err]);
     }
   
     if (isEmptySnapshot(snapshot)) {
-      logger_->Fatalf(__FILE__, __LINE__, "need non-empty snapshot");
+      Fatalf("need non-empty snapshot");
     }
 
     Snapshot *s = msg->mutable_snapshot();
     s->CopyFrom(*snapshot);
     uint64_t sindex = snapshot->metadata().index();
     uint64_t sterm = snapshot->metadata().term();
-    logger_->Debugf(__FILE__, __LINE__, "%x [firstindex: %llu, commit: %llu] sent snapshot[index: %llu, term: %llu] to %x [%s]",
+    Debugf("%x [firstindex: %llu, commit: %llu] sent snapshot[index: %llu, term: %llu] to %x [%s]",
       id_, raftLog_->firstIndex(), raftLog_->committed_, sindex, sterm, to, pr->String().c_str());
     // change to snapshot state
     pr->becomeSnapshot(sindex);
-    logger_->Debugf(__FILE__, __LINE__, "%x paused sending replication messages to %x [%s]", id_, to, pr->String().c_str());
+    Debugf("%x paused sending replication messages to %x [%s]", id_, to, pr->String().c_str());
   } else {
     // else,send Append Msg
     msg->set_type(MsgApp);
@@ -287,7 +286,7 @@ raft::sendAppend(uint64_t to) {
         pr->pause();
         break;
       default:
-        logger_->Fatalf(__FILE__, __LINE__, "%x is sending append in unhandled state %s", id_, pr->stateString());
+        Fatalf("%x is sending append in unhandled state %s", id_, pr->stateString());
         break;
       }
     }
@@ -385,7 +384,7 @@ raft::reset(uint64_t term) {
     uint64_t id = iter->first;
     Progress *pr = progressMap_[id];
     delete pr;
-    progressMap_[id] = new Progress(raftLog_->lastIndex() + 1, maxInfilght_, logger_);
+    progressMap_[id] = new Progress(raftLog_->lastIndex() + 1, maxInfilght_);
     if (id == id_) {
       pr = progressMap_[id];
       pr->match_ = raftLog_->lastIndex();
@@ -393,13 +392,13 @@ raft::reset(uint64_t term) {
   }
   pendingConf_ = false;
   delete readOnly_;
-  readOnly_ = new readOnly(readOnly_->option_, logger_);
+  readOnly_ = new readOnly(readOnly_->option_);
 }
 
 void
 raft::appendEntry(EntryVec* entries) {
   uint64_t li = raftLog_->lastIndex();
-  logger_->Debugf(__FILE__, __LINE__, "lastIndex:%llu", li);
+  Debugf("lastIndex:%llu", li);
   size_t i;
   for (i = 0; i < entries->size(); ++i) {
     (*entries)[i].set_term(term_);
@@ -486,27 +485,27 @@ raft::becomeFollower(uint64_t term, uint64_t leader) {
   leader_ = leader;
   state_ = StateFollower;
   stateStepFunc_ = stepFollower;
-  logger_->Infof(__FILE__, __LINE__, "%x became follower at term %llu", id_, term_);
+  Infof("%x became follower at term %llu", id_, term_);
 }
 
 void
 raft::becomePreCandidate() {
   // TODO(xiangli) remove the panic when the raft implementation is stable
   if (state_ == StateLeader) {
-    logger_->Fatalf(__FILE__, __LINE__, "invalid transition [leader -> pre-candidate]");
+    Fatalf("invalid transition [leader -> pre-candidate]");
   }
   // Becoming a pre-candidate changes our step functions and state,
   // but doesn't change anything else. In particular it does not increase
   // r.Term or change r.Vote.
   state_ = StatePreCandidate;
   stateStepFunc_ = stepCandidate;
-  logger_->Infof(__FILE__, __LINE__, "%x became pre-candidate at term %llu", id_, term_);
+  Infof("%x became pre-candidate at term %llu", id_, term_);
 }
 
 void
 raft::becomeCandidate() {
   if (state_ == StateLeader) {
-    logger_->Fatalf(__FILE__, __LINE__, "invalid transition [leader -> candidate]");
+    Fatalf("invalid transition [leader -> candidate]");
   }
 
   // add term + 1 in candidate state
@@ -514,13 +513,13 @@ raft::becomeCandidate() {
   vote_ = id_;
   state_ = StateCandidate;
   stateStepFunc_ = stepCandidate;
-  logger_->Infof(__FILE__, __LINE__, "%x became candidate at term %llu", id_, term_);
+  Infof("%x became candidate at term %llu", id_, term_);
 }
 
 void
 raft::becomeLeader() {
   if (state_ == StateFollower) {
-    logger_->Fatalf(__FILE__, __LINE__, "invalid transition [follower -> leader]");
+    Fatalf("invalid transition [follower -> leader]");
   }
 
   reset(term_);
@@ -532,13 +531,13 @@ raft::becomeLeader() {
   int err = raftLog_->entries(raftLog_->committed_ + 1, kNoLimit, &entries);
   // fatal if leader get committed entries fail
   if (!SUCCESS(err)) {
-    logger_->Fatalf(__FILE__, __LINE__, "unexpected error getting uncommitted entries (%s)", kErrString[err]);
+    Fatalf("unexpected error getting uncommitted entries (%s)", kErrString[err]);
   }
 
   int n = numOfPendingConf(entries);
   // fatal if leader has pending config > 1
   if (n > 1) {
-    logger_->Fatalf(__FILE__, __LINE__, "unexpected multiple uncommitted config entry");
+    Fatalf("unexpected multiple uncommitted config entry");
   }
 
   if (n == 1) {
@@ -547,7 +546,7 @@ raft::becomeLeader() {
   entries.clear();
   entries.push_back(Entry());
   appendEntry(&entries);
-  logger_->Infof(__FILE__, __LINE__, "%x became leader at term %llu", id_, term_);
+  Infof("%x became leader at term %llu", id_, term_);
 }
 
 void
@@ -582,7 +581,7 @@ raft::campaign(CampaignType t) {
     if (id_ == id) {
       continue;
     }
-    logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu] sent %s request to %x at term %llu",
+    Infof("%x [logterm: %llu, index: %llu] sent %s request to %x at term %llu",
       id_, raftLog_->lastTerm(), raftLog_->lastIndex(), kCampaignString[t], id, term_);
     string ctx = "";
     if (t == CampaignTransfer) {
@@ -602,9 +601,9 @@ raft::campaign(CampaignType t) {
 int
 raft::poll(uint64_t id, MessageType t, bool v) {
   if (v) {
-    logger_->Infof(__FILE__, __LINE__, "%x received %s from %x at term %llu", id_, kMsgString[t], id, term_);
+    Infof("%x received %s from %x at term %llu", id_, kMsgString[t], id, term_);
   } else {
-    logger_->Infof(__FILE__, __LINE__, "%x received %s rejection from %x at term %llu", id_, kMsgString[t], id, term_);
+    Infof("%x received %s rejection from %x at term %llu", id_, kMsgString[t], id, term_);
   }
   if (votes_.find(id) == votes_.end()) {
     votes_[id] = v;
@@ -621,7 +620,7 @@ raft::poll(uint64_t id, MessageType t, bool v) {
 
 int
 raft::step(const Message& msg) {
-  logger_->Debugf(__FILE__, __LINE__, "msg %s %llu -> %llu, term:%llu",
+  Debugf("msg %s %llu -> %llu, term:%llu",
                   kMsgString[msg.type()], msg.from(), msg.to(), term_);
 
   // Handle the message term, which may result in our stepping down to a follower.
@@ -640,7 +639,7 @@ raft::step(const Message& msg) {
       if (!force && inLease) {
         // If a server receives a RequestVote request within the minimum election timeout
         // of hearing from a current leader, it does not update its term or grant its vote
-        logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] ignored %s from %x [logterm: %llu, index: %llu] at term %llu: lease is not expired (remaining ticks: %d)",
+        Infof("%x [logterm: %llu, index: %llu, vote: %x] ignored %s from %x [logterm: %llu, index: %llu] at term %llu: lease is not expired (remaining ticks: %d)",
           id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, kMsgString[type], from,
           msg.logterm(), msg.index(), term, electionTimeout_ - electionElapsed_);
         return OK;
@@ -656,7 +655,7 @@ raft::step(const Message& msg) {
       // rejected our vote so we should become a follower at the new
       // term.
     } else {
-      logger_->Infof(__FILE__, __LINE__, "%x [term: %llu] received a %s message with higher term from %x [term: %llu]",
+      Infof("%x [term: %llu] received a %s message with higher term from %x [term: %llu]",
         id_, term_, kMsgString[type], from, term);
       becomeFollower(term, leader);
     }
@@ -681,7 +680,7 @@ raft::step(const Message& msg) {
       send(respMsg);
     } else {
       // ignore other cases
-      logger_->Infof(__FILE__, __LINE__, "%x [term: %llu] ignored a %s message with lower term from %x [term: %llu]",
+      Infof("%x [term: %llu] ignored a %s message with lower term from %x [term: %llu]",
         id_, term_, kMsgString[type], from, term);
     }
     return OK;
@@ -696,22 +695,22 @@ raft::step(const Message& msg) {
     if (state_ != StateLeader) {
       err = raftLog_->slice(raftLog_->applied_ + 1, raftLog_->committed_ + 1, kNoLimit, &entries);
       if (!SUCCESS(err)) {
-        logger_->Fatalf(__FILE__, __LINE__, "unexpected error getting unapplied entries (%s)", kErrString[err]);
+        Fatalf("unexpected error getting unapplied entries (%s)", kErrString[err]);
       }
       n = numOfPendingConf(entries);
       if (n != 0 && raftLog_->committed_ > raftLog_->applied_) {
-        logger_->Warningf(__FILE__, __LINE__, "%x cannot campaign at term %llu since there are still %llu pending configuration changes to apply",
+        Warnf("%x cannot campaign at term %llu since there are still %llu pending configuration changes to apply",
           id_, term_, n);
         return OK;
       }
-      logger_->Infof(__FILE__, __LINE__, "%x is starting a new election at term %llu", id_, term_);
+      Infof("%x is starting a new election at term %llu", id_, term_);
       if (preVote_) {
         campaign(CampaignPreElection);
       } else {
         campaign(CampaignElection);
       }
     } else {
-      logger_->Debugf(__FILE__, __LINE__, "%x ignoring MsgHup because already leader", id_);
+      Debugf("%x ignoring MsgHup because already leader", id_);
     }
     break;
   case MsgVote:
@@ -719,7 +718,7 @@ raft::step(const Message& msg) {
     // The m.Term > r.Term clause is for MsgPreVote. For MsgVote m.Term should
     // always equal r.Term.
     if ((vote_ == kEmptyPeerId || term > term_ || vote_ == from) && raftLog_->isUpToDate(msg.index(), msg.logterm())) {
-      logger_->Infof(__FILE__, __LINE__, "%x [logterm: %llu, index: %llu, vote: %x] cast %s for %x [logterm: %llu, index: %llu] at term %llu",
+      Infof("%x [logterm: %llu, index: %llu, vote: %x] cast %s for %x [logterm: %llu, index: %llu] at term %llu",
         id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, kMsgString[type], from, msg.logterm(), msg.index(), term_);
       respMsg = new Message();
       respMsg->set_to(from);      
@@ -730,7 +729,7 @@ raft::step(const Message& msg) {
         vote_ = from;
       }
     } else {
-      logger_->Infof(__FILE__, __LINE__,
+      Infof(
         "%x [logterm: %llu, index: %llu, vote: %x] rejected %s from %x [logterm: %llu, index: %llu] at term %llu",
         id_, raftLog_->lastTerm(), raftLog_->lastIndex(), vote_, kMsgString[type], from, msg.logterm(), msg.index(), term_);
       respMsg = new Message();
@@ -758,7 +757,6 @@ stepLeader(raft *r, const Message& msg) {
   uint64_t lastLeadTransferee, leadTransferee;
   EntryVec entries;
   Message *n;
-  Logger* logger = r->logger_;
 
   switch (type) {
   case MsgBeat:
@@ -767,14 +765,14 @@ stepLeader(raft *r, const Message& msg) {
     break;
   case MsgCheckQuorum:
     if (!r->checkQuorumActive()) {
-      logger->Warningf(__FILE__, __LINE__, "%x stepped down to follower since quorum is not active", r->id_);
+      Warnf("%x stepped down to follower since quorum is not active", r->id_);
       r->becomeFollower(r->term_, kEmptyPeerId);
     }
     return;
     break;
   case MsgProp:
     if (msg.entries_size() == 0) {  // received a empty entries MsgProp
-      logger->Fatalf(__FILE__, __LINE__, "%x stepped empty MsgProp", r->id_);
+      Fatalf("%x stepped empty MsgProp", r->id_);
     }
     if (r->progressMap_.find(r->id_) == r->progressMap_.end()) {
       // If we are not currently a member of the range (i.e. this node
@@ -783,7 +781,7 @@ stepLeader(raft *r, const Message& msg) {
       return;
     }
     if (r->leadTransferee_ != kEmptyPeerId) {
-      logger->Debugf(__FILE__, __LINE__,
+      Debugf(
         "%x [term %d] transfer leadership to %x is in progress; dropping proposal",
         r->id_, r->term_, r->leadTransferee_);
       return;
@@ -795,7 +793,7 @@ stepLeader(raft *r, const Message& msg) {
         continue;
       }
       if (r->pendingConf_) {
-        logger->Infof(__FILE__, __LINE__, 
+        Infof( 
           "propose conf %s ignored since pending unapplied configuration",
           entryString(*entry).c_str());
         Entry tmp;
@@ -856,7 +854,7 @@ stepLeader(raft *r, const Message& msg) {
   Message *req, *respMsg;
   map<uint64_t, Progress*>::iterator iter = r->progressMap_.find(from);
   if (iter == r->progressMap_.end()) {
-    logger->Debugf(__FILE__, __LINE__, "%x no progress available for %x", r->id_, from);
+    Debugf("%x no progress available for %x", r->id_, from);
     return;
   }
   pr = iter->second;
@@ -866,10 +864,10 @@ stepLeader(raft *r, const Message& msg) {
   case MsgAppResp:
     pr->recentActive_ = true;
     if (msg.reject()) {
-      logger->Debugf(__FILE__, __LINE__, "%x received msgApp rejection(lastindex: %llu) from %x for index %llu",
+      Debugf("%x received msgApp rejection(lastindex: %llu) from %x for index %llu",
         r->id_, msg.rejecthint(), from, index);
       if (pr->maybeDecrTo(index, msg.rejecthint())) {
-        logger->Debugf(__FILE__, __LINE__, "%x decreased progress of %x to [%s]",
+        Debugf("%x decreased progress of %x to [%s]",
           r->id_, from, pr->String().c_str());
         if (pr->state_ == ProgressStateReplicate) {
           pr->becomeProbe();
@@ -882,7 +880,7 @@ stepLeader(raft *r, const Message& msg) {
         if (pr->state_ == ProgressStateProbe) {
           pr->becomeReplicate();
         } else if (pr->state_ == ProgressStateSnapshot && pr->needSnapshotAbort()) {
-          logger->Debugf(__FILE__, __LINE__, "%x snapshot aborted, resumed sending replication messages to %x [%s]",
+          Debugf("%x snapshot aborted, resumed sending replication messages to %x [%s]",
             r->id_, from, pr->String().c_str());
           pr->becomeProbe();
         } else if (pr->state_ == ProgressStateReplicate) {
@@ -897,7 +895,7 @@ stepLeader(raft *r, const Message& msg) {
         }
         // Transfer leadership is in progress.
         if (msg.from() == r->leadTransferee_ && pr->match_ == r->raftLog_->lastIndex()) {
-          logger->Infof(__FILE__, __LINE__,
+          Infof(
             "%x sent MsgTimeoutNow to %x after received MsgAppResp", r->id_, msg.from());
           r->sendTimeoutNow(msg.from());
         }
@@ -945,12 +943,12 @@ stepLeader(raft *r, const Message& msg) {
     }
     if (!msg.reject()) {
       pr->becomeProbe();
-      logger->Debugf(__FILE__, __LINE__, "%x snapshot succeeded, resumed sending replication messages to %x [%s]",
+      Debugf("%x snapshot succeeded, resumed sending replication messages to %x [%s]",
         r->id_, from, pr->String().c_str());
     } else {
       pr->snapshotFailure();
       pr->becomeProbe();
-      logger->Debugf(__FILE__, __LINE__, "%x snapshot failed, resumed sending replication messages to %x [%s]",
+      Debugf("%x snapshot failed, resumed sending replication messages to %x [%s]",
         r->id_, from, pr->String().c_str());
     }
     // If snapshot finish, wait for the msgAppResp from the remote node before sending
@@ -964,7 +962,7 @@ stepLeader(raft *r, const Message& msg) {
     if (pr->state_ == ProgressStateReplicate) {
       pr->becomeProbe();
     }
-    logger->Debugf(__FILE__, __LINE__, "%x failed to send message to %x because it is unreachable [%s]",
+    Debugf("%x failed to send message to %x because it is unreachable [%s]",
       r->id_, msg.from(), pr->String().c_str());
     break;
   case MsgTransferLeader:
@@ -972,24 +970,24 @@ stepLeader(raft *r, const Message& msg) {
     lastLeadTransferee = r->leadTransferee_;
     if (lastLeadTransferee != kEmptyPeerId) {
       if (lastLeadTransferee == leadTransferee) {
-        logger->Infof(__FILE__, __LINE__,
+        Infof(
           "%x [term %llu] transfer leadership to %x is in progress, ignores request to same node %x",
           r->id_, r->term_, leadTransferee, leadTransferee);
         return;
       }
       r->abortLeaderTransfer();
-      logger->Infof(__FILE__, __LINE__,
+      Infof(
         "%x [term %d] abort previous transferring leadership to %x",
         r->id_, r->term_, leadTransferee);
     }
     if (leadTransferee == r->id_) {
-      logger->Debugf(__FILE__, __LINE__,
+      Debugf(
         "%x is already leader. Ignored transferring leadership to self",
         r->id_);
       return;
     }
     // Transfer leadership to third party.
-    logger->Infof(__FILE__, __LINE__,
+    Infof(
       "%x [term %llu] starts to transfer leadership to %x",
       r->id_, r->term_, leadTransferee);
     // Transfer leadership should be finished in one electionTimeout, so reset r.electionElapsed.
@@ -997,7 +995,7 @@ stepLeader(raft *r, const Message& msg) {
     r->leadTransferee_ = leadTransferee;
     if (pr->match_ == r->raftLog_->lastIndex()) {
       r->sendTimeoutNow(leadTransferee);
-      logger->Infof(__FILE__, __LINE__,
+      Infof(
         "%x sends MsgTimeoutNow to %x immediately as %x already has up-to-date log",
         r->id_, leadTransferee, leadTransferee);
     } else {
@@ -1022,11 +1020,10 @@ stepCandidate(raft* r, const Message& msg) {
   }
   int type = msg.type();
   int granted = 0;
-  Logger* logger = r->logger_;
 
   if (type == voteRespType) {
     granted = r->poll(msg.from(), msg.type(), !msg.reject());
-    logger->Infof(__FILE__, __LINE__, "%x [quorum:%llu] has received %d %s votes and %llu vote rejections",
+    Infof("%x [quorum:%llu] has received %d %s votes and %llu vote rejections",
       r->id_, r->quorum(), granted, kMsgString[type], r->votes_.size() - granted);
     if (granted == r->quorum()) {
       if (r->state_ == StatePreCandidate) {
@@ -1043,7 +1040,7 @@ stepCandidate(raft* r, const Message& msg) {
 
   switch (type) {
   case MsgProp:
-    logger->Infof(__FILE__, __LINE__, "%x no leader at term %llu; dropping proposal", r->id_, r->term_);
+    Infof("%x no leader at term %llu; dropping proposal", r->id_, r->term_);
     return;
     break;
   case MsgApp:
@@ -1055,7 +1052,7 @@ stepCandidate(raft* r, const Message& msg) {
     r->handleHeartbeat(msg);
     break;
   case MsgTimeoutNow:
-    logger->Debugf(__FILE__, __LINE__, "%x [term %llu state candidate] ignored MsgTimeoutNow from %x",
+    Debugf("%x [term %llu state candidate] ignored MsgTimeoutNow from %x",
       r->id_, r->term_, msg.from());
     break;
   }
@@ -1065,7 +1062,6 @@ void
 stepFollower(raft* r, const Message& msg) {
   int type = msg.type();
   Message *n;
-  Logger* logger = r->logger_;
 
   switch (type) {
   case MsgProp:
@@ -1093,8 +1089,7 @@ stepFollower(raft* r, const Message& msg) {
     break;
   case MsgTransferLeader:
     if (r->leader_ == kEmptyPeerId) {
-      logger->Infof(__FILE__, __LINE__,
-        "%x no leader at term %llu; dropping leader transfer msg",
+      Infof("%x no leader at term %llu; dropping leader transfer msg",
         r->id_, r->term_);
       return;
     }
@@ -1104,22 +1099,20 @@ stepFollower(raft* r, const Message& msg) {
     break;
   case MsgTimeoutNow:
     if (r->promotable()) {
-      logger->Infof(__FILE__, __LINE__,
-        "%x [term %llu] received MsgTimeoutNow from %x and starts an election to get leadership.",
+      Infof("%x [term %llu] received MsgTimeoutNow from %x and starts an election to get leadership.",
         r->id_, r->term_, msg.from());
  			// Leadership transfers never use pre-vote even if r.preVote is true; we
 			// know we are not recovering from a partition so there is no need for the
 			// extra round trip.
       r->campaign(CampaignTransfer);
     } else {
-      logger->Infof(__FILE__, __LINE__,
-        "%x received MsgTimeoutNow from %x but is not promotable",
+      Infof("%x received MsgTimeoutNow from %x but is not promotable",
         r->id_, msg.from());
     }
     break;
   case MsgReadIndex:
     if (r->leader_ == kEmptyPeerId) {
-      logger->Infof(__FILE__, __LINE__, "%x no leader at term %llu; dropping index reading msg", r->id_, r->term_);
+      Infof("%x no leader at term %llu; dropping index reading msg", r->id_, r->term_);
       return;
     }
     n = cloneMessage(msg);
@@ -1128,7 +1121,7 @@ stepFollower(raft* r, const Message& msg) {
     break;
   case MsgReadIndexResp:
     if (msg.entries_size() != 1) {
-      logger->Errorf(__FILE__, __LINE__, "%x invalid format of MsgReadIndexResp from %x, entries count: %llu",
+      Errorf("%x invalid format of MsgReadIndexResp from %x, entries count: %llu",
         r->id_, msg.from(), msg.entries_size());
       return;
     }
@@ -1148,7 +1141,7 @@ raft::restore(const Snapshot& snapshot) {
 
   // check if snapshot's [index,term] match log's [index,term]
   if (raftLog_->matchTerm(snapshot.metadata().index(), snapshot.metadata().term())) {
-    logger_->Infof(__FILE__, __LINE__, "%x [commit: %llu, lastindex: %llu, lastterm: %llu] fast-forwarded commit to snapshot [index: %llu, term: %llu]",
+    Infof("%x [commit: %llu, lastindex: %llu, lastterm: %llu] fast-forwarded commit to snapshot [index: %llu, term: %llu]",
       id_, raftLog_->committed_, raftLog_->lastIndex(), raftLog_->lastTerm(),
        snapshot.metadata().index(), snapshot.metadata().term());
     raftLog_->commitTo(snapshot.metadata().index());
@@ -1157,7 +1150,7 @@ raft::restore(const Snapshot& snapshot) {
 
   // below is the case use snapshot data to restore raft state machine
 
-  logger_->Infof(__FILE__, __LINE__, "%x [commit: %llu, lastindex: %llu, lastterm: %llu] starts to restore snapshot [index: %llu, term: %llu]",
+  Infof("%x [commit: %llu, lastindex: %llu, lastterm: %llu] starts to restore snapshot [index: %llu, term: %llu]",
     id_, raftLog_->committed_, raftLog_->lastIndex(), raftLog_->lastTerm(),
     snapshot.metadata().index(), snapshot.metadata().term());
 
@@ -1173,7 +1166,7 @@ raft::restore(const Snapshot& snapshot) {
       match = next - 1;
     }
     setProgress(node, match, next);
-    logger_->Infof(__FILE__, __LINE__, "%x restored progress of %x [%s]", id_, node, progressMap_[node]->String().c_str());
+    Infof("%x restored progress of %x [%s]", id_, node, progressMap_[node]->String().c_str());
   }
   return true;
 }
@@ -1187,12 +1180,12 @@ raft::handleSnapshot(const Message& msg) {
   resp->set_to(msg.from());
   resp->set_type(MsgAppResp);
   if (restore(msg.snapshot())) {
-    logger_->Infof(__FILE__, __LINE__, "%x [commit: %d] restored snapshot [index: %d, term: %d]",
+    Infof("%x [commit: %d] restored snapshot [index: %d, term: %d]",
       id_, raftLog_->committed_, sindex, sterm);
     // if success to restore from snapshot, return the last index
     resp->set_index(raftLog_->lastIndex());
   } else {
-    logger_->Infof(__FILE__, __LINE__, "%x [commit: %d] ignored snapshot [index: %d, term: %d]",
+    Infof("%x [commit: %d] ignored snapshot [index: %d, term: %d]",
       id_, raftLog_->committed_, sindex, sterm);
     // if failed to restore from snapshot, return the commit index
     resp->set_index(raftLog_->committed_);
@@ -1237,7 +1230,7 @@ raft::handleAppendEntries(const Message& msg) {
   } else {
     uint64_t term;
     int err = raftLog_->term(msg.index(), &term);
-    logger_->Debugf(__FILE__, __LINE__,
+    Debugf(
       "%x [logterm: %llu, index: %llu] rejected msgApp [logterm: %llu, index: %llu] from %x",
       id_, raftLog_->zeroTermOnErrCompacted(term, err), msg.index(), msg.logterm(), msg.index(), msg.from());
     Message *resp = new Message();
@@ -1255,7 +1248,7 @@ raft::setProgress(uint64_t id, uint64_t match, uint64_t next) {
   if (progressMap_[id] != NULL)  {
     delete progressMap_[id];
   }
-  progressMap_[id] = new Progress(next, maxInfilght_, logger_);
+  progressMap_[id] = new Progress(next, maxInfilght_);
   progressMap_[id]->match_ = match;
 }
 
@@ -1338,12 +1331,8 @@ validateConfig(Config *config) {
     printf("[FATAL] max inflight messages must be greater than 0\n");
     return -1;
   }
-  if (config->logger == NULL) {
-    config->logger = new DefaultLogger();
-    printf("[WANR] logger is NULL, use DefaultLogger by default\n");
-  }
   if (config->storage == NULL) {
-    config->storage = new MemoryStorage(config->logger);
+    config->storage = new MemoryStorage(NULL);
     printf("[WANR] storage is NULL, use MemoryStorage by default\n");
   }
   return 0;
@@ -1355,10 +1344,9 @@ newRaft(Config *config) {
     return NULL;
   }
 
-  raftLog *rl = newLog(config->storage, config->logger);
+  raftLog *rl = newLog(config->storage);
   HardState hs;
   ConfState cs;
-  Logger *logger = config->logger;
   vector<uint64_t> peers = config->peers;
   int err;
   size_t i;
@@ -1366,12 +1354,12 @@ newRaft(Config *config) {
   // init hs,cs from storage
   err = config->storage->InitialState(&hs, &cs);
   if (!SUCCESS(err)) {
-    logger->Fatalf(__FILE__, __LINE__, "storage InitialState fail: %s", kErrString[err]); 
+    Fatalf("storage InitialState fail: %s", kErrString[err]); 
   }
 
   if (cs.nodes_size() > 0) {
     if (peers.size() > 0) {
-      logger->Fatalf(__FILE__, __LINE__, "cannot specify both newRaft(peers) and ConfState.Nodes)");
+      Fatalf("cannot specify both newRaft(peers) and ConfState.Nodes)");
     }
     peers.clear();
     for (i = 0; (int)i < cs.nodes_size(); ++i) {
@@ -1382,7 +1370,7 @@ newRaft(Config *config) {
   // init the progressMap_
   raft *r = new raft(config, rl);
   for (i = 0; i < peers.size(); ++i) {
-    r->progressMap_[peers[i]] = new Progress(1, r->maxInfilght_, logger);
+    r->progressMap_[peers[i]] = new Progress(1, r->maxInfilght_);
   }
 
   // load hardState if needed.
@@ -1405,8 +1393,7 @@ newRaft(Config *config) {
   }
   string nodeStr = joinStrings(peerStrs, ",");
 
-  r->logger_->Infof(__FILE__, __LINE__,
-    "newRaft %llu [peers: [%s], term: %llu, commit: %llu, applied: %llu, lastindex: %llu, lastterm: %llu]",
+  Infof("newRaft %llu [peers: [%s], term: %llu, commit: %llu, applied: %llu, lastindex: %llu, lastterm: %llu]",
     r->id_, nodeStr.c_str(), r->term_, rl->committed_, rl->applied_, rl->lastIndex(), rl->lastTerm());
   return r;
 }

@@ -3,7 +3,6 @@
  */
 
 #include <string>
-#include "base/default_logger.h"
 #include "base/util.h"
 
 using namespace std;

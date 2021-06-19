@@ -135,8 +135,8 @@ newSnapshot(uint64_t index = 0, uint64_t term = 0) {
 }
 
 static inline Progress
-initProgress(uint64_t next, int maxInfilght, Logger *logger, ProgressState state, uint64_t match, uint64_t pendingSnapshot = 0) { 
-  Progress progress(next, maxInfilght, logger);
+initProgress(uint64_t next, int maxInfilght, ProgressState state, uint64_t match, uint64_t pendingSnapshot = 0) { 
+  Progress progress(next, maxInfilght);
   progress.state_ = state;
   progress.match_ = match;
   progress.pendingSnapshot_ = pendingSnapshot;

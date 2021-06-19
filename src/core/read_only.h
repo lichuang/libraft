@@ -27,9 +27,8 @@ struct readOnly {
   ReadOnlyOption option_;
   map<string, readIndexStatus*> pendingReadIndex_;
   vector<string> readIndexQueue_;
-  Logger *logger_;
 
-  readOnly(ReadOnlyOption option, Logger *logger);
+  readOnly(ReadOnlyOption option);
   void addRequest(uint64_t index, Message *msg);
   int recvAck(const Message& msg);
   void advance(const Message& msg, vector<readIndexStatus*>* rss);

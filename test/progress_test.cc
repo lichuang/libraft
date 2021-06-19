@@ -4,7 +4,6 @@
 
 #include <gtest/gtest.h>
 #include "libraft.h"
-#include "base/default_logger.h"
 #include "base/util.h"
 #include "core/progress.h"
 
@@ -24,7 +23,7 @@ bool deepEqualInflights(const inflights& in1, const inflights& in2) {
 }
 
 TEST(progressTests, TestInflightsAdd) {
-  inflights ins(10, &kDefaultLogger);
+  inflights ins(10);
   int i;
 
   for (i = 0; i < 5; ++i) {
@@ -32,7 +31,7 @@ TEST(progressTests, TestInflightsAdd) {
   }
 
   {
-    inflights wantIns(10, &kDefaultLogger);
+    inflights wantIns(10);
     wantIns.start_ = 0;
     wantIns.count_ = 5;
     wantIns.size_  = 10;
@@ -47,7 +46,7 @@ TEST(progressTests, TestInflightsAdd) {
   }
 
   {
-    inflights wantIns(10, &kDefaultLogger);
+    inflights wantIns(10);
     wantIns.start_ = 0;
     wantIns.count_ = 10;
     wantIns.size_  = 10;
@@ -58,14 +57,14 @@ TEST(progressTests, TestInflightsAdd) {
   }
 
   // rotating case
-  inflights ins2(10, &kDefaultLogger);
+  inflights ins2(10);
   ins2.start_ = 5;
 
   for (i = 0; i < 5; ++i) {
     ins2.add(i);
   }
   {
-    inflights wantIns(10, &kDefaultLogger);
+    inflights wantIns(10);
     wantIns.start_ = 5;
     wantIns.count_ = 5;
     wantIns.size_  = 10;
@@ -78,7 +77,7 @@ TEST(progressTests, TestInflightsAdd) {
     ins2.add(i);
   }
   {
-    inflights wantIns(10, &kDefaultLogger);
+    inflights wantIns(10);
     wantIns.start_ = 5;
     wantIns.count_ = 10;
     wantIns.size_  = 10;
@@ -90,7 +89,7 @@ TEST(progressTests, TestInflightsAdd) {
 }
 
 TEST(progressTests, TestInflightFreeTo) {
-  inflights ins(10, &kDefaultLogger);
+  inflights ins(10);
   int i;
 
   for (i = 0; i < 10; ++i) {
@@ -99,7 +98,7 @@ TEST(progressTests, TestInflightFreeTo) {
 
   ins.freeTo(4);
   {
-    inflights wantIns(10, &kDefaultLogger);
+    inflights wantIns(10);
     wantIns.start_ = 5;
     wantIns.count_ = 5;
     wantIns.size_  = 10;
@@ -111,7 +110,7 @@ TEST(progressTests, TestInflightFreeTo) {
 
   ins.freeTo(8);
   {
-    inflights wantIns(10, &kDefaultLogger);
+    inflights wantIns(10);
     wantIns.start_ = 9;
     wantIns.count_ = 1;
     wantIns.size_  = 10;
@@ -127,7 +126,7 @@ TEST(progressTests, TestInflightFreeTo) {
   }
   ins.freeTo(12);
   {
-    inflights wantIns(10, &kDefaultLogger);
+    inflights wantIns(10);
     wantIns.start_ = 3;
     wantIns.count_ = 2;
     wantIns.size_  = 10;
@@ -139,7 +138,7 @@ TEST(progressTests, TestInflightFreeTo) {
 
   ins.freeTo(14);
   {
-    inflights wantIns(10, &kDefaultLogger);
+    inflights wantIns(10);
     wantIns.start_ = 0;
     wantIns.count_ = 0;
     wantIns.size_  = 10;
@@ -149,7 +148,7 @@ TEST(progressTests, TestInflightFreeTo) {
 }
 
 TEST(progressTests, TestInflightFreeFirstOne) {
-  inflights ins(10, &kDefaultLogger);
+  inflights ins(10);
   int i;
 
   for (i = 0; i < 10; ++i) {
@@ -158,7 +157,7 @@ TEST(progressTests, TestInflightFreeFirstOne) {
   
   ins.freeFirstOne();
   {
-    inflights wantIns(10, &kDefaultLogger);
+    inflights wantIns(10);
     wantIns.start_ = 1;
     wantIns.count_ = 9;
     wantIns.size_  = 10;

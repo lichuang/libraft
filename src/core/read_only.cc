@@ -2,13 +2,13 @@
  * Copyright (C) lichuang
  */
 
+#include "base/logger.h"
 #include "core/read_only.h"
 
 namespace libraft {
-  
-readOnly::readOnly(ReadOnlyOption option, Logger *logger)
-  : option_(option),
-    logger_(logger) {
+
+readOnly::readOnly(ReadOnlyOption option)
+  : option_(option) {
 }
 
 // addRequest adds a read only reuqest into readonly struct.
@@ -49,7 +49,7 @@ void readOnly::advance(const Message& msg, vector<readIndexStatus*> *rss) {
   for (i = 0; i < readIndexQueue_.size(); ++i) {
     map<string, readIndexStatus*>::iterator iter = pendingReadIndex_.find(ctx);
     if (iter == pendingReadIndex_.end()) {
-      logger_->Fatalf(__FILE__, __LINE__, "cannot find corresponding read state from pending map");
+      Fatalf("cannot find corresponding read state from pending map");
     }
 
     readIndexStatus* rs = iter->second;

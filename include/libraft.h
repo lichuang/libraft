@@ -181,17 +181,6 @@ public:
   //virtual int CreateSnapshot(uint64_t i, ConfState *cs, const string& data, Snapshot *ss) = 0;
 };
 
-class Logger {
-public:
-  virtual void Debugf(const char *file, int line, const char *fmt, ...) = 0;
-  virtual void Infof(const char *file, int line, const char *fmt, ...) = 0;
-  virtual void Warningf(const char *file, int line, const char *fmt, ...) = 0;
-  virtual void Errorf(const char *file, int line, const char *fmt, ...) = 0;
-  virtual void Fatalf(const char *file, int line, const char *fmt, ...) = 0;
-
-  virtual ~Logger() {}
-};
-
 // ReadOnlyOption specifies how the read only request is processed.
 enum ReadOnlyOption {
   // ReadOnlySafe guarantees the linearizability of the read only request by
@@ -205,6 +194,8 @@ enum ReadOnlyOption {
   // in that case.
   ReadOnlyLeaseBased = 1
 };
+
+typedef void (*raft_log_func)(const char * buf);
 
 // Config contains the parameters to start a raft.
 struct Config {
@@ -267,11 +258,11 @@ struct Config {
   // rejoins the cluster.
   bool preVote = false;
 
-  // logger is the logger used for raft log. For multinode which can host
+  // logFunc is the logger function used for raft log. For multinode which can host
   // multiple raft group, each raft group can have its own logger.
   // when node end up, storage will be destroyed.
   // if it is NULL, use `DefaultLogger' by default.
-  Logger*           logger = NULL;            
+  raft_log_func logFunc = NULL;
 
   ReadOnlyOption    readOnlyOption;
 };
