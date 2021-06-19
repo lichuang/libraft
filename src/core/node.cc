@@ -70,7 +70,7 @@ int
 NodeImpl::ProposeConfChange(const ConfChange& cc, Ready **ready) {
   string data;
   if (!cc.SerializeToString(&data)) {
-    Errorf(__FILE__, __LINE__, "ConfChange SerializeToString error");
+    Errorf("ConfChange SerializeToString error");
     return ErrSerializeFail;
   }
 
@@ -168,13 +168,13 @@ NodeImpl::stateMachine(const Message& msg, Ready **ready) {
         Infof("raft.node: %x elected leader %x at term %llu",
           raft_->id_, raft_->leader_, raft_->term_);
       } else {
-        Infof(__FILE__, __LINE__, "raft.node: %x changed leader from %x to %x at term %llu",
+        Infof("raft.node: %x changed leader from %x to %x at term %llu",
           raft_->id_, leader_, raft_->leader_, raft_->term_);
       }
       canPropose_ = true;
     } else {
       canPropose_ = false;
-      Infof(__FILE__, __LINE__, "raft.node: %x lost leader %x at term %llu",
+      Infof("raft.node: %x lost leader %x at term %llu",
         raft_->id_, leader_, raft_->term_);
     }
     leader_ = raft_->leader_;
@@ -240,7 +240,7 @@ NodeImpl::handleConfChange() {
     raft_->resetPendingConf();
     break;
   default:
-    Fatalf(__FILE__, __LINE__, "unexpected conf type");
+    Fatalf("unexpected conf type");
     break;
   }
 

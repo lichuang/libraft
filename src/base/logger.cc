@@ -2,14 +2,13 @@
  * Copyright (C) lichuang
  */
 
-#include "libraft.h"
 #include "base/logger.h"
 #include <libgen.h> // for basename
 #include <stdio.h>
 
 namespace libraft {
 
-log_level_e gLogLevel = Debug;
+LogLevel gLogLevel = Debug;
 
 static void  default_logger(const char * buf);
 const static int kLogBufferSize = 1024;
@@ -26,11 +25,11 @@ const static char* kLogString[] = {
 static void
 default_logger(const char * buf) {
   fprintf(stdout, "%s", buf);
-  fflush(stdout);
+  //fflush(stdout);
 }
 
 void 
-do_log(log_level_e level, const char *file, int line, const char *fmt, ...) {
+do_log(LogLevel level, const char *file, int line, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
 

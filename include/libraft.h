@@ -197,6 +197,14 @@ enum ReadOnlyOption {
 
 typedef void (*raft_log_func)(const char * buf);
 
+enum LogLevel {
+  Debug     = 0,
+  Warn      = 1,
+  Info      = 2,
+  Error     = 3,
+  Fatal     = 4,
+};
+
 // Config contains the parameters to start a raft.
 struct Config {
   // ID is the identity of the local raft. ID cannot be 0.
@@ -258,10 +266,13 @@ struct Config {
   // rejoins the cluster.
   bool preVote = false;
 
+  // log level of raft log, Debug by default
+  LogLevel logLevel = Debug;
+
   // logFunc is the logger function used for raft log. For multinode which can host
   // multiple raft group, each raft group can have its own logger.
   // when node end up, storage will be destroyed.
-  // if it is NULL, use `DefaultLogger' by default.
+  // if it is NULL, the default logger will send log to stdout.
   raft_log_func logFunc = NULL;
 
   ReadOnlyOption    readOnlyOption;
