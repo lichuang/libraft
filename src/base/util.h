@@ -31,6 +31,16 @@ string entryVecDebugString(const EntryVec& entries);
 // string util
 string joinStrings(const vector<string>& strs, const string &sep);
 
+// IsEmptySnap returns true if the given Snapshot is empty.
+inline static bool
+isEmptyHardState(const HardState& hs) {
+  return isHardStateEqual(hs, kEmptyHardState);
+}
+
+inline static bool
+isEmptySoftState(const SoftState& ss) {
+  return isSoftStateEqual(ss, kEmptySoftState);
+}
 }; // namespace libraft
 
 #endif  // __LIBRAFT_UTIL_H__

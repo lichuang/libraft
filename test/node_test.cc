@@ -39,13 +39,14 @@ TEST(nodeTests, TestNodePropose) {
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  NodeImpl *n = new NodeImpl(r);  
+  Config config; 
+  NodeImpl *n = new NodeImpl(r, &config);
 
   readStates.push_back(new ReadState(1, "somedata"));
   r->readStates_ = readStates;
-
-  Ready *ready;
-  n->Campaign(&ready);
+  
+  n->Campaign();
+  Ready *ready = n->get_ready();
 
   while (true) {
     EXPECT_EQ(ready->readStates, readStates);
@@ -61,7 +62,7 @@ TEST(nodeTests, TestNodePropose) {
 
   r->stateStepFunc_ = appendStep;
   string wrequestCtx = "somedata2";
-  n->ReadIndex(wrequestCtx, &ready);
+  n->ReadIndex(wrequestCtx);
 
   EXPECT_EQ((int)msgs.size(), 1);
   EXPECT_EQ(msgs[0].type(), MsgReadIndex);
@@ -156,10 +157,11 @@ TEST(nodeTests, TestNodeProposeConfig) {
   MemoryStorage *s = new MemoryStorage(NULL);
   vector<uint64_t> peers = {1};
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  NodeImpl *n = new NodeImpl(r); 
-
-  Ready *ready;
-  n->Campaign(&ready);
+  Config config;
+  NodeImpl *n = new NodeImpl(r, &config);
+  
+  n->Campaign();
+  Ready *ready = n->get_ready();
 
   while (true) {
     s->Append(ready->entries);
@@ -179,7 +181,8 @@ TEST(nodeTests, TestNodeProposeConfig) {
   string ccdata;
   cc.SerializeToString(&ccdata);
 
-  n->ProposeConfChange(cc, &ready);
+  n->ProposeConfChange(cc);
+  ready = n->get_ready();
   n->Stop();
 
   EXPECT_EQ((int)msgs.size(), 1);
@@ -207,7 +210,8 @@ void applyReadyEntries(Ready* ready, EntryVec* readyEntries, MemoryStorage *s, N
       ConfChange cc;
       cc.ParseFromString(entry.data());
       ConfState cs;
-      n->ApplyConfChange(cc, &cs, &nready);
+      n->ApplyConfChange(cc, &cs);
+      nready = n->get_ready();
       //applyReadyEntries(nready, readyEntries, s, n);
     }
   }
@@ -219,11 +223,12 @@ TEST(nodeTests, TestNodeProposeAddDuplicateNode) {
   vector<uint64_t> peers;
   peers.push_back(1);
   raft *r = newTestRaft(1, peers, 10, 1, s);
-  NodeImpl *n = new NodeImpl(r); 
+  Config config;
+  NodeImpl *n = new NodeImpl(r, &config);
 
-  Ready *ready;
   EntryVec readyEntries;
-  n->Campaign(&ready);
+  n->Campaign();
+  Ready *ready = n->get_ready();
   applyReadyEntries(ready, &readyEntries, s, n);
 
   ConfChange cc1, cc2;
@@ -232,18 +237,21 @@ TEST(nodeTests, TestNodeProposeAddDuplicateNode) {
   cc1.set_type(ConfChangeAddNode);
   cc1.set_nodeid(1);
   cc1.SerializeToString(&ccdata1);
-  n->ProposeConfChange(cc1, &ready);
+  n->ProposeConfChange(cc1);
+  ready = n->get_ready();
   applyReadyEntries(ready, &readyEntries, s, n);
   
   // try add the same node again
-  n->ProposeConfChange(cc1, &ready);
+  n->ProposeConfChange(cc1);
+  ready = n->get_ready();
   applyReadyEntries(ready, &readyEntries, s, n);
 
   // the new node join should be ok
   cc2.set_type(ConfChangeAddNode);
   cc2.set_nodeid(2);
   cc2.SerializeToString(&ccdata2);
-  n->ProposeConfChange(cc2, &ready);
+  n->ProposeConfChange(cc2);
+  ready = n->get_ready();
   applyReadyEntries(ready, &readyEntries, s, n);
 
   EXPECT_EQ((int)readyEntries.size(), 4);

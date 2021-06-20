@@ -5,7 +5,8 @@ set(libraft_files
   src/base/mutex.cc
   src/base/util.cc 
 
-  src/core/node.cc 
+  src/core/node.cc
+  src/core/fsm_caller.cc
   src/core/progress.cc 
   src/core/raft.cc 
   src/core/read_only.cc 

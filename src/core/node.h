@@ -6,6 +6,7 @@
 #define __LIBRAFT_NODE_H__
 
 #include "libraft.h"
+#include "core/fsm_caller.h"
 
 namespace libraft {
 
@@ -20,26 +21,66 @@ enum NodeMessageType {
 
 struct raft;
 
+struct Ready {
+ 	// The current volatile state of a Node.
+	// SoftState will be nil if there is no update.
+	// It is not required to consume or store SoftState.
+  SoftState         softState;
+
+	// The current state of a Node to be saved to stable storage BEFORE
+	// Messages are sent.
+	// HardState will be equal to empty state if there is no update.
+  HardState         hardState;
+
+ 	// ReadStates can be used for node to serve linearizable read requests locally
+	// when its applied index is greater than the index in ReadState.
+	// Note that the readState will be returned when raft receives msgReadIndex.
+	// The returned is only valid for the request that requested to read.
+  vector<ReadState*> readStates;
+
+	// Entries specifies entries to be saved to stable storage BEFORE
+	// Messages are sent.
+  EntryVec          entries;
+
+  // Snapshot specifies the snapshot to be saved to stable storage.
+  Snapshot          *snapshot;
+
+	// CommittedEntries specifies entries to be committed to a
+	// store/state-machine. These have previously been committed to stable
+	// store.
+  EntryVec          committedEntries;
+
+ 	// Messages specifies outbound messages to be sent AFTER Entries are
+	// committed to stable storage.
+	// If it contains a MsgSnap message, the application MUST report back to raft
+	// when the snapshot has been received or has failed by calling ReportSnapshot.
+  MessageVec  messages;
+};
+
 class NodeImpl : public Node {
 public:
-  NodeImpl(raft*);
+  NodeImpl(raft*, Config*);
   virtual ~NodeImpl();
 
-  virtual void Tick(Ready **ready);
-  virtual int  Campaign(Ready **ready);
-  virtual int  Propose(const string& data, Ready **ready);
-  virtual int  ProposeConfChange(const ConfChange& cc, Ready **ready);
-  virtual int  Step(const Message& msg, Ready **ready);
+  virtual void Tick();
+  virtual int  Campaign();
+  virtual int  Propose(const string& data);
+  virtual int  ProposeConfChange(const ConfChange& cc);
+  virtual int  Step(const Message& msg);
   virtual void Advance();
-  virtual void ApplyConfChange(const ConfChange& cc, ConfState *cs, Ready **ready);
-  virtual void TransferLeadership(uint64_t leader, uint64_t transferee, Ready **ready);
-  virtual int  ReadIndex(const string &rctx, Ready **ready);
+  virtual void ApplyConfChange(const ConfChange& cc, ConfState *cs);
+  virtual void TransferLeadership(uint64_t leader, uint64_t transferee);
+  virtual int  ReadIndex(const string &rctx);
   virtual void Stop();
 
+  Ready* get_ready() {
+    return &ready_;
+  }
+
 private:
-  int stateMachine(const Message& msg, Ready **ready);
-  Ready* newReady();
-  int doStep(const Message& msg, Ready **ready);
+  int stateMachine(const Message& msg);
+  void newReady();
+  int doStep(const Message& msg);
   bool isMessageFromClusterNode(const Message& msg);
   void handleConfChange();
   void handleAdvance();
@@ -60,6 +101,8 @@ public:
 
   // save Ready data in each step
   Ready ready_;
+
+  FsmCaller fsm_caller_;
 
   // if there is no leader, then cannot propose any msg
   bool canPropose_;

@@ -101,42 +101,6 @@ struct ReadState {
 typedef vector<Entry> EntryVec;
 typedef vector<Message*> MessageVec;
 
-struct Ready {
- 	// The current volatile state of a Node.
-	// SoftState will be nil if there is no update.
-	// It is not required to consume or store SoftState.
-  SoftState         softState;
-
-	// The current state of a Node to be saved to stable storage BEFORE
-	// Messages are sent.
-	// HardState will be equal to empty state if there is no update.
-  HardState         hardState;
-
- 	// ReadStates can be used for node to serve linearizable read requests locally
-	// when its applied index is greater than the index in ReadState.
-	// Note that the readState will be returned when raft receives msgReadIndex.
-	// The returned is only valid for the request that requested to read.
-  vector<ReadState*> readStates;
-
-	// Entries specifies entries to be saved to stable storage BEFORE
-	// Messages are sent.
-  EntryVec          entries;
-
-  // Snapshot specifies the snapshot to be saved to stable storage.
-  Snapshot          *snapshot;
-
-	// CommittedEntries specifies entries to be committed to a
-	// store/state-machine. These have previously been committed to stable
-	// store.
-  EntryVec          committedEntries;
-
- 	// Messages specifies outbound messages to be sent AFTER Entries are
-	// committed to stable storage.
-	// If it contains a MsgSnap message, the application MUST report back to raft
-	// when the snapshot has been received or has failed by calling ReportSnapshot.
-  MessageVec  messages;
-};
-
 // Storage is an interface that may be implemented by the application
 // to retrieve log entries from storage.
 //
@@ -193,6 +157,21 @@ enum ReadOnlyOption {
   // should (clock can move backward/pause without any bound). ReadIndex is not safe
   // in that case.
   ReadOnlyLeaseBased = 1
+};
+
+// StateMachine is the sink of all the events of a very raft node.
+// Implement a specific StateMachine by application.
+//
+// NOTE: All the interfaces are not guaranteed to be thread safe and they are
+// called sequentially, saying that every single operation will block all the
+// following ones.
+class StateMachine {
+public:
+  virtual ~StateMachine();
+
+  virtual void on_soft_state_changed(const SoftState&) = 0;
+
+  virtual void on_send_message(const MessageVec&) = 0;
 };
 
 typedef void (*raft_log_func)(const char * buf);
@@ -275,6 +254,9 @@ struct Config {
   // if it is NULL, the default logger will send log to stdout.
   raft_log_func logFunc = NULL;
 
+  // the state machine implemented by the application
+  StateMachine* fsm = NULL;
+
   ReadOnlyOption    readOnlyOption;
 };
 
@@ -287,21 +269,21 @@ class Node {
 public:
 	// Tick increments the internal logical clock for the Node by a single tick. Election
 	// timeouts and heartbeat timeouts are in units of ticks.
-  virtual void Tick(Ready **ready) = 0;
+  virtual void Tick() = 0;
 
   // Campaign causes the Node to transition to candidate state and start campaigning to become leader.
-  virtual int Campaign(Ready **ready) = 0;
+  virtual int Campaign() = 0;
 
   // Propose proposes that data be appended to the log.
-  virtual int Propose(const string& data, Ready **ready) = 0;
+  virtual int Propose(const string& data) = 0;
 
 	// ProposeConfChange proposes config change.
 	// At most one ConfChange can be in the process of going through consensus.
 	// Application needs to call ApplyConfChange when applying EntryConfChange type entry.
-  virtual int ProposeConfChange(const ConfChange& cc, Ready **ready) = 0;
+  virtual int ProposeConfChange(const ConfChange& cc) = 0;
 
   // Step advances the state machine using the given message. ctx.Err() will be returned, if any.
-  virtual int Step(const Message& msg, Ready **ready) = 0;
+  virtual int Step(const Message& msg) = 0;
 
  	// Advance notifies the Node that the application has saved progress up to the last Ready.
 	// It prepares the node to return the next available Ready.
@@ -318,16 +300,16 @@ public:
 	// Returns an opaque ConfState protobuf which must be recorded
 	// in snapshots. Will never return nil; it returns a pointer only
 	// to match MemoryStorage.Compact.
-  virtual void ApplyConfChange(const ConfChange& cc, ConfState *cs, Ready **ready) = 0;
+  virtual void ApplyConfChange(const ConfChange& cc, ConfState *cs) = 0;
 
   // TransferLeadership attempts to transfer leadership to the given transferee.
-  virtual void TransferLeadership(uint64_t leader, uint64_t transferee, Ready **ready) = 0;
+  virtual void TransferLeadership(uint64_t leader, uint64_t transferee) = 0;
 
 	// ReadIndex request a read state. The read state will be set in the ready.
 	// Read state has a read index. Once the application advances further than the read
 	// index, any linearizable read requests issued before the read request can be
 	// processed safely. The read state will have the same rctx attached.
-  virtual int ReadIndex(const string &rctx, Ready **ready) = 0;
+  virtual int ReadIndex(const string &rctx) = 0;
 
 	// Stop performs any necessary termination of the Node.
   virtual void Stop() = 0;

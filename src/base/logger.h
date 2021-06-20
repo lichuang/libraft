@@ -2,8 +2,8 @@
  * Copyright (C) lichuang
  */
 
-#ifndef __LIBRAFT_UTIL_LOGGER_H__
-#define __LIBRAFT_UTIL_LOGGER_H__
+#ifndef __LIBRAFT_LOGGER_H__
+#define __LIBRAFT_LOGGER_H__
 
 #include <stdarg.h>
 #include <stdlib.h>
@@ -25,4 +25,4 @@ extern void initLog();
 
 }; // namespace libraft
 
-#endif  // __LIBRAFT_UTIL_LOGGER_H__
+#endif  // __LIBRAFT_LOGGER_H__

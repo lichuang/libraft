@@ -10,18 +10,7 @@
 
 namespace libraft {
 
-// IsEmptySnap returns true if the given Snapshot is empty.
-inline static bool 
-isEmptyHardState(const HardState& hs) {
-  return isHardStateEqual(hs, kEmptyHardState);
-}
-
-inline static bool 
-isEmptySoftState(const SoftState& ss) {
-  return isSoftStateEqual(ss, kEmptySoftState);
-}
-
-NodeImpl::NodeImpl(raft* r)
+NodeImpl::NodeImpl(raft* r, Config* config)
   : Node()
   , stopped_(false)
   , raft_(r)
@@ -29,6 +18,7 @@ NodeImpl::NodeImpl(raft* r)
   , prevSoftState_(kEmptySoftState)
   , prevHardState_(kEmptyHardState)
   , waitAdvanced_(false)
+  , fsm_caller_(config->fsm, this)
   , canPropose_(true)
   , msgType_(NoneMessage)
   , prevLastUnstableIndex_(0)
@@ -45,29 +35,29 @@ NodeImpl::~NodeImpl() {
 }
 
 void 
-NodeImpl::Tick(Ready **ready) {
+NodeImpl::Tick() {
   msgType_ = TickMessage;
-  stateMachine(Message(), ready);
+  stateMachine(Message());
 }
 
 int 
-NodeImpl::Campaign(Ready **ready) {
+NodeImpl::Campaign() {
   Message msg;
   msg.set_type(MsgHup);
-  return doStep(msg, ready);
+  return doStep(msg);
 }
 
-int 
-NodeImpl::Propose(const string& data, Ready **ready) {
+int
+NodeImpl::Propose(const string& data) {
   Message msg;
   msg.set_type(MsgProp);
   msg.set_from(raft_->id_);
   msg.add_entries()->set_data(data);
-  return doStep(msg, ready);
+  return doStep(msg);
 }
 
 int 
-NodeImpl::ProposeConfChange(const ConfChange& cc, Ready **ready) {
+NodeImpl::ProposeConfChange(const ConfChange& cc) {
   string data;
   if (!cc.SerializeToString(&data)) {
     Errorf("ConfChange SerializeToString error");
@@ -81,18 +71,17 @@ NodeImpl::ProposeConfChange(const ConfChange& cc, Ready **ready) {
   entry->set_type(EntryConfChange);
   entry->set_data(data);
 
-  return Step(msg, ready);
+  return Step(msg);
 }
 
-int 
-NodeImpl::Step(const Message& msg, Ready **ready) {
+int
+NodeImpl::Step(const Message& msg) {
   // ignore unexpected local messages receiving over network
   if (isLoaclMessage(msg.type())) {
-    *ready = NULL;
     return OK;
   }
 
-  return doStep(msg, ready);
+  return doStep(msg);
 }
 
 void
@@ -109,56 +98,57 @@ NodeImpl::Advance() {
   for (i = 0; i < ready_.messages.size(); ++i) {
     delete ready_.messages[i];
   }
+  ready_.messages.clear();
   for (i = 0; i < ready_.readStates.size(); ++i) {
     delete ready_.readStates[i];
   }
+  ready_.readStates.clear();
   waitAdvanced_ = false;
 }
 
-void 
-NodeImpl::ApplyConfChange(const ConfChange& cc, ConfState *cs, Ready **ready) {
+void
+NodeImpl::ApplyConfChange(const ConfChange& cc, ConfState *cs) {
   confChange_ = cc;
   confState_ = cs;
   /*
   msgType_ = ConfChangeMessage;
   stateMachine(Message(), ready);
   */
-  *ready = NULL;
   handleConfChange();
 }
 
 int 
-NodeImpl::doStep(const Message& msg, Ready **ready) {
+NodeImpl::doStep(const Message& msg) {
   if (msg.type() == MsgProp) {
     msgType_ = ProposeMessage;
   } else {
     msgType_ = RecvMessage;
   }
 
-  return stateMachine(msg, ready);
+  return stateMachine(msg);
 }
 
 void 
-NodeImpl::TransferLeadership(uint64_t leader, uint64_t transferee, Ready **ready) {
+NodeImpl::TransferLeadership(uint64_t leader, uint64_t transferee) {
   msgType_ = RecvMessage;
   Message msg;
   msg.set_type(MsgTransferLeader);
   msg.set_from(transferee);
   msg.set_to(leader);
 
-  stateMachine(msg, ready);
+  stateMachine(msg);
 }
 
-int NodeImpl::ReadIndex(const string &rctx, Ready **ready) {
+int NodeImpl::ReadIndex(const string &rctx) {
   Message msg;
   msg.set_type(MsgReadIndex);
   msg.add_entries()->set_data(rctx);
 
-  return doStep(msg, ready);
+  return doStep(msg);
 }
 
-int 
-NodeImpl::stateMachine(const Message& msg, Ready **ready) {
+int
+NodeImpl::stateMachine(const Message& msg) {
   if (stopped_) {
     return OK;
   }
@@ -203,14 +193,11 @@ NodeImpl::stateMachine(const Message& msg, Ready **ready) {
     break;
   }
 
-  if (waitAdvanced_) {
-    *ready = NULL;
-  } else {
-    *ready = newReady();
-    if (!readyContainUpdate()) {
-      *ready = NULL;
-    } else {
+  if (!waitAdvanced_) {
+    newReady();
+    if (readyContainUpdate()) {
       waitAdvanced_ = true;
+      fsm_caller_.on_call_fsm(&ready_);
     }
   }
 
@@ -264,7 +251,7 @@ NodeImpl::isMessageFromClusterNode(const Message& msg) {
   return (raft_->progressMap_.find(msg.from()) != raft_->progressMap_.end());
 }
 
-Ready* 
+void
 NodeImpl::newReady() {
   // 1) reset ready data
   ready_.softState = kEmptySoftState;
@@ -317,8 +304,6 @@ NodeImpl::newReady() {
 
   raft_->outMsgs_.clear();
   raft_->readStates_.clear();
-
-  return &ready_;
 }
 
 void 
@@ -391,7 +376,7 @@ StartNode(Config* config, const vector<Peer>& peers) {
     r->addNode(peer.Id);
   }
 
-  return new NodeImpl(r);
+  return new NodeImpl(r,config);
 }
 
 // RestartNode is similar to StartNode but does not take a list of peers.
@@ -405,7 +390,7 @@ RestartNode(Config *config) {
     return NULL;
   }
 
-  return new NodeImpl(r);
+  return new NodeImpl(r,config);
 }
 
 }; // namespace libraft
