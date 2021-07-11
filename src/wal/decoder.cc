@@ -6,6 +6,7 @@
 #include "base/crc32c.h"
 #include "base/io_buffer.h"
 #include "base/file.h"
+#include "io/buffer_io_reader.h"
 #include "wal/decoder.h"
 #include "wal/wal.h"
 
@@ -14,7 +15,7 @@ namespace libraft {
 const uint32_t kMinSectorSize = 512;
 
 int 
-decoder::decode(Record* rec) {
+Decoder::decode(Record* rec) {
   //rec->Reset();
   locker.Lock();
 
@@ -22,8 +23,8 @@ decoder::decode(Record* rec) {
 }
 
 int 
-decoder::decodeRecord(Record* rec) {
-  if (io_buffers.size() == 0) {
+Decoder::decodeRecord(Record* rec) {
+  if (readers.size() == 0) {
     return kEOF;
   }
 
@@ -31,13 +32,13 @@ decoder::decodeRecord(Record* rec) {
   int64_t lenField = 0;
   int64_t recBytes, padBytes;
 
-  err = io_buffers[0]->ReadInt64(&lenField);
+  err = readers[0]->ReadInt64(&lenField);
   if (err == kEOF || lenField == 0) {
     // hit end of file or preallocated space
-    IOBuffer* buffer = io_buffers[0];
-    delete buffer;
-    io_buffers.erase(io_buffers.begin());
-    if (io_buffers.size() == 0) {
+    BufferIOReader* reader = readers[0];
+    delete reader;
+    readers.erase(readers.begin());
+    if (readers.size() == 0) {
       return kEOF;
     }
 
@@ -53,11 +54,11 @@ decoder::decodeRecord(Record* rec) {
 
   char *data = new char[recBytes + padBytes];
   memset(data, '\0', recBytes + padBytes);
-  int total = io_buffers[0]->ReadFull(data, recBytes + padBytes, &err);
+  int total = readers[0]->Read(data, recBytes + padBytes, &err);
   (void)total;
   if (err != kOK) {
 		// ReadFull returns io.kEOF only if no bytes were read
-		// the decoder should treat this as an kErrUnexpectedEOF instead.
+		// the Decoder should treat this as an kErrUnexpectedEOF instead.
     if (err == kEOF) {
       err = kErrUnexpectedEOF;
       goto out;
@@ -95,7 +96,7 @@ out:
 }
 
 void 
-decoder::decodeFrameSize(int64_t lenField, int64_t* recBytes, int64_t* padBytes) {
+Decoder::decodeFrameSize(int64_t lenField, int64_t* recBytes, int64_t* padBytes) {
   // the record size is stored in the lower 56 bits of the 64-bit length
   *recBytes = (int64_t)(((uint64_t)lenField) & (uint64_t(0xffff) ^ ((uint64_t)(0xff) << 56)));
   *padBytes = 0;
@@ -115,8 +116,8 @@ struct chunk {
 };
 
 bool 
-decoder::isTornEntry(const char* data, uint32_t len) {
-  if (io_buffers.size() != 1) {
+Decoder::isTornEntry(const char* data, uint32_t len) {
+  if (readers.size() != 1) {
     return false;
   }
 
@@ -157,23 +158,26 @@ decoder::isTornEntry(const char* data, uint32_t len) {
   return false;
 }
 
-decoder::decoder(const vector<IOBuffer*>& buffer) {
+Decoder::Decoder(const vector<IOReader*>& reader) {
   uint32_t i;
-  for (i = 0; i < buffer.size(); ++i) {
-    io_buffers.push_back(buffer[i]);
+  for (i = 0; i < reader.size(); ++i) {
+    readers.push_back(new BufferIOReader(reader[i]));
   }
 
   lastValidOff = 0;
   crc32 = 0;
 }
 
-decoder::~decoder() {
-
+Decoder::~Decoder() {
+  uint32_t i;
+  for (i = 0; i < readers.size(); ++i) {
+    delete readers[i];
+  }
 }
 
-decoder* 
-newDecoder(const vector<IOBuffer*>& buffer) {
-  return new decoder(buffer);
+Decoder* 
+newDecoder(const vector<IOReader*>& reader) {
+  return new Decoder(reader);
 }
 
 };  // namespace libraft

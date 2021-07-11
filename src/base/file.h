@@ -12,7 +12,6 @@ using namespace std;
 
 namespace libraft {
 
-
 class File {
 public:
   File(const string& path);

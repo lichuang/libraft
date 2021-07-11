@@ -74,7 +74,7 @@ TEST(recordTests, TestReadRecord) {
     tmp& tt = tests[i];
     Record record;
     vector<IOBuffer*> buf = {newMemoryBufferWithString(tt.data)};
-    decoder* dec = newDecoder(buf);
+    Decoder* dec = newDecoder(buf);
     int err = dec->decode(&record);
     
     ASSERT_EQ(err, tt.we) << "i:" << i << tt.data.length();

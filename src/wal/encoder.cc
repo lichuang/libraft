@@ -8,7 +8,7 @@
 
 namespace libraft {
 
-encoder* 
+encoder*
 newEncoder(File* file, uint32_t prevCrc, int32_t pageOffset) {
   encoder* ec = new encoder();
   return ec;

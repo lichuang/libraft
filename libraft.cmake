@@ -15,6 +15,8 @@ set(libraft_files
   src/core/raft.cc 
   src/core/read_only.cc 
 
+  src/io/buffer_io_reader.cc
+
   src/storage/log.cc    
   src/storage/memory_storage.cc      
   src/storage/unstable_log.cc 

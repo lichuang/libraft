@@ -14,10 +14,11 @@ using namespace walpb;
 
 namespace libraft {
 
-class IOBuffer;
+class BufferIOReader;
+class IOReader;
 
-struct decoder {
-  vector<IOBuffer*> io_buffers;
+struct Decoder {
+  vector<BufferIOReader*> readers;
 
   // lastValidOff file offset following the last valid decoded record
   int64_t lastValidOff;
@@ -26,8 +27,8 @@ struct decoder {
 
   Locker locker;
 
-  decoder(const vector<IOBuffer*>& buffer);
-  ~decoder();
+  Decoder(const vector<IOReader*>& reader);
+  ~Decoder();
 
   int decode(Record* rec);
   int decodeRecord(Record* rec);
@@ -38,8 +39,8 @@ struct decoder {
   bool isTornEntry(const char* data, uint32_t len);
 };
 
-//extern decoder* newDecoder();
-extern decoder* newDecoder(const vector<IOBuffer*>& buffer);
+//extern Decoder* newDecoder();
+extern Decoder* newDecoder(const vector<IOReader*>& reader);
 
 }; // namespace libraft
 
