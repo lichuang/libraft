@@ -391,8 +391,9 @@ raft::reset(uint64_t term) {
     }
   }
   pendingConf_ = false;
+  ReadOnlyOption option = readOnly_->option_;
   delete readOnly_;
-  readOnly_ = new readOnly(readOnly_->option_);
+  readOnly_ = new readOnly(option);
 }
 
 void
